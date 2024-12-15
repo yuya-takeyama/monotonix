@@ -8,10 +8,17 @@ describe('run function', () => {
       docker_build: {
         aws: {
           identities: {
-            'some-registry': 'some-identity',
+            'some-registry': {
+              iam_role: 'some-identity',
+              region: 'some-region',
+            },
           },
           registries: {
-            'some-registry': 'some-registry-url',
+            'some-registry': {
+              identity: 'some-identity',
+              region: 'some-region',
+              repository_base: 'some-repository-base',
+            },
           },
         },
       },
@@ -68,8 +75,15 @@ describe('run function', () => {
           config: {
             environment_type: 'aws',
             aws: {
-              identity: 'some-identity',
-              registry: 'some-registry-url',
+              identity: {
+                iam_role: 'some-identity',
+                region: 'some-region',
+              },
+              registry: {
+                identity: 'some-identity',
+                region: 'some-region',
+                repository_base: 'some-repository-base',
+              },
             },
             tagging: 'semver_datetime',
             platforms: ['linux/amd64'],

@@ -4,8 +4,19 @@ export const GlobalConfigSchema = z.object({
   loaders: z.object({
     docker_build: z.object({
       aws: z.object({
-        identities: z.record(z.any()),
-        registries: z.record(z.any()),
+        identities: z.record(
+          z.object({
+            iam_role: z.string(),
+            region: z.string(),
+          }),
+        ),
+        registries: z.record(
+          z.object({
+            identity: z.string(),
+            region: z.string(),
+            repository_base: z.string(),
+          }),
+        ),
       }),
     }),
   }),
