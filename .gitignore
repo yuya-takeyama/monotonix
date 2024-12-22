@@ -89,7 +89,7 @@ out
 
 # Nuxt.js build / generate output
 .nuxt
-dist/*
+**/dist/*
 
 # GitHub Actions
 !actions/*/dist/index.js
