@@ -6,18 +6,21 @@ describe('run function', () => {
   const stubGlobalConfig: GlobalConfig = {
     loaders: {
       docker_build: {
-        aws: {
-          identities: {
-            'some-registry': {
-              iam_role: 'some-identity',
-              region: 'some-region',
+        environment: {
+          type: 'aws',
+          aws: {
+            identities: {
+              'some-registry': {
+                iam_role: 'some-identity',
+                region: 'some-region',
+              },
             },
-          },
-          registries: {
-            'some-registry': {
-              identity: 'some-identity',
-              region: 'some-region',
-              repository_base: 'some-repository-base',
+            registries: {
+              'some-registry': {
+                identity: 'some-identity',
+                region: 'some-region',
+                repository_base: 'some-repository-base',
+              },
             },
           },
         },
@@ -35,13 +38,15 @@ describe('run function', () => {
         },
         loader: 'docker_build',
         docker_build: {
-          environment_type: 'aws',
-          aws: {
-            identity: 'some-identity',
-            registry: 'some-registry',
+          environment: {
+            type: 'aws',
+            aws: {
+              identity: 'some-identity',
+              registry: 'some-registry',
+            },
           },
-          tagging: 'semver_datetime',
-          platforms: ['linux/amd64'],
+          tagging: 'always_latest',
+          platforms: ['linux/amd64', 'linux/arm64'],
         },
       },
     ],
@@ -57,13 +62,18 @@ describe('run function', () => {
   } as any;
 
   it('should return build parameters', () => {
-    const localConfigs = [{ path: '/path/to/config', config: stubLocalConfig }];
+    const localConfigs = [
+      {
+        path: '/path/to/app/monotonix.yaml',
+        config: stubLocalConfig,
+      },
+    ];
 
     const result = run(stubGlobalConfig, localConfigs, stubContext);
 
     expect(result).toEqual([
       {
-        path: '/path/to',
+        path: '/path/to/app',
         committed_at:
           new Date(stubContext.payload.head_commit.timestamp).getTime() / 1000,
         event: {
@@ -73,20 +83,21 @@ describe('run function', () => {
         job: {
           loader: 'docker_build',
           config: {
-            environment_type: 'aws',
-            aws: {
-              identity: {
-                iam_role: 'some-identity',
-                region: 'some-region',
-              },
-              registry: {
-                identity: 'some-identity',
-                region: 'some-region',
-                repository_base: 'some-repository-base',
+            environment: {
+              type: 'aws',
+              aws: {
+                identity: {
+                  iam_role: 'some-identity',
+                  region: 'some-region',
+                },
+                registry: {
+                  type: 'private',
+                },
               },
             },
-            tagging: 'semver_datetime',
-            platforms: ['linux/amd64'],
+            context: '/path/to/app',
+            tags: ['some-repository-base/path/to/app:latest'],
+            platforms: ['linux/amd64', 'linux/arm64'],
           },
         },
         keys: [
@@ -95,8 +106,8 @@ describe('run function', () => {
           ['event_ref', stubContext.ref],
           ['environment_type', 'aws'],
           ['registry', 'some-registry'],
-          ['tagging', 'semver_datetime'],
-          ['platforms', ['linux/amd64']],
+          ['tagging', 'always_latest'],
+          ['platforms', 'linux/amd64,linux/arm64'],
         ],
       },
     ]);

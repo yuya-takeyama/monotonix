@@ -10,7 +10,7 @@ try {
   const localConfigFileName =
     getInput('local-config-file-name') || 'monotonix.yaml';
 
-  const globalConfig = loadGlobalConfig(rootDir, globalConfigFilePath);
+  const globalConfig = loadGlobalConfig(globalConfigFilePath);
   const localConfigs = loadLocalConfigs(rootDir, localConfigFileName);
 
   const buildParams = run(globalConfig, localConfigs, context);

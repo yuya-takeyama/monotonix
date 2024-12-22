@@ -1,16 +1,19 @@
 import { dirname } from 'path';
 import { getCommittedAt } from './utils';
-import { GlobalConfig, LocalConfig } from './schemas';
+import { GlobalConfig, LocalConfig, JobConfigParameter } from './schemas';
 import { Context } from '@actions/github/lib/context';
+import { join } from 'path';
+import { DateTime } from 'luxon';
 
 export function run(
   globalConfig: GlobalConfig,
   localConfigs: { path: string; config: LocalConfig }[],
   context: Context,
-) {
+): JobConfigParameter[] {
   return localConfigs.flatMap(
     ({ path: localConfigPath, config: localConfig }) => {
       const appDir = dirname(localConfigPath);
+      const committedAt = getCommittedAt(context);
 
       return localConfig.jobs
         .filter(job => job.loader === 'docker_build')
@@ -24,18 +27,19 @@ export function run(
           job: {
             loader: 'docker_build',
             config: {
-              environment_type: 'aws',
-              aws: {
-                identity:
-                  globalConfig.loaders.docker_build.aws.identities[
-                    job.docker_build.aws.registry
-                  ],
-                registry:
-                  globalConfig.loaders.docker_build.aws.registries[
-                    job.docker_build.aws.registry
-                  ],
+              environment: {
+                type: 'aws',
+                aws: {
+                  identity:
+                    globalConfig.loaders.docker_build.environment.aws
+                      .identities[job.docker_build.environment.aws.registry],
+                  registry: {
+                    type: 'private',
+                  },
+                },
               },
-              tagging: job.docker_build.tagging,
+              context: appDir,
+              tags: generateTags(appDir, committedAt, globalConfig, job),
               platforms: job.docker_build.platforms,
             },
           },
@@ -43,12 +47,50 @@ export function run(
             ['loader', 'docker_build'],
             ['event_type', 'push'],
             ['event_ref', context.ref],
-            ['environment_type', job.docker_build.environment_type],
-            ['registry', job.docker_build.aws.registry],
+            ['environment_type', job.docker_build.environment.type],
+            ['registry', job.docker_build.environment.aws.registry],
             ['tagging', job.docker_build.tagging],
-            ['platforms', job.docker_build.platforms],
+            ['platforms', job.docker_build.platforms.join(',')],
           ],
         }));
     },
   );
+}
+
+function generateTags(
+  appDir: string,
+  committedAt: number,
+  globalConfig: GlobalConfig,
+  localConfigJob: LocalConfig['jobs'][number],
+): string[] {
+  const environment = localConfigJob.docker_build.environment;
+
+  if (environment.type === 'aws') {
+    const registry =
+      globalConfig.loaders.docker_build.environment.aws.registries[
+        localConfigJob.docker_build.environment.aws.registry
+      ];
+
+    switch (localConfigJob.docker_build.tagging) {
+      case 'always_latest':
+        return [`${join(registry.repository_base, appDir)}:latest`];
+      case 'semver_datetime':
+        return [
+          `${join(
+            registry.repository_base,
+            appDir,
+          )}:${generateSemverDatetimeTag(committedAt)}`,
+        ];
+      default:
+        throw new Error(
+          `Unsupported tagging: ${localConfigJob.docker_build.tagging}`,
+        );
+    }
+  }
+
+  throw new Error(`Unsupported environment: ${environment.type}`);
+}
+
+function generateSemverDatetimeTag(committedAt: number): string {
+  return `0.0.${DateTime.fromSeconds(committedAt).toFormat('yyyyMMddHHmmss')}`;
 }

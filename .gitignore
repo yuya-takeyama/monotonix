@@ -91,6 +91,12 @@ out
 .nuxt
 dist
 
+# GitHub Actions
+!actions/*/dist/index.jp
+!actions/*/dist/index.jp.map
+!actions/*/dist/licenses.txt
+!actions/*/dist/sourcemap-register.js
+
 # Gatsby files
 .cache/
 # Comment in the public line in if your project uses Gatsby and not Next.js
