@@ -89,11 +89,11 @@ out
 
 # Nuxt.js build / generate output
 .nuxt
-dist
+dist/*
 
 # GitHub Actions
-!actions/*/dist/index.jp
-!actions/*/dist/index.jp.map
+!actions/*/dist/index.js
+!actions/*/dist/index.js.map
 !actions/*/dist/licenses.txt
 !actions/*/dist/sourcemap-register.js
 
