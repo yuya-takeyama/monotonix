@@ -29,6 +29,9 @@ describe('run function', () => {
   };
 
   const stubLocalConfig: LocalConfig = {
+    metadata: {
+      name: 'hello-world',
+    },
     jobs: [
       {
         on: {
@@ -96,7 +99,7 @@ describe('run function', () => {
               },
             },
             context: '/path/to/app',
-            tags: 'some-repository-base/path/to/app:latest',
+            tags: 'some-repository-base/hello-world:latest',
             platforms: 'linux/amd64,linux/arm64',
           },
         },

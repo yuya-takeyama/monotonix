@@ -46554,7 +46554,13 @@ function run(globalConfig, localConfigs, context) {
                         },
                     },
                     context: appDir,
-                    tags: generateTags(appDir, committedAt, globalConfig, job).join(','),
+                    tags: generateTags({
+                        appDir,
+                        committedAt,
+                        globalConfig,
+                        localConfigMetadata: localConfig.metadata,
+                        localConfigJob: job,
+                    }).join(','),
                     platforms: job.docker_build.platforms.join(','),
                 },
             },
@@ -46570,16 +46576,18 @@ function run(globalConfig, localConfigs, context) {
         }));
     });
 }
-function generateTags(appDir, committedAt, globalConfig, localConfigJob) {
+function generateTags({ committedAt, globalConfig, localConfigMetadata, localConfigJob, }) {
     const environment = localConfigJob.docker_build.environment;
     if (environment.type === 'aws') {
         const registry = globalConfig.loaders.docker_build.environment.aws.registries[localConfigJob.docker_build.environment.aws.registry];
         switch (localConfigJob.docker_build.tagging) {
             case 'always_latest':
-                return [`${(0, path_2.join)(registry.repository_base, appDir)}:latest`];
+                return [
+                    `${(0, path_2.join)(registry.repository_base, localConfigMetadata.name)}:latest`,
+                ];
             case 'semver_datetime':
                 return [
-                    `${(0, path_2.join)(registry.repository_base, appDir)}:${generateSemverDatetimeTag(committedAt)}`,
+                    `${(0, path_2.join)(registry.repository_base, localConfigMetadata.name)}:${generateSemverDatetimeTag(committedAt)}`,
                 ];
             default:
                 throw new Error(`Unsupported tagging: ${localConfigJob.docker_build.tagging}`);
@@ -46624,6 +46632,9 @@ exports.GlobalConfigSchema = zod_1.z.object({
     }),
 });
 exports.LocalConfigSchema = zod_1.z.object({
+    metadata: zod_1.z.object({
+        name: zod_1.z.string(),
+    }),
     jobs: zod_1.z.array(zod_1.z.object({
         on: zod_1.z.object({
             push: zod_1.z.object({

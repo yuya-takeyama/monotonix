@@ -29,6 +29,9 @@ export const GlobalConfigSchema = z.object({
 });
 
 export const LocalConfigSchema = z.object({
+  metadata: z.object({
+    name: z.string(),
+  }),
   jobs: z.array(
     z.object({
       on: z.object({

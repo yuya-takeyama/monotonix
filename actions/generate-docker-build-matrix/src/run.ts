@@ -39,9 +39,13 @@ export function run(
                 },
               },
               context: appDir,
-              tags: generateTags(appDir, committedAt, globalConfig, job).join(
-                ',',
-              ),
+              tags: generateTags({
+                appDir,
+                committedAt,
+                globalConfig,
+                localConfigMetadata: localConfig.metadata,
+                localConfigJob: job,
+              }).join(','),
               platforms: job.docker_build.platforms.join(','),
             },
           },
@@ -59,12 +63,19 @@ export function run(
   );
 }
 
-function generateTags(
-  appDir: string,
-  committedAt: number,
-  globalConfig: GlobalConfig,
-  localConfigJob: LocalConfig['jobs'][number],
-): string[] {
+type generateTagsType = {
+  appDir: string;
+  committedAt: number;
+  globalConfig: GlobalConfig;
+  localConfigMetadata: LocalConfig['metadata'];
+  localConfigJob: LocalConfig['jobs'][number];
+};
+function generateTags({
+  committedAt,
+  globalConfig,
+  localConfigMetadata,
+  localConfigJob,
+}: generateTagsType): string[] {
   const environment = localConfigJob.docker_build.environment;
 
   if (environment.type === 'aws') {
@@ -75,12 +86,14 @@ function generateTags(
 
     switch (localConfigJob.docker_build.tagging) {
       case 'always_latest':
-        return [`${join(registry.repository_base, appDir)}:latest`];
+        return [
+          `${join(registry.repository_base, localConfigMetadata.name)}:latest`,
+        ];
       case 'semver_datetime':
         return [
           `${join(
             registry.repository_base,
-            appDir,
+            localConfigMetadata.name,
           )}:${generateSemverDatetimeTag(committedAt)}`,
         ];
       default:
