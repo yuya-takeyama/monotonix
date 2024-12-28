@@ -1,0 +1,9 @@
+{
+  "name": "monotonix",
+  "private": true,
+  "license": "MIT",
+  "workspaces": [
+    "actions/*",
+    "packages/*"
+  ]
+}

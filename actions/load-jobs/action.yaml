@@ -1,0 +1,16 @@
+name: 'Load monotonix jobs'
+description: 'Load and filter monotonix jobs from local configurations files'
+author: 'Yuya Takeyama'
+
+inputs:
+  root-dir:
+    description: 'Root directory'
+    required: true
+
+outputs:
+  jobs:
+    description: 'Jobs'
+
+runs:
+  using: 'node20'
+  main: 'dist/index.js'

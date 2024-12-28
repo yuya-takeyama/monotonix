@@ -28,32 +28,31 @@ export const GlobalConfigSchema = z.object({
   }),
 });
 
+const LocalConfigJobSchema = z.object({
+  on: z.object({
+    push: z.object({
+      branches: z.array(z.string()),
+    }),
+  }),
+  loader: z.string(),
+  docker_build: z.object({
+    environment: z.object({
+      type: z.literal('aws'),
+      aws: z.object({
+        identity: z.string(),
+        registry: z.string(),
+      }),
+    }),
+    tagging: z.enum(['semver_datetime', 'always_latest']),
+    platforms: z.array(z.string()).default(['linux/amd64']),
+  }),
+});
+
 export const LocalConfigSchema = z.object({
   metadata: z.object({
     name: z.string(),
   }),
-  jobs: z.record(
-    z.string(),
-    z.object({
-      on: z.object({
-        push: z.object({
-          branches: z.array(z.string()),
-        }),
-      }),
-      loader: z.string(),
-      docker_build: z.object({
-        environment: z.object({
-          type: z.literal('aws'),
-          aws: z.object({
-            identity: z.string(),
-            registry: z.string(),
-          }),
-        }),
-        tagging: z.enum(['semver_datetime', 'always_latest']),
-        platforms: z.array(z.string()).default(['linux/amd64']),
-      }),
-    }),
-  ),
+  jobs: z.record(z.string(), LocalConfigJobSchema),
 });
 
 export const JobConfigParameterSchema = z.object({
