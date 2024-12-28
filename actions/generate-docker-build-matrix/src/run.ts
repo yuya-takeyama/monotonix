@@ -39,8 +39,10 @@ export function run(
                 },
               },
               context: appDir,
-              tags: generateTags(appDir, committedAt, globalConfig, job),
-              platforms: job.docker_build.platforms,
+              tags: generateTags(appDir, committedAt, globalConfig, job).join(
+                ',',
+              ),
+              platforms: job.docker_build.platforms.join(','),
             },
           },
           keys: [

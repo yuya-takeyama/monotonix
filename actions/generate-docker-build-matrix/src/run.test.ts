@@ -96,8 +96,8 @@ describe('run function', () => {
               },
             },
             context: '/path/to/app',
-            tags: ['some-repository-base/path/to/app:latest'],
-            platforms: ['linux/amd64', 'linux/arm64'],
+            tags: 'some-repository-base/path/to/app:latest',
+            platforms: 'linux/amd64,linux/arm64',
           },
         },
         keys: [
