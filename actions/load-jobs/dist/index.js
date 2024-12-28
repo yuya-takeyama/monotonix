@@ -38831,9 +38831,11 @@ const PushEventScema = zod_1.z.object({
     }),
 });
 const PullRequestEventSchema = zod_1.z.object({
-    pull_request: zod_1.z.object({
+    pull_request: zod_1.z
+        .object({
         branches: zod_1.z.array(zod_1.z.string()).optional(),
-    }),
+    })
+        .optional(),
 });
 exports.LocalConfigSchema = zod_1.z.object({
     app: zod_1.z.object({
@@ -38864,12 +38866,22 @@ function filterJobsByGitHubContext(jobs, context) {
     return jobs.filter(job => {
         switch (context.eventName) {
             case 'push':
-                if (job.on.push && job.on.push.branches) {
-                    return job.on.push.branches.some(branch => (0, minimatch_1.minimatch)(context.ref, branch));
+                if (job.on.push) {
+                    if (job.on.push.branches) {
+                        return job.on.push.branches.some(branch => (0, minimatch_1.minimatch)(context.ref, branch));
+                    }
+                    else {
+                        return true;
+                    }
                 }
             case 'pull_request':
-                if (job.on.pull_request && job.on.pull_request.branches) {
-                    return job.on.pull_request.branches.some(branch => (0, minimatch_1.minimatch)(context.ref, branch));
+                if (job.on.pull_request) {
+                    if (job.on.pull_request.branches) {
+                        return job.on.pull_request.branches.some(branch => (0, minimatch_1.minimatch)(context.ref, branch));
+                    }
+                    else {
+                        return true;
+                    }
                 }
             default:
                 throw new Error(`Unsupported event: ${context.eventName}`);

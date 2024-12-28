@@ -12,9 +12,11 @@ const PushEventScema = z.object({
 });
 
 const PullRequestEventSchema = z.object({
-  pull_request: z.object({
-    branches: z.array(z.string()).optional(),
-  }),
+  pull_request: z
+    .object({
+      branches: z.array(z.string()).optional(),
+    })
+    .optional(),
 });
 
 export const LocalConfigSchema = z.object({
