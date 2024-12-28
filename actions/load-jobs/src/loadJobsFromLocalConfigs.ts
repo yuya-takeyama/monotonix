@@ -1,6 +1,7 @@
 import { LocalConfigSchema, Job } from '@monotonix/schema';
 import { load } from 'js-yaml';
-import { globSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
+import { globSync } from 'glob';
 import { join } from 'node:path';
 
 export function loadJobsFromLocalConfigs(
