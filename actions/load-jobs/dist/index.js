@@ -38874,9 +38874,8 @@ function filterJobsByGitHubContext(jobs, context) {
             case 'push':
                 if (job.on.push) {
                     if (job.on.push.branches) {
-                        const result = job.on.push.branches.some(branch => 
-                        // @ts-ignore
-                        (0, minimatch_1.minimatch)(context.ref_name, branch));
+                        const branchName = context.ref.replace(/^refs\/heads\//, '');
+                        const result = job.on.push.branches.some(branch => (0, minimatch_1.minimatch)(branchName, branch));
                         if (result) {
                             return true;
                         }
