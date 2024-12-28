@@ -46531,7 +46531,7 @@ function run(globalConfig, localConfigs, context) {
     return localConfigs.flatMap(({ path: localConfigPath, config: localConfig }) => {
         const appDir = (0, path_1.dirname)(localConfigPath);
         const committedAt = (0, utils_1.getCommittedAt)(context);
-        return localConfig.jobs
+        return Object.values(localConfig.jobs)
             .filter(job => job.loader === 'docker_build')
             .map(job => ({
             path: appDir,
@@ -46635,7 +46635,7 @@ exports.LocalConfigSchema = zod_1.z.object({
     metadata: zod_1.z.object({
         name: zod_1.z.string(),
     }),
-    jobs: zod_1.z.array(zod_1.z.object({
+    jobs: zod_1.z.record(zod_1.z.string(), zod_1.z.object({
         on: zod_1.z.object({
             push: zod_1.z.object({
                 branches: zod_1.z.array(zod_1.z.string()),
