@@ -36,8 +36,7 @@ export function filterJobsByGitHubContext(
           }
         }
 
-      default:
-        throw new Error(`Unsupported event: ${context.eventName}`);
+        return false;
     }
   });
 }

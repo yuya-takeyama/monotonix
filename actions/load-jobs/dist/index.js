@@ -38893,8 +38893,7 @@ function filterJobsByGitHubContext(jobs, context) {
                         return true;
                     }
                 }
-            default:
-                throw new Error(`Unsupported event: ${context.eventName}`);
+                return false;
         }
     });
 }
