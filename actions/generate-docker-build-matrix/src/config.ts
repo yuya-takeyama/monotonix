@@ -2,7 +2,7 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import { load } from 'js-yaml';
 import { GlobalConfigSchema, LocalConfigSchema } from './schemas';
-import glob from 'glob';
+import { globSync } from 'glob';
 import { info } from '@actions/core';
 
 export function loadGlobalConfig(globalConfigFilePath: string) {
@@ -12,7 +12,7 @@ export function loadGlobalConfig(globalConfigFilePath: string) {
 
 export function loadLocalConfigs(rootDir: string, localConfigFileName: string) {
   const pattern = join(rootDir, '**', localConfigFileName);
-  const localConfigPaths = glob.sync(pattern);
+  const localConfigPaths = globSync(pattern);
   return localConfigPaths
     .map(localConfigPath => {
       try {

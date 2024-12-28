@@ -46475,13 +46475,10 @@ exports.NEVER = parseUtil_1.INVALID;
 /***/ }),
 
 /***/ 2973:
-/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
 
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.loadGlobalConfig = loadGlobalConfig;
 exports.loadLocalConfigs = loadLocalConfigs;
@@ -46489,7 +46486,7 @@ const fs_1 = __nccwpck_require__(9896);
 const path_1 = __nccwpck_require__(6928);
 const js_yaml_1 = __nccwpck_require__(4281);
 const schemas_1 = __nccwpck_require__(9011);
-const glob_1 = __importDefault(__nccwpck_require__(1363));
+const glob_1 = __nccwpck_require__(1363);
 const core_1 = __nccwpck_require__(7484);
 function loadGlobalConfig(globalConfigFilePath) {
     const globalConfigContent = (0, fs_1.readFileSync)(globalConfigFilePath, 'utf-8');
@@ -46497,7 +46494,7 @@ function loadGlobalConfig(globalConfigFilePath) {
 }
 function loadLocalConfigs(rootDir, localConfigFileName) {
     const pattern = (0, path_1.join)(rootDir, '**', localConfigFileName);
-    const localConfigPaths = glob_1.default.sync(pattern);
+    const localConfigPaths = (0, glob_1.globSync)(pattern);
     return localConfigPaths
         .map(localConfigPath => {
         try {
