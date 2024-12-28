@@ -32,7 +32,8 @@ export const LocalConfigSchema = z.object({
   metadata: z.object({
     name: z.string(),
   }),
-  jobs: z.array(
+  jobs: z.record(
+    z.string(),
     z.object({
       on: z.object({
         push: z.object({

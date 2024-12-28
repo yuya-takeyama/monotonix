@@ -32,8 +32,8 @@ describe('run function', () => {
     metadata: {
       name: 'hello-world',
     },
-    jobs: [
-      {
+    jobs: {
+      main: {
         on: {
           push: {
             branches: ['main'],
@@ -52,7 +52,7 @@ describe('run function', () => {
           platforms: ['linux/amd64', 'linux/arm64'],
         },
       },
-    ],
+    },
   };
 
   const stubContext: Context = {

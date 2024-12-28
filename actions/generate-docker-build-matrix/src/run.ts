@@ -15,7 +15,7 @@ export function run(
       const appDir = dirname(localConfigPath);
       const committedAt = getCommittedAt(context);
 
-      return localConfig.jobs
+      return Object.values(localConfig.jobs)
         .filter(job => job.loader === 'docker_build')
         .map(job => ({
           path: appDir,
