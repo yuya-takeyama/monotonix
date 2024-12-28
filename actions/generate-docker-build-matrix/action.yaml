@@ -6,7 +6,7 @@ inputs:
   root-dir:
     description: 'Root directory'
     required: true
-  global-config-file:
+  global-config-file-path:
     description: 'Global configuration file'
     required: true
   datetime-tag-timezone:
