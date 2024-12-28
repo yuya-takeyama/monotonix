@@ -38825,17 +38825,21 @@ exports.GlobalConfigSchema = zod_1.z.object({
     loaders: zod_1.z.record(zod_1.z.object({}).passthrough()),
 });
 const PushEventScema = zod_1.z.object({
-    push: zod_1.z.object({
+    push: zod_1.z
+        .object({
         branches: zod_1.z.array(zod_1.z.string()).optional(),
         tags: zod_1.z.array(zod_1.z.string()).optional(),
-    }),
+    })
+        .optional()
+        .nullable(),
 });
 const PullRequestEventSchema = zod_1.z.object({
     pull_request: zod_1.z
         .object({
         branches: zod_1.z.array(zod_1.z.string()).optional(),
     })
-        .optional(),
+        .optional()
+        .nullable(),
 });
 exports.LocalConfigSchema = zod_1.z.object({
     app: zod_1.z.object({

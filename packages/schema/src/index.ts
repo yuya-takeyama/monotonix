@@ -5,10 +5,13 @@ export const GlobalConfigSchema = z.object({
 });
 
 const PushEventScema = z.object({
-  push: z.object({
-    branches: z.array(z.string()).optional(),
-    tags: z.array(z.string()).optional(),
-  }),
+  push: z
+    .object({
+      branches: z.array(z.string()).optional(),
+      tags: z.array(z.string()).optional(),
+    })
+    .optional()
+    .nullable(),
 });
 
 const PullRequestEventSchema = z.object({
@@ -16,7 +19,8 @@ const PullRequestEventSchema = z.object({
     .object({
       branches: z.array(z.string()).optional(),
     })
-    .optional(),
+    .optional()
+    .nullable(),
 });
 
 export const LocalConfigSchema = z.object({
