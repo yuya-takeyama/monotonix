@@ -23,9 +23,8 @@ export function loadLocalConfigs(rootDir: string, localConfigFileName: string) {
           config: LocalConfigSchema.parse(load(localConfigContent)),
         };
       } catch (err) {
-        throw new Error(
-          `Failed to load local config ${localConfigPath}: ${err}`,
-        );
+        info(`Failed to load local config ${localConfigPath}: ${err}`);
+        return false;
       }
     })
     .filter(r => r !== false);
