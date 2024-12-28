@@ -38867,12 +38867,16 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.filterJobsByGitHubContext = filterJobsByGitHubContext;
 const minimatch_1 = __nccwpck_require__(8286);
 function filterJobsByGitHubContext(jobs, context) {
+    console.log('CONTEXT:');
+    console.log(JSON.stringify(context, null, 2));
     return jobs.filter(job => {
         switch (context.eventName) {
             case 'push':
                 if (job.on.push) {
                     if (job.on.push.branches) {
-                        const result = job.on.push.branches.some(branch => (0, minimatch_1.minimatch)(context.ref, branch));
+                        const result = job.on.push.branches.some(branch => 
+                        // @ts-ignore
+                        (0, minimatch_1.minimatch)(context.ref_name, branch));
                         if (result) {
                             return true;
                         }
@@ -38884,7 +38888,9 @@ function filterJobsByGitHubContext(jobs, context) {
             case 'pull_request':
                 if (job.on.pull_request) {
                     if (job.on.pull_request.branches) {
-                        const result = job.on.pull_request.branches.some(branch => (0, minimatch_1.minimatch)(context.ref, branch));
+                        const result = job.on.pull_request.branches.some(branch => 
+                        // @ts-ignore
+                        (0, minimatch_1.minimatch)(context.ref_name, branch));
                         if (result) {
                             return true;
                         }
