@@ -38872,7 +38872,10 @@ function filterJobsByGitHubContext(jobs, context) {
             case 'push':
                 if (job.on.push) {
                     if (job.on.push.branches) {
-                        return job.on.push.branches.some(branch => (0, minimatch_1.minimatch)(context.ref, branch));
+                        const result = job.on.push.branches.some(branch => (0, minimatch_1.minimatch)(context.ref, branch));
+                        if (result) {
+                            return true;
+                        }
                     }
                     else {
                         return true;
@@ -38881,7 +38884,10 @@ function filterJobsByGitHubContext(jobs, context) {
             case 'pull_request':
                 if (job.on.pull_request) {
                     if (job.on.pull_request.branches) {
-                        return job.on.pull_request.branches.some(branch => (0, minimatch_1.minimatch)(context.ref, branch));
+                        const result = job.on.pull_request.branches.some(branch => (0, minimatch_1.minimatch)(context.ref, branch));
+                        if (result) {
+                            return true;
+                        }
                     }
                     else {
                         return true;

@@ -11,9 +11,12 @@ export function filterJobsByGitHubContext(
       case 'push':
         if (job.on.push) {
           if (job.on.push.branches) {
-            return job.on.push.branches.some(branch =>
+            const result = job.on.push.branches.some(branch =>
               minimatch(context.ref, branch),
             );
+            if (result) {
+              return true;
+            }
           } else {
             return true;
           }
@@ -22,9 +25,12 @@ export function filterJobsByGitHubContext(
       case 'pull_request':
         if (job.on.pull_request) {
           if (job.on.pull_request.branches) {
-            return job.on.pull_request.branches.some(branch =>
+            const result = job.on.pull_request.branches.some(branch =>
               minimatch(context.ref, branch),
             );
+            if (result) {
+              return true;
+            }
           } else {
             return true;
           }
