@@ -38945,19 +38945,20 @@ function loadJobConfigsFromLocalConfigFiles(rootDir, localConfigFileName, contex
     const pattern = (0, node_path_1.join)(rootDir, '**', localConfigFileName);
     const localConfigPaths = (0, glob_1.globSync)(pattern);
     return localConfigPaths.flatMap(localConfigPath => {
+        const appPath = (0, node_path_1.dirname)(localConfigPath);
         try {
             const localConfigContent = (0, node_fs_1.readFileSync)(localConfigPath, 'utf-8');
             const config = schema_1.LocalConfigSchema.parse((0, js_yaml_1.load)(localConfigContent));
             return Object.entries(config.jobs).map(([jobKey, job]) => ({
                 app: config.app,
                 app_context: {
-                    path: localConfigPath,
+                    path: appPath,
                 },
                 on: job.on,
                 type: job.type,
                 config: job.config,
                 keys: [
-                    ['app_path', localConfigPath],
+                    ['app_path', appPath],
                     ['job_key', jobKey],
                     ['job_type', job.type],
                     ['github_ref', context.ref],
