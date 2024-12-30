@@ -1,11 +1,14 @@
 import { Context } from '@actions/github/lib/context';
 import { filterJobsByGitHubContext } from './filterJobsByGitHubContext';
+import { JobConfig } from '@monotonix/schema';
 
 describe('filterJobsByGitHubContext', () => {
-  const pushMainJobConfig = {
+  const pushMainJobConfig: JobConfig = {
     app: {
       name: 'hello-world',
-      path: 'apps/hello-world/monotonix.yaml',
+    },
+    app_context: {
+      path: 'apps/hello-world',
     },
     on: {
       push: {
@@ -13,7 +16,7 @@ describe('filterJobsByGitHubContext', () => {
       },
     },
     config: {
-      loader: 'docker_build',
+      job_type: 'docker_build',
       docker_build: {
         environment: {
           type: 'aws',
@@ -26,29 +29,31 @@ describe('filterJobsByGitHubContext', () => {
         platforms: ['linux/amd64'],
       },
     },
+    keys: [],
   };
-  const pullRequestJobConfig = {
+  const pullRequestJobConfig: JobConfig = {
     app: {
       name: 'hello-world',
-      path: 'apps/hello-world/monotonix.yaml',
+    },
+    app_context: {
+      path: 'apps/hello-world',
     },
     on: {
       pull_request: null,
     },
     config: {
-      loader: 'docker_build',
-      docker_build: {
-        environment: {
-          type: 'aws',
-          aws: {
-            identity: 'dev_main',
-            registry: 'dev_main',
-          },
+      job_type: 'docker_build',
+      platform: {
+        type: 'aws',
+        aws: {
+          identity: 'dev_main',
+          registry: 'dev_main',
         },
-        tagging: 'always_latest',
-        platforms: ['linux/amd64'],
       },
+      tagging: 'always_latest',
+      platforms: ['linux/amd64'],
     },
+    keys: [],
   };
   const stubLocalConfigs = [pushMainJobConfig, pullRequestJobConfig];
 

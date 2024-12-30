@@ -38819,10 +38819,10 @@ exports.NEVER = parseUtil_1.INVALID;
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.LocalConfigSchema = exports.GlobalConfigSchema = void 0;
+exports.JobParam = exports.JobConfigSchema = exports.LocalConfigSchema = exports.GlobalConfigSchema = void 0;
 const zod_1 = __nccwpck_require__(5421);
 exports.GlobalConfigSchema = zod_1.z.object({
-    loaders: zod_1.z.record(zod_1.z.object({}).passthrough()),
+    job_types: zod_1.z.record(zod_1.z.string(), zod_1.z.object({}).passthrough()),
 });
 const PushEventScema = zod_1.z.object({
     push: zod_1.z
@@ -38841,18 +38841,41 @@ const PullRequestEventSchema = zod_1.z.object({
         .optional()
         .nullable(),
 });
+const AppSchema = zod_1.z.object({
+    name: zod_1.z.string(),
+});
+const LocalConfigJobEventSchema = zod_1.z.intersection(PushEventScema, PullRequestEventSchema);
+const LocalConfigJobConfigSchema = zod_1.z
+    .object({
+    job_type: zod_1.z.string(),
+})
+    .passthrough();
 exports.LocalConfigSchema = zod_1.z.object({
     app: zod_1.z.object({
         name: zod_1.z.string(),
     }),
     jobs: zod_1.z.record(zod_1.z.string(), zod_1.z.object({
-        on: zod_1.z.intersection(PushEventScema, PullRequestEventSchema),
-        config: zod_1.z
-            .object({
-            loader: zod_1.z.string(),
-        })
-            .passthrough(),
+        on: LocalConfigJobEventSchema,
+        config: LocalConfigJobConfigSchema,
     })),
+});
+const AppContextSchema = zod_1.z.object({
+    path: zod_1.z.string(),
+});
+const JobTargetKeys = zod_1.z.array(zod_1.z.tuple([zod_1.z.string(), zod_1.z.string()]));
+exports.JobConfigSchema = zod_1.z.object({
+    app: AppSchema,
+    app_context: AppContextSchema,
+    on: LocalConfigJobEventSchema,
+    config: LocalConfigJobConfigSchema,
+    keys: JobTargetKeys,
+});
+exports.JobParam = zod_1.z.object({
+    app: AppSchema,
+    app_context: AppContextSchema,
+    config: LocalConfigJobConfigSchema,
+    param: zod_1.z.record(zod_1.z.string(), zod_1.z.any()),
+    keys: JobTargetKeys,
 });
 
 
@@ -38865,11 +38888,11 @@ exports.LocalConfigSchema = zod_1.z.object({
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.filterJobsByGitHubContext = filterJobsByGitHubContext;
+const schema_1 = __nccwpck_require__(67);
 const minimatch_1 = __nccwpck_require__(8286);
-function filterJobsByGitHubContext(jobs, context) {
-    console.log('CONTEXT:');
-    console.log(JSON.stringify(context, null, 2));
-    return jobs.filter(job => {
+function filterJobsByGitHubContext(jobConfigs, context) {
+    return jobConfigs
+        .filter(job => {
         switch (context.eventName) {
             case 'push':
                 if (job.on.push) {
@@ -38900,7 +38923,8 @@ function filterJobsByGitHubContext(jobs, context) {
                 }
                 return false;
         }
-    });
+    })
+        .map(jobConfig => schema_1.JobConfigSchema.parse(jobConfig));
 }
 
 
@@ -38912,25 +38936,32 @@ function filterJobsByGitHubContext(jobs, context) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.loadJobsFromLocalConfigs = loadJobsFromLocalConfigs;
+exports.loadJobConfigsFromLocalConfigFiles = loadJobConfigsFromLocalConfigFiles;
 const schema_1 = __nccwpck_require__(67);
 const js_yaml_1 = __nccwpck_require__(4148);
 const node_fs_1 = __nccwpck_require__(3024);
 const glob_1 = __nccwpck_require__(2712);
 const node_path_1 = __nccwpck_require__(6760);
-function loadJobsFromLocalConfigs(rootDir, localConfigFileName) {
+function loadJobConfigsFromLocalConfigFiles(rootDir, localConfigFileName, context) {
     const pattern = (0, node_path_1.join)(rootDir, '**', localConfigFileName);
     const localConfigPaths = (0, glob_1.globSync)(pattern);
     return localConfigPaths.flatMap(localConfigPath => {
         try {
             const localConfigContent = (0, node_fs_1.readFileSync)(localConfigPath, 'utf-8');
             const config = schema_1.LocalConfigSchema.parse((0, js_yaml_1.load)(localConfigContent));
-            return Object.values(config.jobs).map(job => ({
-                app: {
-                    ...config.app,
+            return Object.entries(config.jobs).map(([jobKey, job]) => ({
+                app: config.app,
+                app_context: {
                     path: localConfigPath,
                 },
-                ...job,
+                on: job.on,
+                config: job.config,
+                keys: [
+                    ['app_path', localConfigPath],
+                    ['job_key', jobKey],
+                    ['job_type', job.config.job_type],
+                    ['github_ref', context.ref],
+                ],
             }));
         }
         catch (err) {
@@ -38952,12 +38983,8 @@ exports.run = run;
 const filterJobsByGitHubContext_1 = __nccwpck_require__(5881);
 const loadJobsFromLocalConfigs_1 = __nccwpck_require__(1010);
 function run({ rootDir, localConfigFileName, context }) {
-    const jobs = (0, loadJobsFromLocalConfigs_1.loadJobsFromLocalConfigs)(rootDir, localConfigFileName);
-    console.log('JOBS:');
-    console.log(JSON.stringify(jobs, null, 2));
+    const jobs = (0, loadJobsFromLocalConfigs_1.loadJobConfigsFromLocalConfigFiles)(rootDir, localConfigFileName, context);
     const filteredJobs = (0, filterJobsByGitHubContext_1.filterJobsByGitHubContext)(jobs, context);
-    console.log('FILTERED JOBS:');
-    console.log(JSON.stringify(filteredJobs, null, 2));
     return filteredJobs;
 }
 
@@ -48812,7 +48839,7 @@ try {
     const rootDir = (0, core_1.getInput)('root-dir');
     const localConfigFileName = (0, core_1.getInput)('local-config-file-name') || 'monotonix.yaml';
     const jobs = (0, run_1.run)({ rootDir, localConfigFileName, context: github_1.context });
-    (0, core_1.setOutput)('jobs', JSON.stringify(jobs));
+    (0, core_1.setOutput)('job-configs', JSON.stringify(jobs));
 }
 catch (error) {
     console.error(error);

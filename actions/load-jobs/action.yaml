@@ -1,5 +1,5 @@
-name: 'Load monotonix jobs'
-description: 'Load and filter monotonix jobs from local configurations files'
+name: 'Load Job Configs'
+description: 'Load and filter Job Configs from Local Config Files'
 author: 'Yuya Takeyama'
 
 inputs:
@@ -8,8 +8,8 @@ inputs:
     required: true
 
 outputs:
-  jobs:
-    description: 'Jobs'
+  job-configs:
+    description: 'Job Configs'
 
 runs:
   using: 'node20'

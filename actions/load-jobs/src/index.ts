@@ -9,7 +9,7 @@ try {
 
   const jobs = run({ rootDir, localConfigFileName, context });
 
-  setOutput('jobs', JSON.stringify(jobs));
+  setOutput('job-configs', JSON.stringify(jobs));
 } catch (error) {
   console.error(error);
   setFailed(`Action failed with error: ${error}`);
