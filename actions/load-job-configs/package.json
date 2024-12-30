@@ -1,5 +1,5 @@
 {
-  "name": "@monotonix/load-jobs",
+  "name": "@monotonix/load-job-configs",
   "scripts": {
     "build": "npx tsc",
     "ci-test": "npx jest",
