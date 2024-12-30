@@ -34,23 +34,19 @@ const LocalConfigJobEventSchema = z.intersection(
   PullRequestEventSchema,
 );
 
-const LocalConfigJobConfigSchema = z
-  .object({
-    job_type: z.string(),
-  })
-  .passthrough();
+const LocalConfigJobConfigSchema = z.object({}).passthrough();
+
+const LocalConfigJobSchema = z.object({
+  on: LocalConfigJobEventSchema,
+  type: z.string(),
+  config: LocalConfigJobConfigSchema,
+});
 
 export const LocalConfigSchema = z.object({
   app: z.object({
     name: z.string(),
   }),
-  jobs: z.record(
-    z.string(),
-    z.object({
-      on: LocalConfigJobEventSchema,
-      config: LocalConfigJobConfigSchema,
-    }),
-  ),
+  jobs: z.record(z.string(), LocalConfigJobSchema),
 });
 
 const AppContextSchema = z.object({
@@ -65,6 +61,7 @@ export const JobConfigSchema = z.object({
   app: AppSchema,
   app_context: AppContextSchema,
   on: LocalConfigJobEventSchema,
+  type: z.string(),
   config: LocalConfigJobConfigSchema,
   keys: JobTargetKeys,
 });
