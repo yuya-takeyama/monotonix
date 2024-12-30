@@ -38845,19 +38845,17 @@ const AppSchema = zod_1.z.object({
     name: zod_1.z.string(),
 });
 const LocalConfigJobEventSchema = zod_1.z.intersection(PushEventScema, PullRequestEventSchema);
-const LocalConfigJobConfigSchema = zod_1.z
-    .object({
-    job_type: zod_1.z.string(),
-})
-    .passthrough();
+const LocalConfigJobConfigSchema = zod_1.z.object({}).passthrough();
+const LocalConfigJobSchema = zod_1.z.object({
+    on: LocalConfigJobEventSchema,
+    type: zod_1.z.string(),
+    config: LocalConfigJobConfigSchema,
+});
 exports.LocalConfigSchema = zod_1.z.object({
     app: zod_1.z.object({
         name: zod_1.z.string(),
     }),
-    jobs: zod_1.z.record(zod_1.z.string(), zod_1.z.object({
-        on: LocalConfigJobEventSchema,
-        config: LocalConfigJobConfigSchema,
-    })),
+    jobs: zod_1.z.record(zod_1.z.string(), LocalConfigJobSchema),
 });
 const AppContextSchema = zod_1.z.object({
     path: zod_1.z.string(),
@@ -38867,6 +38865,7 @@ exports.JobConfigSchema = zod_1.z.object({
     app: AppSchema,
     app_context: AppContextSchema,
     on: LocalConfigJobEventSchema,
+    type: zod_1.z.string(),
     config: LocalConfigJobConfigSchema,
     keys: JobTargetKeys,
 });
@@ -38955,11 +38954,12 @@ function loadJobConfigsFromLocalConfigFiles(rootDir, localConfigFileName, contex
                     path: localConfigPath,
                 },
                 on: job.on,
+                type: job.type,
                 config: job.config,
                 keys: [
                     ['app_path', localConfigPath],
                     ['job_key', jobKey],
-                    ['job_type', job.config.job_type],
+                    ['job_type', job.type],
                     ['github_ref', context.ref],
                 ],
             }));

@@ -23,11 +23,12 @@ export function loadJobConfigsFromLocalConfigFiles(
             path: localConfigPath,
           },
           on: job.on,
+          type: job.type,
           config: job.config,
           keys: [
             ['app_path', localConfigPath],
             ['job_key', jobKey],
-            ['job_type', job.config.job_type],
+            ['job_type', job.type],
             ['github_ref', context.ref],
           ],
         }),

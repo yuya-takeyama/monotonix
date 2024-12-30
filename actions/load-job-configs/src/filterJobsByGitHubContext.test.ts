@@ -15,8 +15,8 @@ describe('filterJobsByGitHubContext', () => {
         branches: ['main'],
       },
     },
+    type: 'docker_build',
     config: {
-      job_type: 'docker_build',
       docker_build: {
         environment: {
           type: 'aws',
@@ -41,8 +41,8 @@ describe('filterJobsByGitHubContext', () => {
     on: {
       pull_request: null,
     },
+    type: 'docker_build',
     config: {
-      job_type: 'docker_build',
       platform: {
         type: 'aws',
         aws: {
