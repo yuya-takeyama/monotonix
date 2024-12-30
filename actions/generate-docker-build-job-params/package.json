@@ -1,5 +1,5 @@
 {
-  "name": "@monotonix/generate-docker-build-params",
+  "name": "@monotonix/generate-docker-build-job-params",
   "scripts": {
     "build": "npx tsc",
     "ci-test": "npx jest",

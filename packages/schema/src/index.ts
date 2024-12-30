@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { string, z } from 'zod';
 
 export const GlobalConfigSchema = z.object({
   job_types: z.record(z.string(), z.object({}).passthrough()),
@@ -68,12 +68,13 @@ export const JobConfigSchema = z.object({
 
 export type JobConfig = z.infer<typeof JobConfigSchema>;
 
-export const JobParam = z.object({
+export const JobParamSchema = z.object({
   app: AppSchema,
   app_context: AppContextSchema,
+  type: z.string(),
   config: LocalConfigJobConfigSchema,
   param: z.record(z.string(), z.any()),
   keys: JobTargetKeys,
 });
 
-export type JobParam = z.infer<typeof JobParam>;
+export type JobParam = z.infer<typeof JobParamSchema>;

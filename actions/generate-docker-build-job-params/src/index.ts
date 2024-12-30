@@ -1,18 +1,17 @@
 import { getInput, setFailed, setOutput } from '@actions/core';
 import { context } from '@actions/github';
-import { loadGlobalConfig, loadLocalConfigs } from './config';
+import { loadGlobalConfig } from './config';
 import { run } from './run';
 
 try {
-  const rootDir = getInput('root-dir');
-  const jobs = getInput('jobs');
+  const jobConfigs = getInput('job-configs');
   const globalConfigFilePath =
     getInput('global-config-file-path') || 'monotonix-global.yaml';
-
   const globalConfig = loadGlobalConfig(globalConfigFilePath);
 
-  const buildParams = run({ globalConfig, jobConfigs: jobs, context });
-  setOutput('build-params', JSON.stringify(buildParams));
+  const jobParams = run({ globalConfig, jobConfigs, context });
+
+  setOutput('result', JSON.stringify(jobParams));
 } catch (error) {
   console.error(error);
   setFailed(`Action failed with error: ${error}`);

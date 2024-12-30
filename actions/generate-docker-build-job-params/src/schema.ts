@@ -1,30 +1,27 @@
 import {
   GlobalConfigSchema,
-  JobSchema,
-  BaseBuildParamSchema,
+  JobConfigSchema,
+  JobParamSchema,
 } from '@monotonix/schema';
 import { z } from 'zod';
 
 export const DockerBuildGlobalConfigSchema = GlobalConfigSchema.extend({
-  loaders: z.object({
+  job_types: z.object({
     docker_build: z.object({
-      environment: z.object({
-        type: z.literal('aws'),
+      registries: z.object({
         aws: z.object({
-          identities: z.record(
+          iams: z.record(
             z.string(),
             z.object({
-              iam_role: z.string(),
+              role: z.string(),
               region: z.string(),
             }),
           ),
-          registries: z.record(
+          repositories: z.record(
             z.string(),
             z.object({
-              identity: z.string(),
-              type: z.enum(['private', 'public']).default('private').optional(),
-              region: z.string(),
-              repository_base: z.string(),
+              type: z.enum(['private', 'public']).default('private'),
+              base_url: z.string(),
             }),
           ),
         }),
@@ -37,14 +34,13 @@ export type DockerBuildGlobalConfig = z.infer<
   typeof DockerBuildGlobalConfigSchema
 >;
 
-export const DockerBuildJobSchema = JobSchema.extend({
+export const DockerBuildJobConfigSchema = JobConfigSchema.extend({
   config: z.object({
-    loader: z.literal('docker_build'),
-    environment: z.object({
+    registry: z.object({
       type: z.literal('aws'),
       aws: z.object({
-        identity: z.string(),
-        registry: z.string(),
+        iam: z.string(),
+        repository: z.string(),
       }),
     }),
     tagging: z.enum(['always_latest', 'semver_datetime']),
@@ -52,20 +48,19 @@ export const DockerBuildJobSchema = JobSchema.extend({
   }),
 });
 
-export type DockerBuildJob = z.infer<typeof DockerBuildJobSchema>;
+export type DockerBuildJobConfig = z.infer<typeof DockerBuildJobConfigSchema>;
 
-export const DockerBuildParamSchema = BaseBuildParamSchema.extend({
+export const DockerBuildJobParamSchema = JobParamSchema.extend({
   param: z.object({
-    environment: z.object({
+    registry: z.object({
       type: z.literal('aws'),
       aws: z.object({
-        identity: z.object({
-          iam_role: z.string(),
+        iam: z.object({
+          role: z.string(),
           region: z.string(),
         }),
-        registry: z.object({
+        repository: z.object({
           type: z.enum(['private', 'public']),
-          region: z.string(),
         }),
       }),
     }),
@@ -75,4 +70,4 @@ export const DockerBuildParamSchema = BaseBuildParamSchema.extend({
   }),
 });
 
-export type DockerBuildParam = z.infer<typeof DockerBuildParamSchema>;
+export type DockerBuildJobParam = z.infer<typeof DockerBuildJobParamSchema>;
