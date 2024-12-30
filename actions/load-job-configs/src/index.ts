@@ -7,9 +7,9 @@ try {
   const localConfigFileName =
     getInput('local-config-file-name') || 'monotonix.yaml';
 
-  const jobs = run({ rootDir, localConfigFileName, context });
+  const jobConfigs = run({ rootDir, localConfigFileName, context });
 
-  setOutput('job-configs', JSON.stringify(jobs));
+  setOutput('result', JSON.stringify(jobConfigs));
 } catch (error) {
   console.error(error);
   setFailed(`Action failed with error: ${error}`);
