@@ -34,6 +34,7 @@ export const run = async ({
           pk: { S: JSON.stringify(jobConfig.keys) },
           sk: { N: jobConfig.app_context.last_commit.timestamp.toString() },
           status: { S: status },
+          commitHash: { S: jobConfig.app_context.last_commit.hash },
           ...ttlKey,
         },
       },
