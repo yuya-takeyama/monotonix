@@ -20,7 +20,7 @@ try {
     jobParams,
     table,
     region,
-    ttlSeconds,
+    ttl,
   });
 } catch (error) {
   console.error(error);

@@ -3,7 +3,9 @@
   "scripts": {
     "build": "npx tsc",
     "format": "npx prettier --write .",
-    "test": "npx jest"
+    "package": "npx ncc build src/index.ts -o dist --source-map --license licenses.txt",
+    "test": "npx jest",
+    "all": "npm run format && npm run test && npm run package"
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.716.0",

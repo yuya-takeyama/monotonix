@@ -6,7 +6,6 @@ import {
   WriteRequest,
 } from '@aws-sdk/client-dynamodb';
 import { z } from 'zod';
-import { Context } from '@actions/github/lib/context';
 
 type runParam = {
   jobParams: string;
@@ -20,7 +19,7 @@ export const run = async ({
   region,
   ttl,
 }: runParam): Promise<void> => {
-  const jobConfigs = z.array(JobParamSchema).parse(JSON.stringify(jobParams));
+  const jobConfigs = z.array(JobParamSchema).parse(JSON.parse(jobParams));
   const client = new DynamoDBClient({ region });
   const chunkedJobConfigs = chunkArray(25, jobConfigs);
 
