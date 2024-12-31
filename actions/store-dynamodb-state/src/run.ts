@@ -22,19 +22,21 @@ export const run = async ({
   ttl,
 }: runParam): Promise<void> => {
   const client = new DynamoDBClient({ region });
-  const chunkedJobConfigs = chunkArray(25, parseJobConfigs(jobParams));
+  const chunkedJobParams = chunkArray(25, parseJobParams(jobParams));
 
   const ttlKey: { ttl: { N: string } } | {} =
     typeof ttl === 'number' ? { ttl: { N: ttl.toString() } } : {};
 
-  for (const chunk of chunkedJobConfigs) {
-    const writeRequests: WriteRequest[] = chunk.map(jobConfig => ({
+  for (const chunk of chunkedJobParams) {
+    const writeRequests: WriteRequest[] = chunk.map(jobParam => ({
       PutRequest: {
         Item: {
-          pk: { S: JSON.stringify(jobConfig.keys) },
-          sk: { N: jobConfig.app_context.last_commit.timestamp.toString() },
-          status: { S: status },
-          commitHash: { S: jobConfig.app_context.last_commit.hash },
+          pk: { S: JSON.stringify(jobParam.keys) },
+          sk: { N: jobParam.app_context.last_commit.timestamp.toString() },
+          // "status" is a reserved word in DynamoDB
+          // https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/ReservedWords.html
+          jobStatus: { S: status },
+          commitHash: { S: jobParam.app_context.last_commit.hash },
           ...ttlKey,
         },
       },
@@ -57,7 +59,7 @@ const chunkArray = <T>(chunkSize: number, array: T[]): T[][] => {
   return result;
 };
 
-const parseJobConfigs = (jobParams: string): JobParam[] => {
+const parseJobParams = (jobParams: string): JobParam[] => {
   if (isArrayJson(jobParams)) {
     return z.array(JobParamSchema).parse(JSON.parse(jobParams));
   } else {

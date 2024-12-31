@@ -1,0 +1,21 @@
+name: 'Filter Job Params by DynamoDB state'
+author: 'Yuya Takeyama'
+
+inputs:
+  job-params:
+    description: 'Job Params'
+    required: true
+  dynamodb-table:
+    description: 'DynamoDB Table'
+    required: true
+  dynamodb-region:
+    description: 'DynamoDB Region'
+    required: true
+
+outputs:
+  result:
+    description: 'Filtered Job Params'
+
+runs:
+  using: 'node20'
+  main: 'dist/index.js'

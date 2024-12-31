@@ -78,11 +78,7 @@ describe('run', () => {
     });
     const expected: DockerBuildJobParam[] = [
       {
-        app: stubJobConfig.app,
-        app_context: stubJobConfig.app_context,
-        type: stubJobConfig.type,
-        keys: stubJobConfig.keys,
-        config: stubJobConfig.config,
+        ...stubJobConfig,
         param: {
           registry: {
             type: 'aws',

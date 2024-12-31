@@ -72,13 +72,8 @@ export const JobConfigSchema = z.object({
 
 export type JobConfig = z.infer<typeof JobConfigSchema>;
 
-export const JobParamSchema = z.object({
-  app: AppSchema,
-  app_context: AppContextSchema,
-  type: z.string(),
-  config: LocalConfigJobConfigSchema,
+export const JobParamSchema = JobConfigSchema.extend({
   param: z.record(z.string(), z.any()),
-  keys: JobTargetKeys,
 });
 
 export type JobParam = z.infer<typeof JobParamSchema>;

@@ -38873,13 +38873,8 @@ exports.JobConfigSchema = zod_1.z.object({
     config: LocalConfigJobConfigSchema,
     keys: JobTargetKeys,
 });
-exports.JobParamSchema = zod_1.z.object({
-    app: AppSchema,
-    app_context: AppContextSchema,
-    type: zod_1.z.string(),
-    config: LocalConfigJobConfigSchema,
+exports.JobParamSchema = exports.JobConfigSchema.extend({
     param: zod_1.z.record(zod_1.z.string(), zod_1.z.any()),
-    keys: JobTargetKeys,
 });
 
 
