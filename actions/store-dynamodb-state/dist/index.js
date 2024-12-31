@@ -56520,16 +56520,18 @@ const client_dynamodb_1 = __nccwpck_require__(7173);
 const zod_1 = __nccwpck_require__(5421);
 const run = async ({ jobParams, table, region, status, ttl, }) => {
     const client = new client_dynamodb_1.DynamoDBClient({ region });
-    const chunkedJobConfigs = chunkArray(25, parseJobConfigs(jobParams));
+    const chunkedJobParams = chunkArray(25, parseJobParams(jobParams));
     const ttlKey = typeof ttl === 'number' ? { ttl: { N: ttl.toString() } } : {};
-    for (const chunk of chunkedJobConfigs) {
-        const writeRequests = chunk.map(jobConfig => ({
+    for (const chunk of chunkedJobParams) {
+        const writeRequests = chunk.map(jobParam => ({
             PutRequest: {
                 Item: {
-                    pk: { S: JSON.stringify(jobConfig.keys) },
-                    sk: { N: jobConfig.app_context.last_commit.timestamp.toString() },
-                    status: { S: status },
-                    commitHash: { S: jobConfig.app_context.last_commit.hash },
+                    pk: { S: JSON.stringify(jobParam.keys) },
+                    sk: { N: jobParam.app_context.last_commit.timestamp.toString() },
+                    // "status" is a reserved word in DynamoDB
+                    // https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/ReservedWords.html
+                    jobStatus: { S: status },
+                    commitHash: { S: jobParam.app_context.last_commit.hash },
                     ...ttlKey,
                 },
             },
@@ -56550,7 +56552,7 @@ const chunkArray = (chunkSize, array) => {
     }
     return result;
 };
-const parseJobConfigs = (jobParams) => {
+const parseJobParams = (jobParams) => {
     if (isArrayJson(jobParams)) {
         return zod_1.z.array(schema_1.JobParamSchema).parse(JSON.parse(jobParams));
     }
