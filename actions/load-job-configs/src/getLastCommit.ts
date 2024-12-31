@@ -22,11 +22,7 @@ export const getLastCommit = async (appPath: string): Promise<CommitInfo> => {
   };
 
   try {
-    await exec(
-      'git',
-      ['log', '-1', '--format="%H/%ct"', '--', appPath],
-      options,
-    );
+    await exec('git', ['log', '-1', '--format=%H/%ct', '--', appPath], options);
 
     console.log(`OUTPUT: ${JSON.stringify(output)}`);
     console.log(`ERROR: ${JSON.stringify(errorOutput)}`);
