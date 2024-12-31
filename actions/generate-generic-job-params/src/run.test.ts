@@ -1,5 +1,5 @@
 import { run } from './run';
-import { JobConfig, JobParam } from '@monotonix/schema';
+import { JobConfig } from '@monotonix/schema';
 
 describe('run', () => {
   const baseJobConfig: JobConfig = {
