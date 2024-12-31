@@ -9,6 +9,10 @@ describe('filterJobConfigsByGitHubContext', () => {
     },
     app_context: {
       path: 'apps/hello-world',
+      last_commit: {
+        hash: '0000000000000000000000000000000000000000',
+        timestamp: 0,
+      },
     },
     on: {
       push: {
@@ -37,6 +41,10 @@ describe('filterJobConfigsByGitHubContext', () => {
     },
     app_context: {
       path: 'apps/hello-world',
+      last_commit: {
+        hash: '0000000000000000000000000000000000000000',
+        timestamp: 0,
+      },
     },
     on: {
       pull_request: null,

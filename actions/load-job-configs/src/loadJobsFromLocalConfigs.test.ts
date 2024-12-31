@@ -29,6 +29,11 @@ describe('createJobConfig', () => {
     },
   };
 
+  const stubCommitInfo = {
+    hash: '0000000000000000000000000000000000000000',
+    timestamp: 0,
+  };
+
   it('creates a job config with the correct structure', () => {
     const appPath = '/root/subdir';
     const jobKey = 'job1';
@@ -36,6 +41,7 @@ describe('createJobConfig', () => {
     const result = createJobConfig({
       localConfig: stubLocalConfig,
       appPath,
+      lastCommit: stubCommitInfo,
       jobKey,
       job: stubJob,
       context: stubContext,
@@ -47,6 +53,7 @@ describe('createJobConfig', () => {
       },
       app_context: {
         path: appPath,
+        last_commit: stubCommitInfo,
       },
       on: {
         push: {
@@ -83,6 +90,7 @@ describe('createJobConfig', () => {
     const result = createJobConfig({
       localConfig: stubLocalConfig,
       appPath,
+      lastCommit: stubCommitInfo,
       jobKey,
       job: differentJob,
       context: stubContext,
@@ -94,6 +102,7 @@ describe('createJobConfig', () => {
       },
       app_context: {
         path: appPath,
+        last_commit: stubCommitInfo,
       },
       on: {
         pull_request: null,

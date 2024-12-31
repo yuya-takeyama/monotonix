@@ -7,13 +7,17 @@ type runParams = {
   localConfigFileName: string;
   context: Context;
 };
-export function run({ rootDir, localConfigFileName, context }: runParams) {
+export const run = async ({
+  rootDir,
+  localConfigFileName,
+  context,
+}: runParams) => {
   return filterJobConfigsByGitHubContext({
-    jobConfigs: loadJobConfigsFromLocalConfigFiles({
+    jobConfigs: await loadJobConfigsFromLocalConfigFiles({
       rootDir,
       localConfigFileName,
       context,
     }),
     context,
   });
-}
+};

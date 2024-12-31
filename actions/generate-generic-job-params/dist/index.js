@@ -30199,6 +30199,10 @@ exports.LocalConfigSchema = zod_1.z.object({
 });
 const AppContextSchema = zod_1.z.object({
     path: zod_1.z.string(),
+    last_commit: zod_1.z.object({
+        hash: zod_1.z.string(),
+        timestamp: zod_1.z.number(),
+    }),
 });
 const JobTargetKeys = zod_1.z.array(zod_1.z.tuple([zod_1.z.string(), zod_1.z.string()]));
 exports.JobConfigSchema = zod_1.z.object({

@@ -36,6 +36,10 @@ describe('run', () => {
     },
     app_context: {
       path: '/apps/hello-world',
+      last_commit: {
+        hash: '0000000000000000000000000000000000000000',
+        timestamp: 0,
+      },
     },
     type: 'docker_build',
     config: {

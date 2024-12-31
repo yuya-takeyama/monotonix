@@ -38859,6 +38859,10 @@ exports.LocalConfigSchema = zod_1.z.object({
 });
 const AppContextSchema = zod_1.z.object({
     path: zod_1.z.string(),
+    last_commit: zod_1.z.object({
+        hash: zod_1.z.string(),
+        timestamp: zod_1.z.number(),
+    }),
 });
 const JobTargetKeys = zod_1.z.array(zod_1.z.tuple([zod_1.z.string(), zod_1.z.string()]));
 exports.JobConfigSchema = zod_1.z.object({
@@ -38930,30 +38934,80 @@ function filterJobConfigsByGitHubContext({ jobConfigs, context, }) {
 
 /***/ }),
 
+/***/ 4815:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.getLastCommit = void 0;
+const core_1 = __nccwpck_require__(7184);
+const exec_1 = __nccwpck_require__(9192);
+const getLastCommit = async (appPath) => {
+    let output = '';
+    let errorOutput = '';
+    const options = {
+        silent: true,
+        listeners: {
+            stdout: (data) => {
+                output += data.toString();
+            },
+            stderr: (data) => {
+                errorOutput += data.toString();
+            },
+        },
+    };
+    try {
+        await (0, exec_1.exec)('git', ['log', '-1', '--format="%H/%ct"', '--', appPath], options);
+        const [hash, timestamp] = output.split('/').map(s => s.trim());
+        if (!hash || !timestamp) {
+            throw new Error(`Failed to get last commit info for ${appPath}: ${errorOutput}`);
+        }
+        return {
+            hash,
+            timestamp: Number(timestamp),
+        };
+    }
+    catch (err) {
+        console.error(err);
+        (0, core_1.warning)(`Failed to get last commit info for ${appPath}: ${errorOutput}`);
+        return {
+            hash: '0000000000000000000000000000000000000000',
+            timestamp: 0,
+        };
+    }
+};
+exports.getLastCommit = getLastCommit;
+
+
+/***/ }),
+
 /***/ 1010:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.createJobConfig = void 0;
-exports.loadJobConfigsFromLocalConfigFiles = loadJobConfigsFromLocalConfigFiles;
+exports.createJobConfig = exports.loadJobConfigsFromLocalConfigFiles = void 0;
 const schema_1 = __nccwpck_require__(67);
 const js_yaml_1 = __nccwpck_require__(4148);
 const node_fs_1 = __nccwpck_require__(3024);
 const glob_1 = __nccwpck_require__(2712);
 const node_path_1 = __nccwpck_require__(6760);
-function loadJobConfigsFromLocalConfigFiles({ rootDir, localConfigFileName, context, }) {
+const getLastCommit_1 = __nccwpck_require__(4815);
+const loadJobConfigsFromLocalConfigFiles = async ({ rootDir, localConfigFileName, context, }) => {
     const pattern = (0, node_path_1.join)(rootDir, '**', localConfigFileName);
     const localConfigPaths = (0, glob_1.globSync)(pattern);
-    return localConfigPaths.flatMap(localConfigPath => {
+    const jobConfigs = await Promise.all(localConfigPaths.map(async (localConfigPath) => {
         const appPath = (0, node_path_1.dirname)(localConfigPath);
+        const lastCommit = await (0, getLastCommit_1.getLastCommit)(appPath);
         try {
             const localConfigContent = (0, node_fs_1.readFileSync)(localConfigPath, 'utf-8');
             const localConfig = schema_1.LocalConfigSchema.parse((0, js_yaml_1.load)(localConfigContent));
             return Object.entries(localConfig.jobs).map(([jobKey, job]) => (0, exports.createJobConfig)({
                 localConfig,
                 appPath,
+                lastCommit,
                 jobKey,
                 job,
                 context,
@@ -38962,12 +39016,15 @@ function loadJobConfigsFromLocalConfigFiles({ rootDir, localConfigFileName, cont
         catch (err) {
             throw new Error(`Failed to load local config: ${localConfigPath}: ${err}`);
         }
-    });
-}
-const createJobConfig = ({ localConfig, appPath, jobKey, job, context, }) => ({
+    }));
+    return jobConfigs.flat();
+};
+exports.loadJobConfigsFromLocalConfigFiles = loadJobConfigsFromLocalConfigFiles;
+const createJobConfig = ({ localConfig, appPath, lastCommit, jobKey, job, context, }) => ({
     app: localConfig.app,
     app_context: {
         path: appPath,
+        last_commit: lastCommit,
     },
     on: job.on,
     type: job.type,
@@ -38989,19 +39046,20 @@ exports.createJobConfig = createJobConfig;
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.run = run;
+exports.run = void 0;
 const filterJobConfigsByGitHubContext_1 = __nccwpck_require__(9703);
 const loadJobsFromLocalConfigs_1 = __nccwpck_require__(1010);
-function run({ rootDir, localConfigFileName, context }) {
+const run = async ({ rootDir, localConfigFileName, context, }) => {
     return (0, filterJobConfigsByGitHubContext_1.filterJobConfigsByGitHubContext)({
-        jobConfigs: (0, loadJobsFromLocalConfigs_1.loadJobConfigsFromLocalConfigFiles)({
+        jobConfigs: await (0, loadJobsFromLocalConfigs_1.loadJobConfigsFromLocalConfigFiles)({
             rootDir,
             localConfigFileName,
             context,
         }),
         context,
     });
-}
+};
+exports.run = run;
 
 
 /***/ }),
@@ -48850,16 +48908,18 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 const core_1 = __nccwpck_require__(7184);
 const github_1 = __nccwpck_require__(5683);
 const run_1 = __nccwpck_require__(4795);
-try {
-    const rootDir = (0, core_1.getInput)('root-dir');
-    const localConfigFileName = (0, core_1.getInput)('local-config-file-name') || 'monotonix.yaml';
-    const jobConfigs = (0, run_1.run)({ rootDir, localConfigFileName, context: github_1.context });
-    (0, core_1.setOutput)('result', JSON.stringify(jobConfigs));
-}
-catch (error) {
-    console.error(error);
-    (0, core_1.setFailed)(`Action failed with error: ${error}`);
-}
+(async () => {
+    try {
+        const rootDir = (0, core_1.getInput)('root-dir');
+        const localConfigFileName = (0, core_1.getInput)('local-config-file-name') || 'monotonix.yaml';
+        const jobConfigs = await (0, run_1.run)({ rootDir, localConfigFileName, context: github_1.context });
+        (0, core_1.setOutput)('result', JSON.stringify(jobConfigs));
+    }
+    catch (error) {
+        console.error(error);
+        (0, core_1.setFailed)(`Action failed with error: ${error}`);
+    }
+})();
 
 })();
 

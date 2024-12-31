@@ -51,6 +51,10 @@ export const LocalConfigSchema = z.object({
 
 const AppContextSchema = z.object({
   path: z.string(),
+  last_commit: z.object({
+    hash: z.string(),
+    timestamp: z.number(),
+  }),
 });
 
 const JobTargetKeys = z.array(z.tuple([z.string(), z.string()]));

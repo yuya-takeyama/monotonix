@@ -8,6 +8,10 @@ describe('run', () => {
     },
     app_context: {
       path: 'apps/test-app',
+      last_commit: {
+        hash: '0000000000000000000000000000000000000000',
+        timestamp: 0,
+      },
     },
     on: {
       push: {
