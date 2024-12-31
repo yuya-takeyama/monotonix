@@ -1,0 +1,26 @@
+name: 'Store state into DynamoDB'
+author: 'Yuya Takeyama'
+
+inputs:
+  job-params:
+    description: 'Job Params'
+    required: true
+  dynamodb-table:
+    description: 'DynamoDB Table'
+    required: true
+  dynamodb-region:
+    description: 'DynamoDB Region'
+    required: true
+  ttl-days:
+    description: 'TTL Days'
+    required: false
+  ttl-hours:
+    description: 'TTL Hours'
+    required: false
+  ttl-minutes:
+    description: 'TTL Minutes'
+    required: false
+
+runs:
+  using: 'node20'
+  main: 'dist/index.js'
