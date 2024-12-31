@@ -56527,9 +56527,7 @@ const run = async ({ jobParams, table, region, ttl, }) => {
     const jobConfigs = zod_1.z.array(schema_1.JobParamSchema).parse(JSON.parse(jobParams));
     const client = new client_dynamodb_1.DynamoDBClient({ region });
     const chunkedJobConfigs = chunkArray(25, jobConfigs);
-    const ttlKey = ttl && typeof ttl === 'number' && ttl > 0
-        ? { ttl: { N: ttl.toString() } }
-        : {};
+    const ttlKey = typeof ttl === 'number' ? { ttl: { N: ttl.toString() } } : {};
     for (const chunk of chunkedJobConfigs) {
         const writeRequests = chunk.map(jobConfig => ({
             PutRequest: {
@@ -58524,6 +58522,10 @@ try {
     const table = (0, core_1.getInput)('dynamodb-table');
     const region = (0, core_1.getInput)('dynamodb-region');
     const jobParams = (0, core_1.getInput)('job-params');
+    const status = (0, core_1.getInput)('status');
+    if (!['running', 'success', 'failure'].includes(status)) {
+        throw new Error(`Invalid status: ${status}: must be one of 'running', 'success', 'failure'`);
+    }
     const now = Math.floor(Date.now() / 1000);
     let ttl = null;
     if ((0, core_1.getInput)('ttl-in-days')) {

@@ -11,14 +11,17 @@ inputs:
   dynamodb-region:
     description: 'DynamoDB Region'
     required: true
-  ttl-days:
-    description: 'TTL Days'
+  status:
+    description: 'Status (running, success, failure)'
+    required: true
+  ttl-in-days:
+    description: 'TTL in hays'
     required: false
-  ttl-hours:
-    description: 'TTL Hours'
+  ttl-in-hours:
+    description: 'TTL in hours'
     required: false
-  ttl-minutes:
-    description: 'TTL Minutes'
+  ttl-in-minutes:
+    description: 'TTL in minutes'
     required: false
 
 runs:

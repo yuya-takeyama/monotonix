@@ -24,9 +24,7 @@ export const run = async ({
   const chunkedJobConfigs = chunkArray(25, jobConfigs);
 
   const ttlKey: { ttl: { N: string } } | {} =
-    ttl && typeof ttl === 'number' && ttl > 0
-      ? { ttl: { N: ttl.toString() } }
-      : {};
+    typeof ttl === 'number' ? { ttl: { N: ttl.toString() } } : {};
 
   for (const chunk of chunkedJobConfigs) {
     const writeRequests: WriteRequest[] = chunk.map(jobConfig => ({

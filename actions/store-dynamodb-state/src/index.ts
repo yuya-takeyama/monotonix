@@ -5,6 +5,13 @@ try {
   const table = getInput('dynamodb-table');
   const region = getInput('dynamodb-region');
   const jobParams = getInput('job-params');
+  const status = getInput('status');
+
+  if (!['running', 'success', 'failure'].includes(status)) {
+    throw new Error(
+      `Invalid status: ${status}: must be one of 'running', 'success', 'failure'`,
+    );
+  }
 
   const now = Math.floor(Date.now() / 1000);
   let ttl: number | null = null;

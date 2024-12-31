@@ -24,10 +24,7 @@ export const getLastCommit = async (appPath: string): Promise<CommitInfo> => {
   try {
     await exec('git', ['log', '-1', '--format=%H/%ct', '--', appPath], options);
 
-    console.log(`OUTPUT: ${JSON.stringify(output)}`);
-    console.log(`ERROR: ${JSON.stringify(errorOutput)}`);
     const [hash, timestamp] = output.split('/').map(s => s.trim());
-
     if (!hash || !timestamp) {
       throw new Error(
         `Failed to get last commit info for ${appPath}: ${errorOutput}`,
