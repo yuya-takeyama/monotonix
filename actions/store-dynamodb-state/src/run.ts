@@ -1,4 +1,4 @@
-import { JobParamSchema } from '@monotonix/schema';
+import { JobParam, JobParamSchema } from '@monotonix/schema';
 import {
   DynamoDBClient,
   BatchWriteItemCommandInput,
@@ -21,9 +21,8 @@ export const run = async ({
   status,
   ttl,
 }: runParam): Promise<void> => {
-  const jobConfigs = z.array(JobParamSchema).parse(JSON.parse(jobParams));
   const client = new DynamoDBClient({ region });
-  const chunkedJobConfigs = chunkArray(25, jobConfigs);
+  const chunkedJobConfigs = chunkArray(25, parseJobConfigs(jobParams));
 
   const ttlKey: { ttl: { N: string } } | {} =
     typeof ttl === 'number' ? { ttl: { N: ttl.toString() } } : {};
@@ -55,4 +54,16 @@ const chunkArray = <T>(chunkSize: number, array: T[]): T[][] => {
     result.push(array.slice(i, i + chunkSize));
   }
   return result;
+};
+
+const parseJobConfigs = (jobParams: string): JobParam[] => {
+  if (isArrayJson(jobParams)) {
+    return z.array(JobParamSchema).parse(JSON.parse(jobParams));
+  } else {
+    return [JobParamSchema.parse(JSON.parse(jobParams))];
+  }
+};
+
+const isArrayJson = (value: string): boolean => {
+  return value.trim().startsWith('[');
 };

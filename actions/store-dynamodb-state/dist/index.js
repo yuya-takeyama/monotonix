@@ -56524,9 +56524,8 @@ const schema_1 = __nccwpck_require__(67);
 const client_dynamodb_1 = __nccwpck_require__(7173);
 const zod_1 = __nccwpck_require__(5421);
 const run = async ({ jobParams, table, region, status, ttl, }) => {
-    const jobConfigs = zod_1.z.array(schema_1.JobParamSchema).parse(JSON.parse(jobParams));
     const client = new client_dynamodb_1.DynamoDBClient({ region });
-    const chunkedJobConfigs = chunkArray(25, jobConfigs);
+    const chunkedJobConfigs = chunkArray(25, parseJobConfigs(jobParams));
     const ttlKey = typeof ttl === 'number' ? { ttl: { N: ttl.toString() } } : {};
     for (const chunk of chunkedJobConfigs) {
         const writeRequests = chunk.map(jobConfig => ({
@@ -56554,6 +56553,17 @@ const chunkArray = (chunkSize, array) => {
         result.push(array.slice(i, i + chunkSize));
     }
     return result;
+};
+const parseJobConfigs = (jobParams) => {
+    if (isArrayJson(jobParams)) {
+        return zod_1.z.array(schema_1.JobParamSchema).parse(JSON.parse(jobParams));
+    }
+    else {
+        return [schema_1.JobParamSchema.parse(JSON.parse(jobParams))];
+    }
+};
+const isArrayJson = (value) => {
+    return value.trim().startsWith('[');
 };
 
 
