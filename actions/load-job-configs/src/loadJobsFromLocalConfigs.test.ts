@@ -29,7 +29,7 @@ describe('createJobConfig', () => {
     },
   };
 
-  it('should create a job config with the correct structure', () => {
+  it('creates a job config with the correct structure', () => {
     const appPath = '/root/subdir';
     const jobKey = 'job1';
 
@@ -67,7 +67,7 @@ describe('createJobConfig', () => {
     expect(result).toEqual(expected);
   });
 
-  it('should handle different job configurations', () => {
+  it('handles different job configurations', () => {
     const appPath = '/root/subdir';
     const jobKey = 'job2';
     const differentJob = {

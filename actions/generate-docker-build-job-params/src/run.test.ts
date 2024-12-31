@@ -6,7 +6,7 @@ import {
 } from './schema';
 import { Context } from '@actions/github/lib/context';
 
-describe('run function', () => {
+describe('run', () => {
   const stubGlobalConfig: DockerBuildGlobalConfig = {
     job_types: {
       docker_build: {
@@ -66,7 +66,7 @@ describe('run function', () => {
     },
   } as any;
 
-  it('should return build parameters', () => {
+  it('returns build parameters for docker build', () => {
     const result = run({
       globalConfig: stubGlobalConfig,
       jobConfigs: JSON.stringify([stubJobConfig]),

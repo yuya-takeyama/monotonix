@@ -1,4 +1,4 @@
-import { string, z } from 'zod';
+import { z } from 'zod';
 
 export const GlobalConfigSchema = z.object({
   job_types: z.record(z.string(), z.object({}).passthrough()),
