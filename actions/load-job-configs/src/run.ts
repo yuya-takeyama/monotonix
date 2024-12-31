@@ -1,4 +1,4 @@
-import { filterJobsByGitHubContext } from './filterJobsByGitHubContext';
+import { filterJobConfigsByGitHubContext } from './filterJobConfigsByGitHubContext';
 import { loadJobConfigsFromLocalConfigFiles } from './loadJobsFromLocalConfigs';
 import { Context } from '@actions/github/lib/context';
 
@@ -8,13 +8,12 @@ type runParams = {
   context: Context;
 };
 export function run({ rootDir, localConfigFileName, context }: runParams) {
-  const jobs = loadJobConfigsFromLocalConfigFiles(
-    rootDir,
-    localConfigFileName,
+  return filterJobConfigsByGitHubContext({
+    jobConfigs: loadJobConfigsFromLocalConfigFiles({
+      rootDir,
+      localConfigFileName,
+      context,
+    }),
     context,
-  );
-
-  const filteredJobs = filterJobsByGitHubContext(jobs, context);
-
-  return filteredJobs;
+  });
 }

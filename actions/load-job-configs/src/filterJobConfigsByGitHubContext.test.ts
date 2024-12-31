@@ -1,8 +1,8 @@
 import { Context } from '@actions/github/lib/context';
-import { filterJobsByGitHubContext } from './filterJobsByGitHubContext';
+import { filterJobConfigsByGitHubContext } from './filterJobConfigsByGitHubContext';
 import { JobConfig } from '@monotonix/schema';
 
-describe('filterJobsByGitHubContext', () => {
+describe('filterJobConfigsByGitHubContext', () => {
   const pushMainJobConfig: JobConfig = {
     app: {
       name: 'hello-world',
@@ -65,7 +65,10 @@ describe('filterJobsByGitHubContext', () => {
         ref: 'refs/heads/main',
       };
       expect(
-        filterJobsByGitHubContext(stubLocalConfigs, context),
+        filterJobConfigsByGitHubContext({
+          jobConfigs: stubLocalConfigs,
+          context,
+        }),
       ).toStrictEqual([pushMainJobConfig]);
     });
 
@@ -76,7 +79,10 @@ describe('filterJobsByGitHubContext', () => {
         ref: 'refs/heads/feature',
       };
       expect(
-        filterJobsByGitHubContext(stubLocalConfigs, context),
+        filterJobConfigsByGitHubContext({
+          jobConfigs: stubLocalConfigs,
+          context,
+        }),
       ).toStrictEqual([]);
     });
   });
