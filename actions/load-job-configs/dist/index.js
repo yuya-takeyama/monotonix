@@ -38967,7 +38967,7 @@ const getLastCommit = async (appPath) => {
         }
         return {
             hash,
-            timestamp: Number(timestamp),
+            timestamp: Number(timestamp) * 1000,
         };
     }
     catch (err) {
