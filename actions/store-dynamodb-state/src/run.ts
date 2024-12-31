@@ -11,12 +11,14 @@ type runParam = {
   jobParams: string;
   table: string;
   region: string;
+  status: 'running' | 'success' | 'failure';
   ttl?: number | null;
 };
 export const run = async ({
   jobParams,
   table,
   region,
+  status,
   ttl,
 }: runParam): Promise<void> => {
   const jobConfigs = z.array(JobParamSchema).parse(JSON.parse(jobParams));
@@ -32,6 +34,7 @@ export const run = async ({
         Item: {
           pk: { S: JSON.stringify(jobConfig.keys) },
           sk: { N: jobConfig.app_context.last_commit.timestamp.toString() },
+          status: { S: status },
           ...ttlKey,
         },
       },

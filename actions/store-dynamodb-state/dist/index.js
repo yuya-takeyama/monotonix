@@ -56523,7 +56523,7 @@ exports.run = void 0;
 const schema_1 = __nccwpck_require__(67);
 const client_dynamodb_1 = __nccwpck_require__(7173);
 const zod_1 = __nccwpck_require__(5421);
-const run = async ({ jobParams, table, region, ttl, }) => {
+const run = async ({ jobParams, table, region, status, ttl, }) => {
     const jobConfigs = zod_1.z.array(schema_1.JobParamSchema).parse(JSON.parse(jobParams));
     const client = new client_dynamodb_1.DynamoDBClient({ region });
     const chunkedJobConfigs = chunkArray(25, jobConfigs);
@@ -56534,6 +56534,7 @@ const run = async ({ jobParams, table, region, ttl, }) => {
                 Item: {
                     pk: { S: JSON.stringify(jobConfig.keys) },
                     sk: { N: jobConfig.app_context.last_commit.timestamp.toString() },
+                    status: { S: status },
                     ...ttlKey,
                 },
             },
@@ -58523,7 +58524,7 @@ try {
     const region = (0, core_1.getInput)('dynamodb-region');
     const jobParams = (0, core_1.getInput)('job-params');
     const status = (0, core_1.getInput)('status');
-    if (!['running', 'success', 'failure'].includes(status)) {
+    if (!(status === 'running' || status === 'success' || status === 'failure')) {
         throw new Error(`Invalid status: ${status}: must be one of 'running', 'success', 'failure'`);
     }
     const now = Math.floor(Date.now() / 1000);
@@ -58541,6 +58542,7 @@ try {
         jobParams,
         table,
         region,
+        status,
         ttl,
     });
 }

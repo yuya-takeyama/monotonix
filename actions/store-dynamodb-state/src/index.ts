@@ -7,7 +7,7 @@ try {
   const jobParams = getInput('job-params');
   const status = getInput('status');
 
-  if (!['running', 'success', 'failure'].includes(status)) {
+  if (!(status === 'running' || status === 'success' || status === 'failure')) {
     throw new Error(
       `Invalid status: ${status}: must be one of 'running', 'success', 'failure'`,
     );
@@ -27,6 +27,7 @@ try {
     jobParams,
     table,
     region,
+    status,
     ttl,
   });
 } catch (error) {
