@@ -36,7 +36,7 @@ export const getLastCommit = async (appPath: string): Promise<CommitInfo> => {
 
     return {
       hash,
-      timestamp: Number(timestamp) * 1000,
+      timestamp: Number(timestamp),
     };
   } catch (err) {
     console.error(err);
