@@ -28,6 +28,8 @@ export const getLastCommit = async (appPath: string): Promise<CommitInfo> => {
       options,
     );
 
+    console.log(`OUTPUT: ${JSON.stringify(output)}`);
+    console.log(`ERROR: ${JSON.stringify(errorOutput)}`);
     const [hash, timestamp] = output.split('/').map(s => s.trim());
 
     if (!hash || !timestamp) {
