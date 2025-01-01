@@ -56536,7 +56536,7 @@ const run = async ({ jobParams, table, region, }) => {
         };
         const result = await client.send(new client_dynamodb_1.QueryCommand(input));
         if (typeof result.Count === 'number' && result.Count > 0) {
-            (0, core_1.warning)(`Skip: Job is already running or success: ${JSON.stringify(jobParam.keys)}`);
+            (0, core_1.info)(`Skip: Job is already running or success: ${JSON.stringify(jobParam.keys)}: ${jobParam.app_context.last_commit.hash}`);
             return null;
         }
         return jobParam;

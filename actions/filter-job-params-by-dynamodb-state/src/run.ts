@@ -5,7 +5,7 @@ import {
   QueryCommandInput,
 } from '@aws-sdk/client-dynamodb';
 import { z } from 'zod';
-import { warning } from '@actions/core';
+import { info } from '@actions/core';
 
 type runParam = {
   jobParams: string;
@@ -35,8 +35,8 @@ export const run = async ({
       };
       const result = await client.send(new QueryCommand(input));
       if (typeof result.Count === 'number' && result.Count > 0) {
-        warning(
-          `Skip: Job is already running or success: ${JSON.stringify(jobParam.keys)}`,
+        info(
+          `Skip: Job is already running or success: ${JSON.stringify(jobParam.keys)}: ${jobParam.app_context.last_commit.hash}`,
         );
 
         return null;
