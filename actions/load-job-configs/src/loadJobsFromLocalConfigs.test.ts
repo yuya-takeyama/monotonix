@@ -54,6 +54,7 @@ describe('createJobConfig', () => {
       app_context: {
         path: appPath,
         last_commit: stubCommitInfo,
+        label: 'test-app / job1',
       },
       on: {
         push: {
@@ -103,6 +104,7 @@ describe('createJobConfig', () => {
       app_context: {
         path: appPath,
         last_commit: stubCommitInfo,
+        label: 'test-app / job2',
       },
       on: {
         pull_request: null,

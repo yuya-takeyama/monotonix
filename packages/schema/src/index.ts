@@ -55,6 +55,7 @@ const AppContextSchema = z.object({
     hash: z.string(),
     timestamp: z.number(),
   }),
+  label: z.string(),
 });
 
 const JobTargetKeys = z.array(z.tuple([z.string(), z.string()]));

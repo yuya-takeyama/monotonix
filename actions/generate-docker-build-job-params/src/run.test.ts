@@ -40,6 +40,7 @@ describe('run', () => {
         hash: '0000000000000000000000000000000000000000',
         timestamp: 0,
       },
+      label: '',
     },
     type: 'docker_build',
     config: {

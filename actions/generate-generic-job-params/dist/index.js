@@ -30203,6 +30203,7 @@ const AppContextSchema = zod_1.z.object({
         hash: zod_1.z.string(),
         timestamp: zod_1.z.number(),
     }),
+    label: zod_1.z.string(),
 });
 const JobTargetKeys = zod_1.z.array(zod_1.z.tuple([zod_1.z.string(), zod_1.z.string()]));
 exports.JobConfigSchema = zod_1.z.object({

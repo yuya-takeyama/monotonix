@@ -1,11 +1,11 @@
 {
   "name": "@monotonix/load-job-configs",
   "scripts": {
-    "build": "npx tsc",
-    "ci-test": "npx jest",
-    "format": "npx prettier --write .",
-    "package": "npx ncc build src/index.ts -o dist --source-map --license licenses.txt",
-    "test": "npx jest",
+    "build": "tsc",
+    "ci-test": "jest",
+    "format": "prettier --write .",
+    "package": "ncc build src/index.ts -o dist --source-map --license licenses.txt",
+    "test": "jest",
     "all": "npm run format && npm run test && npm run package"
   },
   "dependencies": {

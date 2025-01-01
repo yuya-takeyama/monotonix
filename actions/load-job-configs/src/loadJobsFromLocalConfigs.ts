@@ -68,6 +68,7 @@ export const createJobConfig = ({
   app_context: {
     path: appPath,
     last_commit: lastCommit,
+    label: `${localConfig.app.name} / ${jobKey}`,
   },
   on: job.on,
   type: job.type,

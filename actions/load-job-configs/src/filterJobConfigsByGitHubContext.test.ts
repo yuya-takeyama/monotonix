@@ -13,6 +13,7 @@ describe('filterJobConfigsByGitHubContext', () => {
         hash: '0000000000000000000000000000000000000000',
         timestamp: 0,
       },
+      label: '',
     },
     on: {
       push: {
@@ -45,6 +46,7 @@ describe('filterJobConfigsByGitHubContext', () => {
         hash: '0000000000000000000000000000000000000000',
         timestamp: 0,
       },
+      label: '',
     },
     on: {
       pull_request: null,
