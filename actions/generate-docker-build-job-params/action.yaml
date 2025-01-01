@@ -5,6 +5,7 @@ inputs:
   job-configs:
     description: 'Job Configs'
     required: true
+    default: ${{ env.MONOTONIX_JOB_CONFIGS }}
   global-config-file-path:
     description: 'Global config file path'
     required: true
