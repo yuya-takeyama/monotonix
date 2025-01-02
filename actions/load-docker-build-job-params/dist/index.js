@@ -46200,7 +46200,7 @@ exports.NEVER = parseUtil_1.INVALID;
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.JobParamsSchema = exports.JobParamSchema = exports.LocalConfigSchema = exports.GlobalConfigSchema = void 0;
+exports.JobsSchema = exports.JobSchema = exports.LocalConfigSchema = exports.GlobalConfigSchema = void 0;
 const zod_1 = __nccwpck_require__(5421);
 exports.GlobalConfigSchema = zod_1.z.object({
     job_types: zod_1.z.record(zod_1.z.string(), zod_1.z.object({}).passthrough()),
@@ -46248,7 +46248,7 @@ const AppContextSchema = zod_1.z.object({
     label: zod_1.z.string(),
 });
 const JobTargetKeys = zod_1.z.array(zod_1.z.tuple([zod_1.z.string(), zod_1.z.string()]));
-exports.JobParamSchema = zod_1.z.object({
+exports.JobSchema = zod_1.z.object({
     app: AppSchema,
     app_context: AppContextSchema,
     on: LocalConfigJobEventSchema,
@@ -46256,7 +46256,7 @@ exports.JobParamSchema = zod_1.z.object({
     params: zod_1.z.object({}).catchall(zod_1.z.object({}).catchall(zod_1.z.any())),
     keys: JobTargetKeys,
 });
-exports.JobParamsSchema = zod_1.z.array(exports.JobParamSchema);
+exports.JobsSchema = zod_1.z.array(exports.JobSchema);
 
 
 /***/ }),
@@ -46287,13 +46287,11 @@ function loadGlobalConfig(globalConfigFilePath) {
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.run = run;
 const utils_1 = __nccwpck_require__(7583);
-const schema_1 = __nccwpck_require__(855);
 const path_1 = __nccwpck_require__(6928);
 const luxon_1 = __nccwpck_require__(9888);
-function run({ globalConfig, jobParams, context, }) {
-    const parsedJobParams = schema_1.InputJobParamsSchema.parse(JSON.parse(jobParams));
-    return parsedJobParams.map((jobParam) => {
-        const localDockerBuildConfig = jobParam.configs.docker_build;
+function run({ globalConfig, jobs, context }) {
+    return jobs.map((job) => {
+        const localDockerBuildConfig = job.configs.docker_build;
         const repository = globalConfig.job_types.docker_build.registries.aws.repositories[localDockerBuildConfig.registry.aws.repository];
         if (!repository) {
             throw new Error(`Repository not found from Global Config: ${localDockerBuildConfig.registry.aws.repository}`);
@@ -46303,9 +46301,9 @@ function run({ globalConfig, jobParams, context, }) {
             throw new Error(`IAM not found from Global Config: ${localDockerBuildConfig.registry.aws.iam}`);
         }
         return {
-            ...jobParam,
+            ...job,
             params: {
-                ...jobParam.params,
+                ...job.params,
                 docker_build: {
                     registry: {
                         type: 'aws',
@@ -46319,11 +46317,11 @@ function run({ globalConfig, jobParams, context, }) {
                             },
                         },
                     },
-                    context: jobParam.app_context.path,
+                    context: job.app_context.path,
                     tags: generateTags({
                         committedAt: (0, utils_1.getCommittedAt)(context),
                         globalConfig,
-                        jobParam,
+                        inputJob: job,
                     }).join(','),
                     platforms: localDockerBuildConfig.platforms.join(','),
                 },
@@ -46331,22 +46329,22 @@ function run({ globalConfig, jobParams, context, }) {
         };
     });
 }
-function generateTags({ committedAt, globalConfig, jobParam, }) {
-    const registry = jobParam.configs.docker_build.registry;
+function generateTags({ committedAt, globalConfig, inputJob, }) {
+    const registry = inputJob.configs.docker_build.registry;
     if (registry.type === 'aws') {
-        const repository = globalConfig.job_types.docker_build.registries.aws.repositories[jobParam.configs.docker_build.registry.aws.repository];
+        const repository = globalConfig.job_types.docker_build.registries.aws.repositories[inputJob.configs.docker_build.registry.aws.repository];
         if (!repository) {
-            throw new Error(`Repository not found from Global Config: ${jobParam.configs.docker_build.registry.aws.repository}`);
+            throw new Error(`Repository not found from Global Config: ${inputJob.configs.docker_build.registry.aws.repository}`);
         }
-        switch (jobParam.configs.docker_build.tagging) {
+        switch (inputJob.configs.docker_build.tagging) {
             case 'always_latest':
-                return [`${(0, path_1.join)(repository.base_url, jobParam.app.name)}:latest`];
+                return [`${(0, path_1.join)(repository.base_url, inputJob.app.name)}:latest`];
             case 'semver_datetime':
                 return [
-                    `${(0, path_1.join)(repository.base_url, jobParam.app.name)}:${generateSemverDatetimeTag(committedAt)}`,
+                    `${(0, path_1.join)(repository.base_url, inputJob.app.name)}:${generateSemverDatetimeTag(committedAt)}`,
                 ];
             default:
-                throw new Error(`Unsupported tagging: ${jobParam.configs.docker_build.tagging} for environment: ${registry.type}`);
+                throw new Error(`Unsupported tagging: ${inputJob.configs.docker_build.tagging} for environment: ${registry.type}`);
         }
     }
     throw new Error(`Unsupported environment: ${registry.type}`);
@@ -46364,7 +46362,7 @@ function generateSemverDatetimeTag(committedAt) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.InputJobParamsSchema = exports.DockerBuildGlobalConfigSchema = void 0;
+exports.OutputJobsSchema = exports.InputJobsSchema = exports.DockerBuildGlobalConfigSchema = void 0;
 const schema_1 = __nccwpck_require__(67);
 const zod_1 = __nccwpck_require__(5421);
 exports.DockerBuildGlobalConfigSchema = schema_1.GlobalConfigSchema.extend({
@@ -46385,8 +46383,8 @@ exports.DockerBuildGlobalConfigSchema = schema_1.GlobalConfigSchema.extend({
         }),
     }),
 });
-const InputJobParamSchema = schema_1.JobParamSchema.extend({
-    configs: schema_1.JobParamSchema.shape.configs.extend({
+const InputJobSchema = schema_1.JobSchema.extend({
+    configs: schema_1.JobSchema.shape.configs.extend({
         docker_build: zod_1.z.object({
             registry: zod_1.z.object({
                 type: zod_1.z.literal('aws'),
@@ -46400,9 +46398,9 @@ const InputJobParamSchema = schema_1.JobParamSchema.extend({
         }),
     }),
 });
-exports.InputJobParamsSchema = zod_1.z.array(InputJobParamSchema);
-const OutputJobParamSchema = InputJobParamSchema.extend({
-    params: InputJobParamSchema.shape.params.extend({
+exports.InputJobsSchema = zod_1.z.array(InputJobSchema);
+const OutputJobSchema = InputJobSchema.extend({
+    params: InputJobSchema.shape.params.extend({
         docker_build: zod_1.z.object({
             registry: zod_1.z.object({
                 type: zod_1.z.literal('aws'),
@@ -46422,6 +46420,7 @@ const OutputJobParamSchema = InputJobParamSchema.extend({
         }),
     }),
 });
+exports.OutputJobsSchema = zod_1.z.array(OutputJobSchema);
 
 
 /***/ }),
@@ -48354,16 +48353,18 @@ const core_1 = __nccwpck_require__(7184);
 const github_1 = __nccwpck_require__(5683);
 const config_1 = __nccwpck_require__(8374);
 const run_1 = __nccwpck_require__(4795);
+const schema_1 = __nccwpck_require__(855);
 try {
     const globalConfigFilePath = (0, core_1.getInput)('global-config-file-path') || 'monotonix-global.yaml';
     const globalConfig = (0, config_1.loadGlobalConfig)(globalConfigFilePath);
-    const jobParams = (0, core_1.getInput)('job-params') || process.env.MONOTONIX_JOB_PARAMS;
-    if (!jobParams) {
-        throw new Error('Input job-params or env $MONOTONIX_JOB_PARAMS is required');
+    const jobsJson = (0, core_1.getInput)('jobs') || process.env.MONOTONIX_JOBS;
+    if (!jobsJson) {
+        throw new Error('Input jobs or env $MONOTONIX_JOBS is required');
     }
-    const result = (0, run_1.run)({ globalConfig, jobParams, context: github_1.context });
+    const jobs = schema_1.InputJobsSchema.parse(JSON.parse(jobsJson));
+    const result = (0, run_1.run)({ globalConfig, jobs, context: github_1.context });
     (0, core_1.setOutput)('result', result);
-    (0, core_1.exportVariable)('MONOTONIX_JOB_PARAMS', result);
+    (0, core_1.exportVariable)('MONOTONIX_JOBS', result);
 }
 catch (error) {
     console.error(error);

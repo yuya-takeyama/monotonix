@@ -1,9 +1,5 @@
 import { run } from './run';
-import {
-  DockerBuildGlobalConfig,
-  InputJobParam,
-  OutputJobParam,
-} from './schema';
+import { DockerBuildGlobalConfig, InputJob, OutputJob } from './schema';
 import { Context } from '@actions/github/lib/context';
 
 describe('run', () => {
@@ -30,7 +26,7 @@ describe('run', () => {
     },
   };
 
-  const stubJobConfig: InputJobParam = {
+  const stubJob: InputJob = {
     app: {
       name: 'hello-world',
     },
@@ -76,12 +72,12 @@ describe('run', () => {
   it('returns build parameters for docker build', () => {
     const result = run({
       globalConfig: stubGlobalConfig,
-      jobParams: JSON.stringify([stubJobConfig]),
+      jobs: [stubJob],
       context: stubContext,
     });
-    const expected: OutputJobParam[] = [
+    const expected: OutputJob[] = [
       {
-        ...stubJobConfig,
+        ...stubJob,
         params: {
           docker_build: {
             registry: {

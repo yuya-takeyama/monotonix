@@ -65,7 +65,7 @@ const JobTargetKeys = z.array(z.tuple([z.string(), z.string()]));
 
 export type LocalConfig = z.infer<typeof LocalConfigSchema>;
 
-export const JobParamSchema = z.object({
+export const JobSchema = z.object({
   app: AppSchema,
   app_context: AppContextSchema,
   on: LocalConfigJobEventSchema,
@@ -74,7 +74,7 @@ export const JobParamSchema = z.object({
   keys: JobTargetKeys,
 });
 
-export type JobParam = z.infer<typeof JobParamSchema>;
+export type Job = z.infer<typeof JobSchema>;
 
-export const JobParamsSchema = z.array(JobParamSchema);
-export type JobParams = z.infer<typeof JobParamsSchema>;
+export const JobsSchema = z.array(JobSchema);
+export type Jobs = z.infer<typeof JobsSchema>;

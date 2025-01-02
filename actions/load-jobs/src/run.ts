@@ -1,5 +1,5 @@
-import { filterJobParamsByGitHubContext } from './filterJobConfigsByGitHubContext';
-import { loadJobConfigsFromLocalConfigFiles } from './loadJobsFromLocalConfigs';
+import { filterJobsByGitHubContext } from './filterJobsByGitHubContext';
+import { loadJobsFromLocalConfigFiles } from './loadJobsFromLocalConfigs';
 import { Context } from '@actions/github/lib/context';
 
 type runParams = {
@@ -12,8 +12,8 @@ export const run = async ({
   localConfigFileName,
   context,
 }: runParams) => {
-  return filterJobParamsByGitHubContext({
-    jobParams: await loadJobConfigsFromLocalConfigFiles({
+  return filterJobsByGitHubContext({
+    jobs: await loadJobsFromLocalConfigFiles({
       rootDir,
       localConfigFileName,
       context,

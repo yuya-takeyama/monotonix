@@ -1,12 +1,16 @@
 import { getInput, setFailed } from '@actions/core';
 import { run } from './run';
+import { Jobs, JobSchema, JobsSchema } from '@monotonix/schema';
 
 try {
   const table = getInput('dynamodb-table');
   const region = getInput('dynamodb-region');
-  const jobParams = getInput('job-params');
+  const jobsJson = getInput('jobs') || process.env.MONOTONIX_JOBS;
+  if (!jobsJson) {
+    throw new Error('Input job or env $MONOTONIX_JOBS is required');
+  }
+  const jobs = parseJobs(jobsJson);
   const status = getInput('status');
-
   if (!(status === 'running' || status === 'success' || status === 'failure')) {
     throw new Error(
       `Invalid status: ${status}: must be one of 'running', 'success', 'failure'`,
@@ -24,7 +28,7 @@ try {
   }
 
   run({
-    jobParams,
+    jobs,
     table,
     region,
     status,
@@ -33,4 +37,16 @@ try {
 } catch (error) {
   console.error(error);
   setFailed(`Action failed with error: ${error}`);
+}
+
+function parseJobs(jobsJson: string): Jobs {
+  if (isArrayJson(jobsJson)) {
+    return JobsSchema.parse(JSON.parse(jobsJson));
+  } else {
+    return [JobSchema.parse(JSON.parse(jobsJson))];
+  }
+}
+
+function isArrayJson(value: string): boolean {
+  return value.trim().startsWith('[');
 }

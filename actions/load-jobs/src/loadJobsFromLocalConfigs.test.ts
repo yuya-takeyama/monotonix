@@ -1,8 +1,8 @@
-import { createJobParam } from './loadJobsFromLocalConfigs';
+import { createJob } from './loadJobsFromLocalConfigs';
 import { Context } from '@actions/github/lib/context';
-import { JobParam, LocalConfig, LocalConfigJob } from '@monotonix/schema';
+import { Job, LocalConfig, LocalConfigJob } from '@monotonix/schema';
 
-describe('createJobConfig', () => {
+describe('createJob', () => {
   // @ts-ignore
   const stubContext = {
     ref: 'refs/heads/main',
@@ -39,7 +39,7 @@ describe('createJobConfig', () => {
     const appPath = '/root/subdir';
     const jobKey = 'job1';
 
-    const result = createJobParam({
+    const result = createJob({
       localConfig: stubLocalConfig,
       appPath,
       lastCommit: stubCommitInfo,
@@ -48,7 +48,7 @@ describe('createJobConfig', () => {
       context: stubContext,
     });
 
-    const expected: JobParam = {
+    const expected: Job = {
       app: {
         name: 'test-app',
       },
@@ -92,7 +92,7 @@ describe('createJobConfig', () => {
       },
     };
 
-    const result = createJobParam({
+    const result = createJob({
       localConfig: stubLocalConfig,
       appPath,
       lastCommit: stubCommitInfo,
@@ -101,7 +101,7 @@ describe('createJobConfig', () => {
       context: stubContext,
     });
 
-    const expected: JobParam = {
+    const expected: Job = {
       app: {
         name: 'test-app',
       },

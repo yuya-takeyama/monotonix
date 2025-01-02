@@ -1,23 +1,23 @@
 import { Context } from '@actions/github/lib/context';
-import { JobParam, JobParamSchema } from '@monotonix/schema';
+import { Job, JobSchema } from '@monotonix/schema';
 import { minimatch } from 'minimatch';
 
-type filterJobConfigsByGitHubContextParams = {
-  jobParams: JobParam[];
+type filterJobsByGitHubContextParams = {
+  jobs: Job[];
   context: Context;
 };
-export function filterJobParamsByGitHubContext({
-  jobParams,
+export function filterJobsByGitHubContext({
+  jobs,
   context,
-}: filterJobConfigsByGitHubContextParams): JobParam[] {
-  return jobParams
-    .filter(jobParam => {
+}: filterJobsByGitHubContextParams): Job[] {
+  return jobs
+    .filter(job => {
       switch (context.eventName) {
         case 'push':
-          if (jobParam.on.push) {
-            if (jobParam.on.push.branches) {
+          if (job.on.push) {
+            if (job.on.push.branches) {
               const branchName = context.ref.replace(/^refs\/heads\//, '');
-              const result = jobParam.on.push.branches.some(branch =>
+              const result = job.on.push.branches.some(branch =>
                 minimatch(branchName, branch),
               );
               if (result) {
@@ -29,9 +29,9 @@ export function filterJobParamsByGitHubContext({
           }
 
         case 'pull_request':
-          if (jobParam.on.pull_request) {
-            if (jobParam.on.pull_request.branches) {
-              const result = jobParam.on.pull_request.branches.some(branch =>
+          if (job.on.pull_request) {
+            if (job.on.pull_request.branches) {
+              const result = job.on.pull_request.branches.some(branch =>
                 // @ts-ignore
                 minimatch(context.ref_name, branch),
               );
@@ -46,5 +46,5 @@ export function filterJobParamsByGitHubContext({
           return false;
       }
     })
-    .map(jobParam => JobParamSchema.parse(jobParam));
+    .map(job => JobSchema.parse(job));
 }

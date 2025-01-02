@@ -1,6 +1,7 @@
 import {
   LocalConfigSchema,
-  JobParam,
+  Job,
+  Jobs,
   LocalConfig,
   LocalConfigJob,
 } from '@monotonix/schema';
@@ -11,20 +12,20 @@ import { join, dirname } from 'node:path';
 import { Context } from '@actions/github/lib/context';
 import { CommitInfo, getLastCommit } from './getLastCommit';
 
-type loadJobConfigsFromLocalConfigFilesParams = {
+type loadJobsFromLocalConfigFilesParams = {
   rootDir: string;
   localConfigFileName: string;
   context: Context;
 };
-export const loadJobConfigsFromLocalConfigFiles = async ({
+export const loadJobsFromLocalConfigFiles = async ({
   rootDir,
   localConfigFileName,
   context,
-}: loadJobConfigsFromLocalConfigFilesParams): Promise<JobParam[]> => {
+}: loadJobsFromLocalConfigFilesParams): Promise<Jobs> => {
   const pattern = join(rootDir, '**', localConfigFileName);
   const localConfigPaths = globSync(pattern);
 
-  const jobConfigs = await Promise.all(
+  const jobs = await Promise.all(
     localConfigPaths.map(async localConfigPath => {
       const appPath = dirname(localConfigPath);
       const lastCommit = await getLastCommit(appPath);
@@ -32,8 +33,8 @@ export const loadJobConfigsFromLocalConfigFiles = async ({
         const localConfigContent = readFileSync(localConfigPath, 'utf-8');
         const localConfig = LocalConfigSchema.parse(load(localConfigContent));
         return Object.entries(localConfig.jobs).map(
-          ([jobKey, job]): JobParam =>
-            createJobParam({
+          ([jobKey, job]): Job =>
+            createJob({
               localConfig,
               appPath,
               lastCommit,
@@ -50,10 +51,10 @@ export const loadJobConfigsFromLocalConfigFiles = async ({
     }),
   );
 
-  return jobConfigs.flat();
+  return jobs.flat();
 };
 
-type createJobConfigParams = {
+type createJobParams = {
   localConfig: LocalConfig;
   appPath: string;
   lastCommit: CommitInfo;
@@ -61,14 +62,14 @@ type createJobConfigParams = {
   job: LocalConfigJob;
   context: Context;
 };
-export const createJobParam = ({
+export const createJob = ({
   localConfig,
   appPath,
   lastCommit,
   jobKey,
   job,
   context,
-}: createJobConfigParams): JobParam => ({
+}: createJobParams): Job => ({
   ...job,
   app: localConfig.app,
   app_context: {

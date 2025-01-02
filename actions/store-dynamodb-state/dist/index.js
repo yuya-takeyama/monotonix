@@ -56447,7 +56447,7 @@ exports.NEVER = parseUtil_1.INVALID;
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.JobParamsSchema = exports.JobParamSchema = exports.LocalConfigSchema = exports.GlobalConfigSchema = void 0;
+exports.JobsSchema = exports.JobSchema = exports.LocalConfigSchema = exports.GlobalConfigSchema = void 0;
 const zod_1 = __nccwpck_require__(5421);
 exports.GlobalConfigSchema = zod_1.z.object({
     job_types: zod_1.z.record(zod_1.z.string(), zod_1.z.object({}).passthrough()),
@@ -56495,7 +56495,7 @@ const AppContextSchema = zod_1.z.object({
     label: zod_1.z.string(),
 });
 const JobTargetKeys = zod_1.z.array(zod_1.z.tuple([zod_1.z.string(), zod_1.z.string()]));
-exports.JobParamSchema = zod_1.z.object({
+exports.JobSchema = zod_1.z.object({
     app: AppSchema,
     app_context: AppContextSchema,
     on: LocalConfigJobEventSchema,
@@ -56503,7 +56503,7 @@ exports.JobParamSchema = zod_1.z.object({
     params: zod_1.z.object({}).catchall(zod_1.z.object({}).catchall(zod_1.z.any())),
     keys: JobTargetKeys,
 });
-exports.JobParamsSchema = zod_1.z.array(exports.JobParamSchema);
+exports.JobsSchema = zod_1.z.array(exports.JobSchema);
 
 
 /***/ }),
@@ -56515,23 +56515,21 @@ exports.JobParamsSchema = zod_1.z.array(exports.JobParamSchema);
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.run = void 0;
-const schema_1 = __nccwpck_require__(67);
 const client_dynamodb_1 = __nccwpck_require__(7173);
-const zod_1 = __nccwpck_require__(5421);
-const run = async ({ jobParams, table, region, status, ttl, }) => {
+const run = async ({ jobs, table, region, status, ttl, }) => {
     const client = new client_dynamodb_1.DynamoDBClient({ region });
-    const chunkedJobParams = chunkArray(25, parseJobParams(jobParams));
+    const chunkedJobs = chunkArray(25, jobs);
     const ttlKey = typeof ttl === 'number' ? { ttl: { N: ttl.toString() } } : {};
-    for (const chunk of chunkedJobParams) {
-        const writeRequests = chunk.map(jobParam => ({
+    for (const chunk of chunkedJobs) {
+        const writeRequests = chunk.map(job => ({
             PutRequest: {
                 Item: {
-                    pk: { S: JSON.stringify(jobParam.keys) },
-                    sk: { N: jobParam.app_context.last_commit.timestamp.toString() },
+                    pk: { S: JSON.stringify(job.keys) },
+                    sk: { N: job.app_context.last_commit.timestamp.toString() },
                     // "status" is a reserved word in DynamoDB
                     // https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/ReservedWords.html
                     jobStatus: { S: status },
-                    commitHash: { S: jobParam.app_context.last_commit.hash },
+                    commitHash: { S: job.app_context.last_commit.hash },
                     ...ttlKey,
                 },
             },
@@ -56551,17 +56549,6 @@ const chunkArray = (chunkSize, array) => {
         result.push(array.slice(i, i + chunkSize));
     }
     return result;
-};
-const parseJobParams = (jobParams) => {
-    if (isArrayJson(jobParams)) {
-        return zod_1.z.array(schema_1.JobParamSchema).parse(JSON.parse(jobParams));
-    }
-    else {
-        return [schema_1.JobParamSchema.parse(JSON.parse(jobParams))];
-    }
-};
-const isArrayJson = (value) => {
-    return value.trim().startsWith('[');
 };
 
 
@@ -58527,10 +58514,15 @@ var exports = __webpack_exports__;
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 const core_1 = __nccwpck_require__(7184);
 const run_1 = __nccwpck_require__(4795);
+const schema_1 = __nccwpck_require__(67);
 try {
     const table = (0, core_1.getInput)('dynamodb-table');
     const region = (0, core_1.getInput)('dynamodb-region');
-    const jobParams = (0, core_1.getInput)('job-params');
+    const jobsJson = (0, core_1.getInput)('jobs') || process.env.MONOTONIX_JOBS;
+    if (!jobsJson) {
+        throw new Error('Input job or env $MONOTONIX_JOBS is required');
+    }
+    const jobs = parseJobs(jobsJson);
     const status = (0, core_1.getInput)('status');
     if (!(status === 'running' || status === 'success' || status === 'failure')) {
         throw new Error(`Invalid status: ${status}: must be one of 'running', 'success', 'failure'`);
@@ -58547,7 +58539,7 @@ try {
         ttl = now + Number((0, core_1.getInput)('ttl-in-minutes')) * 60;
     }
     (0, run_1.run)({
-        jobParams,
+        jobs,
         table,
         region,
         status,
@@ -58557,6 +58549,17 @@ try {
 catch (error) {
     console.error(error);
     (0, core_1.setFailed)(`Action failed with error: ${error}`);
+}
+function parseJobs(jobsJson) {
+    if (isArrayJson(jobsJson)) {
+        return schema_1.JobsSchema.parse(JSON.parse(jobsJson));
+    }
+    else {
+        return [schema_1.JobSchema.parse(JSON.parse(jobsJson))];
+    }
+}
+function isArrayJson(value) {
+    return value.trim().startsWith('[');
 }
 
 })();

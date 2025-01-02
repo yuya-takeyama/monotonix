@@ -1,5 +1,5 @@
 {
-  "name": "@monotonix/load-job-params-from-config-files",
+  "name": "@monotonix/load-jobs",
   "scripts": {
     "build": "tsc",
     "ci-test": "jest",

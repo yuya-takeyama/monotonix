@@ -1,4 +1,4 @@
-import { JobParam, JobParamsSchema } from '@monotonix/schema';
+import { Jobs, JobSchema } from '@monotonix/schema';
 import {
   DynamoDBClient,
   QueryCommand,
@@ -7,26 +7,22 @@ import {
 import { info } from '@actions/core';
 
 type runParam = {
-  jobParams: string;
+  jobs: Jobs;
   table: string;
   region: string;
 };
-export const run = async ({
-  jobParams,
-  table,
-  region,
-}: runParam): Promise<JobParam[]> => {
+export const run = async ({ jobs, table, region }: runParam): Promise<Jobs> => {
   const client = new DynamoDBClient({ region });
 
   const results = await Promise.all(
-    JobParamsSchema.parse(JSON.parse(jobParams)).map(async jobParam => {
+    jobs.map(async job => {
       const input: QueryCommandInput = {
         TableName: table,
         KeyConditionExpression: 'pk = :pk AND sk >= :sk',
         FilterExpression: 'jobStatus = :success OR jobStatus = :running',
         ExpressionAttributeValues: {
-          ':pk': { S: JSON.stringify(jobParam.keys) },
-          ':sk': { N: jobParam.app_context.last_commit.timestamp.toString() },
+          ':pk': { S: JSON.stringify(job.keys) },
+          ':sk': { N: job.app_context.last_commit.timestamp.toString() },
           ':success': { S: 'success' },
           ':running': { S: 'running' },
         },
@@ -35,13 +31,13 @@ export const run = async ({
       const result = await client.send(new QueryCommand(input));
       if (typeof result.Count === 'number' && result.Count > 0) {
         info(
-          `Skip: Job is already running or success: ${JSON.stringify(jobParam.keys)}: ${jobParam.app_context.last_commit.hash}`,
+          `Skip: Job is already running or success: ${job.app_context.label}: ${job.app_context.last_commit.hash}`,
         );
 
         return null;
       }
 
-      return jobParam;
+      return job;
     }),
   );
 

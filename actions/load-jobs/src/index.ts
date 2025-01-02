@@ -11,7 +11,7 @@ import { run } from './run';
     const result = await run({ rootDir, localConfigFileName, context });
 
     setOutput('result', result);
-    exportVariable('MONOTONIX_JOB_PARAMS', result);
+    exportVariable('MONOTONIX_JOBS', result);
   } catch (error) {
     console.error(error);
     setFailed(`Action failed with error: ${error}`);

@@ -1,4 +1,4 @@
-import { GlobalConfigSchema, JobParamSchema } from '@monotonix/schema';
+import { GlobalConfigSchema, JobSchema } from '@monotonix/schema';
 import { z } from 'zod';
 
 export const DockerBuildGlobalConfigSchema = GlobalConfigSchema.extend({
@@ -30,8 +30,8 @@ export type DockerBuildGlobalConfig = z.infer<
   typeof DockerBuildGlobalConfigSchema
 >;
 
-const InputJobParamSchema = JobParamSchema.extend({
-  configs: JobParamSchema.shape.configs.extend({
+const InputJobSchema = JobSchema.extend({
+  configs: JobSchema.shape.configs.extend({
     docker_build: z.object({
       registry: z.object({
         type: z.literal('aws'),
@@ -46,12 +46,13 @@ const InputJobParamSchema = JobParamSchema.extend({
   }),
 });
 
-export type InputJobParam = z.infer<typeof InputJobParamSchema>;
+export type InputJob = z.infer<typeof InputJobSchema>;
 
-export const InputJobParamsSchema = z.array(InputJobParamSchema);
+export const InputJobsSchema = z.array(InputJobSchema);
+export type InputJobs = z.infer<typeof InputJobsSchema>;
 
-const OutputJobParamSchema = InputJobParamSchema.extend({
-  params: InputJobParamSchema.shape.params.extend({
+const OutputJobSchema = InputJobSchema.extend({
+  params: InputJobSchema.shape.params.extend({
     docker_build: z.object({
       registry: z.object({
         type: z.literal('aws'),
@@ -72,4 +73,7 @@ const OutputJobParamSchema = InputJobParamSchema.extend({
   }),
 });
 
-export type OutputJobParam = z.infer<typeof OutputJobParamSchema>;
+export type OutputJob = z.infer<typeof OutputJobSchema>;
+
+export const OutputJobsSchema = z.array(OutputJobSchema);
+export type OutputJobs = z.infer<typeof OutputJobsSchema>;

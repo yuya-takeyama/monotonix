@@ -1,8 +1,9 @@
 import { getCommittedAt } from './utils';
 import {
-  InputJobParamsSchema,
-  InputJobParam,
-  OutputJobParam,
+  InputJobs,
+  InputJob,
+  OutputJobs,
+  OutputJob,
   DockerBuildGlobalConfig,
 } from './schema';
 import { Context } from '@actions/github/lib/context';
@@ -11,18 +12,12 @@ import { DateTime } from 'luxon';
 
 type runParams = {
   globalConfig: DockerBuildGlobalConfig;
-  jobParams: string;
+  jobs: InputJobs;
   context: Context;
 };
-export function run({
-  globalConfig,
-  jobParams,
-  context,
-}: runParams): OutputJobParam[] {
-  const parsedJobParams = InputJobParamsSchema.parse(JSON.parse(jobParams));
-
-  return parsedJobParams.map((jobParam): OutputJobParam => {
-    const localDockerBuildConfig = jobParam.configs.docker_build;
+export function run({ globalConfig, jobs, context }: runParams): OutputJobs {
+  return jobs.map((job): OutputJob => {
+    const localDockerBuildConfig = job.configs.docker_build;
     const repository =
       globalConfig.job_types.docker_build.registries.aws.repositories[
         localDockerBuildConfig.registry.aws.repository
@@ -44,9 +39,9 @@ export function run({
     }
 
     return {
-      ...jobParam,
+      ...job,
       params: {
-        ...jobParam.params,
+        ...job.params,
         docker_build: {
           registry: {
             type: 'aws',
@@ -60,11 +55,11 @@ export function run({
               },
             },
           },
-          context: jobParam.app_context.path,
+          context: job.app_context.path,
           tags: generateTags({
             committedAt: getCommittedAt(context),
             globalConfig,
-            jobParam,
+            inputJob: job,
           }).join(','),
           platforms: localDockerBuildConfig.platforms.join(','),
         },
@@ -76,39 +71,39 @@ export function run({
 type generateTagsType = {
   committedAt: number;
   globalConfig: DockerBuildGlobalConfig;
-  jobParam: InputJobParam;
+  inputJob: InputJob;
 };
 function generateTags({
   committedAt,
   globalConfig,
-  jobParam,
+  inputJob,
 }: generateTagsType): string[] {
-  const registry = jobParam.configs.docker_build.registry;
+  const registry = inputJob.configs.docker_build.registry;
 
   if (registry.type === 'aws') {
     const repository =
       globalConfig.job_types.docker_build.registries.aws.repositories[
-        jobParam.configs.docker_build.registry.aws.repository
+        inputJob.configs.docker_build.registry.aws.repository
       ];
     if (!repository) {
       throw new Error(
-        `Repository not found from Global Config: ${jobParam.configs.docker_build.registry.aws.repository}`,
+        `Repository not found from Global Config: ${inputJob.configs.docker_build.registry.aws.repository}`,
       );
     }
 
-    switch (jobParam.configs.docker_build.tagging) {
+    switch (inputJob.configs.docker_build.tagging) {
       case 'always_latest':
-        return [`${join(repository.base_url, jobParam.app.name)}:latest`];
+        return [`${join(repository.base_url, inputJob.app.name)}:latest`];
       case 'semver_datetime':
         return [
           `${join(
             repository.base_url,
-            jobParam.app.name,
+            inputJob.app.name,
           )}:${generateSemverDatetimeTag(committedAt)}`,
         ];
       default:
         throw new Error(
-          `Unsupported tagging: ${jobParam.configs.docker_build.tagging} for environment: ${registry.type}`,
+          `Unsupported tagging: ${inputJob.configs.docker_build.tagging} for environment: ${registry.type}`,
         );
     }
   }

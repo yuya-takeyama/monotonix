@@ -1,9 +1,9 @@
 import { Context } from '@actions/github/lib/context';
-import { filterJobParamsByGitHubContext } from './filterJobConfigsByGitHubContext';
-import { JobParam } from '@monotonix/schema';
+import { filterJobsByGitHubContext } from './filterJobsByGitHubContext';
+import { Job } from '@monotonix/schema';
 
-describe('filterJobConfigsByGitHubContext', () => {
-  const pushMainJobConfig: JobParam = {
+describe('filterJobsByGitHubContext', () => {
+  const pushMainJob: Job = {
     app: {
       name: 'hello-world',
     },
@@ -36,7 +36,7 @@ describe('filterJobConfigsByGitHubContext', () => {
     params: {},
     keys: [],
   };
-  const pullRequestJobConfig: JobParam = {
+  const pullRequestJob: Job = {
     app: {
       name: 'hello-world',
     },
@@ -63,7 +63,7 @@ describe('filterJobConfigsByGitHubContext', () => {
     },
     keys: [],
   };
-  const stubLocalConfigs = [pushMainJobConfig, pullRequestJobConfig];
+  const stubLocalConfigs = [pushMainJob, pullRequestJob];
 
   describe('push event', () => {
     it('should return jobs that match the branch', () => {
@@ -73,11 +73,11 @@ describe('filterJobConfigsByGitHubContext', () => {
         ref: 'refs/heads/main',
       };
       expect(
-        filterJobParamsByGitHubContext({
-          jobParams: stubLocalConfigs,
+        filterJobsByGitHubContext({
+          jobs: stubLocalConfigs,
           context,
         }),
-      ).toStrictEqual([pushMainJobConfig]);
+      ).toStrictEqual([pushMainJob]);
     });
 
     it('should not return jobs that do not match the branch', () => {
@@ -87,8 +87,8 @@ describe('filterJobConfigsByGitHubContext', () => {
         ref: 'refs/heads/feature',
       };
       expect(
-        filterJobParamsByGitHubContext({
-          jobParams: stubLocalConfigs,
+        filterJobsByGitHubContext({
+          jobs: stubLocalConfigs,
           context,
         }),
       ).toStrictEqual([]);

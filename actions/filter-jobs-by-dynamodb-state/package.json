@@ -1,5 +1,5 @@
 {
-  "name": "@monotonix/filter-job-params-by-dynamodb-state",
+  "name": "@monotonix/filter-jobs-by-dynamodb-state",
   "scripts": {
     "build": "tsc",
     "format": "prettier --write .",

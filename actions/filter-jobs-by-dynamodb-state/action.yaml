@@ -1,9 +1,9 @@
-name: 'Filter Job Params by DynamoDB state'
+name: 'Filter Jobs by DynamoDB state'
 author: 'Yuya Takeyama'
 
 inputs:
-  job-params:
-    description: 'Job Params'
+  jobs:
+    description: 'Jobs'
   dynamodb-table:
     description: 'DynamoDB Table'
     required: true
@@ -13,7 +13,7 @@ inputs:
 
 outputs:
   result:
-    description: 'Filtered Job Params'
+    description: 'Filtered Jobs'
 
 runs:
   using: 'node20'

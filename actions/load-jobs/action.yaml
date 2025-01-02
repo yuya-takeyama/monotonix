@@ -1,5 +1,5 @@
-name: 'Load Job Configs'
-description: 'Load and filter Job Params from Local Config Files'
+name: 'Load Jobs'
+description: 'Load and filter Jobs from config files'
 author: 'Yuya Takeyama'
 
 inputs:
@@ -9,7 +9,7 @@ inputs:
 
 outputs:
   result:
-    description: 'Job Params'
+    description: 'Jobs'
 
 runs:
   using: 'node20'
