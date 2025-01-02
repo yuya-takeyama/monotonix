@@ -2,7 +2,7 @@ name: 'Load generic Job Params'
 author: 'Yuya Takeyama'
 
 inputs:
-  job-type:
+  config-key:
     description: 'Job Type to generate job params'
     required: true
   job-params:

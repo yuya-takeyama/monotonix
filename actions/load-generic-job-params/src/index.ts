@@ -2,7 +2,7 @@ import { getInput, setFailed, setOutput, exportVariable } from '@actions/core';
 import { run } from './run';
 
 try {
-  const jobType = getInput('job-type');
+  const configKey = getInput('config-key');
   const jobParams = getInput('job-params') || process.env.MONOTONIX_JOB_PARAMS;
   if (!jobParams) {
     throw new Error(
@@ -10,7 +10,7 @@ try {
     );
   }
 
-  const result = JSON.stringify(run(jobType, jobParams));
+  const result = JSON.stringify(run(configKey, jobParams));
 
   setOutput('result', result);
   exportVariable('MONOTONIX_JOB_PARAMS', result);

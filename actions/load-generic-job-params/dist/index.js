@@ -30228,14 +30228,14 @@ exports.JobParamsSchema = zod_1.z.array(exports.JobParamSchema);
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.run = void 0;
 const schema_1 = __nccwpck_require__(67);
-const run = (jobType, jobParams) => {
+const run = (configKey, jobParams) => {
     return schema_1.JobParamsSchema.parse(JSON.parse(jobParams)).map(jobParam => {
-        const config = jobParam.configs[jobType];
+        const config = jobParam.configs[configKey];
         return {
             ...jobParam,
             params: {
                 ...jobParam.params,
-                ...(config ? { [jobType]: config } : {}),
+                ...(config ? { [configKey]: config } : {}),
             },
         };
     });
@@ -32158,12 +32158,12 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 const core_1 = __nccwpck_require__(7184);
 const run_1 = __nccwpck_require__(4795);
 try {
-    const jobType = (0, core_1.getInput)('job-type');
+    const configKey = (0, core_1.getInput)('config-key');
     const jobParams = (0, core_1.getInput)('job-params') || process.env.MONOTONIX_JOB_PARAMS;
     if (!jobParams) {
         throw new Error('Input job-params or env $MONOTONIX_JOB_PARAMS is required');
     }
-    const result = JSON.stringify((0, run_1.run)(jobType, jobParams));
+    const result = JSON.stringify((0, run_1.run)(configKey, jobParams));
     (0, core_1.setOutput)('result', result);
     (0, core_1.exportVariable)('MONOTONIX_JOB_PARAMS', result);
 }
