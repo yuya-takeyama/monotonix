@@ -62192,7 +62192,7 @@ const deleteRunningState = async ({ job, table, docClient, pk, }) => {
             pk,
             sk: `${job.context.app_path}#${job.context.job_key}#running`,
         },
-        ConditionExpression: 'commitTs = :expectedCommitTs',
+        ConditionExpression: 'commitTs = :commitTs',
         ExpressionAttributeValues: {
             ':commitTs': job.context.last_commit.timestamp,
         },
