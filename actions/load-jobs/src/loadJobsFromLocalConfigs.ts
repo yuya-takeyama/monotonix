@@ -79,14 +79,11 @@ export const createJob = ({
   app: localConfig.app,
   context: {
     workflow_id: workflowId,
+    github_ref: githubContext.ref,
     app_path: appPath,
+    job_key: jobKey,
     last_commit: lastCommit,
     label: `${localConfig.app.name} / ${jobKey}`,
   },
   params: {},
-  keys: [
-    ['app_path', appPath],
-    ['job_key', jobKey],
-    ['github_ref', githubContext.ref],
-  ],
 });

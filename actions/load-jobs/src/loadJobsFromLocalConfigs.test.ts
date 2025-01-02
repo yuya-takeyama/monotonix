@@ -55,7 +55,9 @@ describe('createJob', () => {
       },
       context: {
         workflow_id: 'docker_build',
+        github_ref: stubContext.ref,
         app_path: appPath,
+        job_key: jobKey,
         last_commit: stubCommitInfo,
         label: 'test-app / job1',
       },
@@ -70,11 +72,6 @@ describe('createJob', () => {
         },
       },
       params: {},
-      keys: [
-        ['app_path', appPath],
-        ['job_key', jobKey],
-        ['github_ref', stubContext.ref],
-      ],
     };
 
     expect(result).toEqual(expected);
@@ -110,7 +107,9 @@ describe('createJob', () => {
       },
       context: {
         workflow_id: 'docker_build',
+        github_ref: stubContext.ref,
         app_path: appPath,
+        job_key: jobKey,
         last_commit: stubCommitInfo,
         label: 'test-app / job2',
       },
@@ -123,11 +122,6 @@ describe('createJob', () => {
         },
       },
       params: {},
-      keys: [
-        ['app_path', appPath],
-        ['job_key', jobKey],
-        ['github_ref', stubContext.ref],
-      ],
     };
 
     expect(result).toEqual(expected);

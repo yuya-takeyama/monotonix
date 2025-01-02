@@ -10,6 +10,18 @@ const AppSchema = z.object({
   name: z.string(),
 });
 
+const ContextSchema = z.object({
+  workflow_id: z.string(),
+  github_ref: z.string(),
+  app_path: z.string(),
+  last_commit: z.object({
+    hash: z.string(),
+    timestamp: z.number(),
+  }),
+  job_key: z.string(),
+  label: z.string(),
+});
+
 const PushEventScema = z.object({
   push: z
     .object({
@@ -47,27 +59,16 @@ export const LocalConfigSchema = z.object({
   jobs: z.record(z.string(), LocalConfigJobSchema),
 });
 
-const ContextSchema = z.object({
-  workflow_id: z.string(),
-  app_path: z.string(),
-  last_commit: z.object({
-    hash: z.string(),
-    timestamp: z.number(),
-  }),
-  label: z.string(),
-});
-
-const JobTargetKeys = z.array(z.tuple([z.string(), z.string()]));
-
 export type LocalConfig = z.infer<typeof LocalConfigSchema>;
+
+const JobParamsSchema = z.object({}).catchall(z.object({}).catchall(z.any()));
 
 export const JobSchema = z.object({
   app: AppSchema,
   context: ContextSchema,
   on: JobEventSchema,
   configs: JobConfigsSchema,
-  params: z.object({}).catchall(z.object({}).catchall(z.any())),
-  keys: JobTargetKeys,
+  params: JobParamsSchema,
 });
 
 export type Job = z.infer<typeof JobSchema>;

@@ -46208,6 +46208,17 @@ exports.GlobalConfigSchema = zod_1.z.object({
 const AppSchema = zod_1.z.object({
     name: zod_1.z.string(),
 });
+const ContextSchema = zod_1.z.object({
+    workflow_id: zod_1.z.string(),
+    github_ref: zod_1.z.string(),
+    app_path: zod_1.z.string(),
+    last_commit: zod_1.z.object({
+        hash: zod_1.z.string(),
+        timestamp: zod_1.z.number(),
+    }),
+    job_key: zod_1.z.string(),
+    label: zod_1.z.string(),
+});
 const PushEventScema = zod_1.z.object({
     push: zod_1.z
         .object({
@@ -46237,23 +46248,13 @@ exports.LocalConfigSchema = zod_1.z.object({
     }),
     jobs: zod_1.z.record(zod_1.z.string(), LocalConfigJobSchema),
 });
-const ContextSchema = zod_1.z.object({
-    workflow_id: zod_1.z.string(),
-    app_path: zod_1.z.string(),
-    last_commit: zod_1.z.object({
-        hash: zod_1.z.string(),
-        timestamp: zod_1.z.number(),
-    }),
-    label: zod_1.z.string(),
-});
-const JobTargetKeys = zod_1.z.array(zod_1.z.tuple([zod_1.z.string(), zod_1.z.string()]));
+const JobParamsSchema = zod_1.z.object({}).catchall(zod_1.z.object({}).catchall(zod_1.z.any()));
 exports.JobSchema = zod_1.z.object({
     app: AppSchema,
     context: ContextSchema,
     on: JobEventSchema,
     configs: JobConfigsSchema,
-    params: zod_1.z.object({}).catchall(zod_1.z.object({}).catchall(zod_1.z.any())),
-    keys: JobTargetKeys,
+    params: JobParamsSchema,
 });
 exports.JobsSchema = zod_1.z.array(exports.JobSchema);
 

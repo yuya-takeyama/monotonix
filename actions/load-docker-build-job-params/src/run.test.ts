@@ -32,7 +32,9 @@ describe('run', () => {
     },
     context: {
       workflow_id: 'docker_build',
+      github_ref: 'refs/heads/main',
       app_path: '/apps/hello-world',
+      job_key: 'job1',
       last_commit: {
         hash: '0000000000000000000000000000000000000000',
         timestamp: 0,
@@ -58,7 +60,6 @@ describe('run', () => {
       },
     },
     params: {},
-    keys: [],
   };
 
   const stubContext: Context = {

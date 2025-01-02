@@ -9,7 +9,9 @@
   },
   "dependencies": {
     "@actions/core": "^1.11.1",
+    "@actions/github": "^6.0.0",
     "@aws-sdk/client-dynamodb": "^3.716.0",
+    "@aws-sdk/lib-dynamodb": "^3.716.0",
     "@monotonix/schema": "*",
     "js-yaml": "^4.1.0",
     "zod": "^3.24.1"
