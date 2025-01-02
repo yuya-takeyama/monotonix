@@ -62174,7 +62174,7 @@ const run = async ({ workflowId, githubRef, jobs, table, region, }) => {
         workflowId,
         githubRef,
     });
-    return jobs;
+    return filteredJobs;
 };
 exports.run = run;
 const setRunningStatus = async ({ docClient, table, jobs, workflowId, githubRef, }) => {

@@ -41,7 +41,7 @@ export const run = async ({
     githubRef,
   });
 
-  return jobs;
+  return filteredJobs;
 };
 
 const setRunningStatus = async ({
