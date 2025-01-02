@@ -2,8 +2,8 @@ name: 'Load Job Params for docker build'
 author: 'Yuya Takeyama'
 
 inputs:
-  job-params:
-    description: 'Job Params'
+  jobs:
+    description: 'Jobs'
   global-config-file-path:
     description: 'Global config file path'
     required: true
@@ -14,7 +14,7 @@ inputs:
 
 outputs:
   result:
-    description: 'Job Params'
+    description: 'Jobs'
 
 runs:
   using: 'node20'

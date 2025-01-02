@@ -2,8 +2,8 @@ name: 'Store state into DynamoDB'
 author: 'Yuya Takeyama'
 
 inputs:
-  job-params:
-    description: 'Job Params'
+  jobs:
+    description: 'Jobs'
     required: true
   dynamodb-table:
     description: 'DynamoDB Table'
