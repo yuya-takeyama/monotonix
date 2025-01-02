@@ -24,7 +24,7 @@ jobs:
 
       - name: Build
         run: |
-          npm run build -w @monotonix/schema
+          npm run build -w @monotonix/schema -w @monotonix/dynamodb-common
           npm run build
           npm run package
 

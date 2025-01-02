@@ -1,19 +1,26 @@
 import { getInput, setFailed } from '@actions/core';
 import { run } from './run';
-import { Jobs, JobSchema, JobsSchema } from '@monotonix/schema';
+import { JobSchema } from '@monotonix/schema';
+import { context } from '@actions/github';
 
 try {
+  const workflowId =
+    getInput('workflow-id') || process.env.MONOTONIX_WORKFLOW_ID;
+  if (!workflowId) {
+    throw new Error(
+      'Input workflow-id or env $MONOTONIX_WORKFLOW_ID is required',
+    );
+  }
   const table = getInput('dynamodb-table');
   const region = getInput('dynamodb-region');
-  const jobsJson = getInput('jobs') || process.env.MONOTONIX_JOBS;
-  if (!jobsJson) {
-    throw new Error('Input job or env $MONOTONIX_JOBS is required');
-  }
-  const jobs = parseJobs(jobsJson);
+  const jobJson = getInput('job');
+  const job = JobSchema.parse(jobJson);
   const status = getInput('status');
-  if (!(status === 'running' || status === 'success' || status === 'failure')) {
+  if (
+    !(status === 'success' || status === 'failure' || status === 'cancelled')
+  ) {
     throw new Error(
-      `Invalid status: ${status}: must be one of 'running', 'success', 'failure'`,
+      `Invalid status: ${status}: must be one of 'success', 'failure', or 'cancelled'`,
     );
   }
 
@@ -28,7 +35,9 @@ try {
   }
 
   run({
-    jobs,
+    workflowId,
+    githubRef: context.ref,
+    job,
     table,
     region,
     status,
@@ -37,16 +46,4 @@ try {
 } catch (error) {
   console.error(error);
   setFailed(`Action failed with error: ${error}`);
-}
-
-function parseJobs(jobsJson: string): Jobs {
-  if (isArrayJson(jobsJson)) {
-    return JobsSchema.parse(JSON.parse(jobsJson));
-  } else {
-    return [JobSchema.parse(JSON.parse(jobsJson))];
-  }
-}
-
-function isArrayJson(value: string): boolean {
-  return value.trim().startsWith('[');
 }

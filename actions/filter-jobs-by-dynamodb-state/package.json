@@ -12,6 +12,7 @@
     "@actions/github": "^6.0.0",
     "@aws-sdk/client-dynamodb": "^3.716.0",
     "@aws-sdk/lib-dynamodb": "^3.716.0",
+    "@monotonix/dynamodb-common": "*",
     "@monotonix/schema": "*",
     "js-yaml": "^4.1.0",
     "zod": "^3.24.1"

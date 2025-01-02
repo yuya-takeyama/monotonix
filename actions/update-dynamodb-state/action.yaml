@@ -1,20 +1,21 @@
-name: 'Store state into DynamoDB'
+name: 'Update DynamoDB State'
 author: 'Yuya Takeyama'
 
 inputs:
-  jobs:
-    description: 'Jobs'
   dynamodb-table:
     description: 'DynamoDB Table'
     required: true
   dynamodb-region:
     description: 'DynamoDB Region'
     required: true
+  job:
+    description: 'Job'
+    required: true
   status:
-    description: 'Status (running, success, failure)'
+    description: 'Job Status (Use job.status)'
     required: true
   ttl-in-days:
-    description: 'TTL in hays'
+    description: 'TTL in days'
     required: false
   ttl-in-hours:
     description: 'TTL in hours'

@@ -1,5 +1,5 @@
 {
-  "name": "@monotonix/store-dynamodb-state",
+  "name": "@monotonix/update-dynamodb-state",
   "scripts": {
     "build": "tsc",
     "format": "prettier --write .",
@@ -8,6 +8,8 @@
     "all": "npm run format && npm run test && npm run package"
   },
   "dependencies": {
+    "@actions/core": "^1.11.1",
+    "@actions/github": "^6.0.0",
     "@aws-sdk/client-dynamodb": "^3.716.0",
     "@monotonix/schema": "*",
     "js-yaml": "^4.1.0",

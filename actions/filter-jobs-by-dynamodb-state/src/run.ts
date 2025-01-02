@@ -7,6 +7,7 @@ import {
 } from '@aws-sdk/lib-dynamodb';
 import { info, warning } from '@actions/core';
 import { z } from 'zod';
+import { StateItemSchema, StateItem } from '@monotonix/dynamodb-common';
 
 type runParam = {
   workflowId: string;
@@ -154,16 +155,6 @@ const filterJobsByAppJobStatuses = (
     return true;
   });
 };
-
-const StateItemSchema = z.object({
-  appPath: z.string(),
-  jobKey: z.string(),
-  jobStatus: z.enum(['running', 'success']),
-  commitTs: z.number(),
-  commitHash: z.string(),
-});
-
-type StateItem = z.infer<typeof StateItemSchema>;
 
 const AppJobStatus = z.object({
   appPath: z.string(),

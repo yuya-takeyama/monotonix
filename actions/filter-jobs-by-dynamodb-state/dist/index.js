@@ -62079,6 +62079,25 @@ exports.NEVER = parseUtil_1.INVALID;
 
 /***/ }),
 
+/***/ 9266:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.StateItemSchema = void 0;
+const zod_1 = __nccwpck_require__(5421);
+exports.StateItemSchema = zod_1.z.object({
+    appPath: zod_1.z.string(),
+    jobKey: zod_1.z.string(),
+    jobStatus: zod_1.z.enum(['running', 'success']),
+    commitTs: zod_1.z.number(),
+    commitHash: zod_1.z.string(),
+});
+
+
+/***/ }),
+
 /***/ 67:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
@@ -62157,6 +62176,7 @@ const client_dynamodb_1 = __nccwpck_require__(7173);
 const lib_dynamodb_1 = __nccwpck_require__(2415);
 const core_1 = __nccwpck_require__(7184);
 const zod_1 = __nccwpck_require__(5421);
+const dynamodb_common_1 = __nccwpck_require__(9266);
 const run = async ({ workflowId, githubRef, jobs, table, region, }) => {
     const client = new client_dynamodb_1.DynamoDBClient({ region });
     const docClient = lib_dynamodb_1.DynamoDBDocumentClient.from(client);
@@ -62242,13 +62262,6 @@ const filterJobsByAppJobStatuses = (jobs, appJobStatuses) => {
         return true;
     });
 };
-const StateItemSchema = zod_1.z.object({
-    appPath: zod_1.z.string(),
-    jobKey: zod_1.z.string(),
-    jobStatus: zod_1.z.enum(['running', 'success']),
-    commitTs: zod_1.z.number(),
-    commitHash: zod_1.z.string(),
-});
 const AppJobStatus = zod_1.z.object({
     appPath: zod_1.z.string(),
     jobKey: zod_1.z.string(),
@@ -62260,7 +62273,7 @@ const transofrmItems = (items) => {
     const appJobStatuses = {};
     for (const item of items) {
         let stateItem = null;
-        const result = StateItemSchema.safeParse(item);
+        const result = dynamodb_common_1.StateItemSchema.safeParse(item);
         if (result.success) {
             stateItem = result.data;
             const appJobStatus = appJobStatuses[`${stateItem.appPath}#${stateItem.jobKey}`];
