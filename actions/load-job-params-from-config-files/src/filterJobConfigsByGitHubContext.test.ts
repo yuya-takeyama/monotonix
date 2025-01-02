@@ -1,9 +1,9 @@
 import { Context } from '@actions/github/lib/context';
-import { filterJobConfigsByGitHubContext } from './filterJobConfigsByGitHubContext';
-import { JobConfig } from '@monotonix/schema';
+import { filterJobParamsByGitHubContext } from './filterJobConfigsByGitHubContext';
+import { JobParam } from '@monotonix/schema';
 
 describe('filterJobConfigsByGitHubContext', () => {
-  const pushMainJobConfig: JobConfig = {
+  const pushMainJobConfig: JobParam = {
     app: {
       name: 'hello-world',
     },
@@ -20,8 +20,7 @@ describe('filterJobConfigsByGitHubContext', () => {
         branches: ['main'],
       },
     },
-    type: 'docker_build',
-    config: {
+    configs: {
       docker_build: {
         environment: {
           type: 'aws',
@@ -34,9 +33,10 @@ describe('filterJobConfigsByGitHubContext', () => {
         platforms: ['linux/amd64'],
       },
     },
+    params: {},
     keys: [],
   };
-  const pullRequestJobConfig: JobConfig = {
+  const pullRequestJobConfig: JobParam = {
     app: {
       name: 'hello-world',
     },
@@ -51,17 +51,15 @@ describe('filterJobConfigsByGitHubContext', () => {
     on: {
       pull_request: null,
     },
-    type: 'docker_build',
-    config: {
-      platform: {
-        type: 'aws',
-        aws: {
-          identity: 'dev_main',
-          registry: 'dev_main',
-        },
+    configs: {
+      generic: {
+        foo: 'FOO',
       },
-      tagging: 'always_latest',
-      platforms: ['linux/amd64'],
+    },
+    params: {
+      generic: {
+        foo: 'FOO',
+      },
     },
     keys: [],
   };
@@ -75,8 +73,8 @@ describe('filterJobConfigsByGitHubContext', () => {
         ref: 'refs/heads/main',
       };
       expect(
-        filterJobConfigsByGitHubContext({
-          jobConfigs: stubLocalConfigs,
+        filterJobParamsByGitHubContext({
+          jobParams: stubLocalConfigs,
           context,
         }),
       ).toStrictEqual([pushMainJobConfig]);
@@ -89,8 +87,8 @@ describe('filterJobConfigsByGitHubContext', () => {
         ref: 'refs/heads/feature',
       };
       expect(
-        filterJobConfigsByGitHubContext({
-          jobConfigs: stubLocalConfigs,
+        filterJobParamsByGitHubContext({
+          jobParams: stubLocalConfigs,
           context,
         }),
       ).toStrictEqual([]);

@@ -34,13 +34,16 @@ const LocalConfigJobEventSchema = z.intersection(
   PullRequestEventSchema,
 );
 
-const LocalConfigJobConfigSchema = z.object({}).passthrough();
+const LocalConfigJobConfigsSchema = z
+  .object({})
+  .catchall(z.object({}).catchall(z.any()));
 
 const LocalConfigJobSchema = z.object({
   on: LocalConfigJobEventSchema,
-  type: z.string(),
-  config: LocalConfigJobConfigSchema,
+  configs: LocalConfigJobConfigsSchema,
 });
+
+export type LocalConfigJob = z.infer<typeof LocalConfigJobSchema>;
 
 export const LocalConfigSchema = z.object({
   app: z.object({
@@ -62,19 +65,16 @@ const JobTargetKeys = z.array(z.tuple([z.string(), z.string()]));
 
 export type LocalConfig = z.infer<typeof LocalConfigSchema>;
 
-export const JobConfigSchema = z.object({
+export const JobParamSchema = z.object({
   app: AppSchema,
   app_context: AppContextSchema,
   on: LocalConfigJobEventSchema,
-  type: z.string(),
-  config: LocalConfigJobConfigSchema,
+  configs: LocalConfigJobConfigsSchema,
+  params: z.object({}).catchall(z.object({}).catchall(z.any())),
   keys: JobTargetKeys,
 });
 
-export type JobConfig = z.infer<typeof JobConfigSchema>;
-
-export const JobParamSchema = JobConfigSchema.extend({
-  param: z.record(z.string(), z.any()),
-});
-
 export type JobParam = z.infer<typeof JobParamSchema>;
+
+export const JobParamsSchema = z.array(JobParamSchema);
+export type JobParams = z.infer<typeof JobParamsSchema>;

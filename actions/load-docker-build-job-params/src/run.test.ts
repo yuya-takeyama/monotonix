@@ -1,8 +1,8 @@
 import { run } from './run';
 import {
   DockerBuildGlobalConfig,
-  DockerBuildJobConfig,
-  DockerBuildJobParam,
+  InputJobParam,
+  OutputJobParam,
 } from './schema';
 import { Context } from '@actions/github/lib/context';
 
@@ -30,7 +30,7 @@ describe('run', () => {
     },
   };
 
-  const stubJobConfig: DockerBuildJobConfig = {
+  const stubJobConfig: InputJobParam = {
     app: {
       name: 'hello-world',
     },
@@ -42,23 +42,25 @@ describe('run', () => {
       },
       label: '',
     },
-    type: 'docker_build',
-    config: {
-      registry: {
-        type: 'aws',
-        aws: {
-          iam: 'some-registry',
-          repository: 'some-registry',
+    configs: {
+      docker_build: {
+        registry: {
+          type: 'aws',
+          aws: {
+            iam: 'some-registry',
+            repository: 'some-registry',
+          },
         },
+        tagging: 'always_latest',
+        platforms: ['linux/amd64', 'linux/arm64'],
       },
-      tagging: 'always_latest',
-      platforms: ['linux/amd64', 'linux/arm64'],
     },
     on: {
       push: {
         branches: ['main'],
       },
     },
+    params: {},
     keys: [],
   };
 
@@ -74,28 +76,30 @@ describe('run', () => {
   it('returns build parameters for docker build', () => {
     const result = run({
       globalConfig: stubGlobalConfig,
-      jobConfigs: JSON.stringify([stubJobConfig]),
+      jobParams: JSON.stringify([stubJobConfig]),
       context: stubContext,
     });
-    const expected: DockerBuildJobParam[] = [
+    const expected: OutputJobParam[] = [
       {
         ...stubJobConfig,
-        param: {
-          registry: {
-            type: 'aws',
-            aws: {
-              iam: {
-                role: 'some-identity',
-                region: 'some-region',
-              },
-              repository: {
-                type: 'private',
+        params: {
+          docker_build: {
+            registry: {
+              type: 'aws',
+              aws: {
+                iam: {
+                  role: 'some-identity',
+                  region: 'some-region',
+                },
+                repository: {
+                  type: 'private',
+                },
               },
             },
+            context: '/apps/hello-world',
+            tags: 'some-repository-base/hello-world:latest',
+            platforms: 'linux/amd64,linux/arm64',
           },
-          context: '/apps/hello-world',
-          tags: 'some-repository-base/hello-world:latest',
-          platforms: 'linux/amd64,linux/arm64',
         },
       },
     ];

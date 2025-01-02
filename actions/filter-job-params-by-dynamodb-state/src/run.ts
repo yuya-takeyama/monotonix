@@ -1,10 +1,9 @@
-import { JobParam, JobParamSchema } from '@monotonix/schema';
+import { JobParam, JobParamsSchema } from '@monotonix/schema';
 import {
   DynamoDBClient,
   QueryCommand,
   QueryCommandInput,
 } from '@aws-sdk/client-dynamodb';
-import { z } from 'zod';
 import { info } from '@actions/core';
 
 type runParam = {
@@ -20,7 +19,7 @@ export const run = async ({
   const client = new DynamoDBClient({ region });
 
   const results = await Promise.all(
-    paraseJobParams(jobParams).map(async jobParam => {
+    JobParamsSchema.parse(JSON.parse(jobParams)).map(async jobParam => {
       const input: QueryCommandInput = {
         TableName: table,
         KeyConditionExpression: 'pk = :pk AND sk >= :sk',
@@ -47,8 +46,4 @@ export const run = async ({
   );
 
   return results.filter(result => !!result);
-};
-
-const paraseJobParams = (jobParams: string): JobParam[] => {
-  return z.array(JobParamSchema).parse(JSON.parse(jobParams));
 };

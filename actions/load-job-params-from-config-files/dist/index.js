@@ -38819,7 +38819,7 @@ exports.NEVER = parseUtil_1.INVALID;
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.JobParamSchema = exports.JobConfigSchema = exports.LocalConfigSchema = exports.GlobalConfigSchema = void 0;
+exports.JobParamsSchema = exports.JobParamSchema = exports.LocalConfigSchema = exports.GlobalConfigSchema = void 0;
 const zod_1 = __nccwpck_require__(5421);
 exports.GlobalConfigSchema = zod_1.z.object({
     job_types: zod_1.z.record(zod_1.z.string(), zod_1.z.object({}).passthrough()),
@@ -38845,11 +38845,12 @@ const AppSchema = zod_1.z.object({
     name: zod_1.z.string(),
 });
 const LocalConfigJobEventSchema = zod_1.z.intersection(PushEventScema, PullRequestEventSchema);
-const LocalConfigJobConfigSchema = zod_1.z.object({}).passthrough();
+const LocalConfigJobConfigsSchema = zod_1.z
+    .object({})
+    .catchall(zod_1.z.object({}).catchall(zod_1.z.any()));
 const LocalConfigJobSchema = zod_1.z.object({
     on: LocalConfigJobEventSchema,
-    type: zod_1.z.string(),
-    config: LocalConfigJobConfigSchema,
+    configs: LocalConfigJobConfigsSchema,
 });
 exports.LocalConfigSchema = zod_1.z.object({
     app: zod_1.z.object({
@@ -38866,17 +38867,15 @@ const AppContextSchema = zod_1.z.object({
     label: zod_1.z.string(),
 });
 const JobTargetKeys = zod_1.z.array(zod_1.z.tuple([zod_1.z.string(), zod_1.z.string()]));
-exports.JobConfigSchema = zod_1.z.object({
+exports.JobParamSchema = zod_1.z.object({
     app: AppSchema,
     app_context: AppContextSchema,
     on: LocalConfigJobEventSchema,
-    type: zod_1.z.string(),
-    config: LocalConfigJobConfigSchema,
+    configs: LocalConfigJobConfigsSchema,
+    params: zod_1.z.object({}).catchall(zod_1.z.object({}).catchall(zod_1.z.any())),
     keys: JobTargetKeys,
 });
-exports.JobParamSchema = exports.JobConfigSchema.extend({
-    param: zod_1.z.record(zod_1.z.string(), zod_1.z.any()),
-});
+exports.JobParamsSchema = zod_1.z.array(exports.JobParamSchema);
 
 
 /***/ }),
@@ -38887,18 +38886,18 @@ exports.JobParamSchema = exports.JobConfigSchema.extend({
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.filterJobConfigsByGitHubContext = filterJobConfigsByGitHubContext;
+exports.filterJobParamsByGitHubContext = filterJobParamsByGitHubContext;
 const schema_1 = __nccwpck_require__(67);
 const minimatch_1 = __nccwpck_require__(8286);
-function filterJobConfigsByGitHubContext({ jobConfigs, context, }) {
-    return jobConfigs
-        .filter(job => {
+function filterJobParamsByGitHubContext({ jobParams, context, }) {
+    return jobParams
+        .filter(jobParam => {
         switch (context.eventName) {
             case 'push':
-                if (job.on.push) {
-                    if (job.on.push.branches) {
+                if (jobParam.on.push) {
+                    if (jobParam.on.push.branches) {
                         const branchName = context.ref.replace(/^refs\/heads\//, '');
-                        const result = job.on.push.branches.some(branch => (0, minimatch_1.minimatch)(branchName, branch));
+                        const result = jobParam.on.push.branches.some(branch => (0, minimatch_1.minimatch)(branchName, branch));
                         if (result) {
                             return true;
                         }
@@ -38908,9 +38907,9 @@ function filterJobConfigsByGitHubContext({ jobConfigs, context, }) {
                     }
                 }
             case 'pull_request':
-                if (job.on.pull_request) {
-                    if (job.on.pull_request.branches) {
-                        const result = job.on.pull_request.branches.some(branch => 
+                if (jobParam.on.pull_request) {
+                    if (jobParam.on.pull_request.branches) {
+                        const result = jobParam.on.pull_request.branches.some(branch => 
                         // @ts-ignore
                         (0, minimatch_1.minimatch)(context.ref_name, branch));
                         if (result) {
@@ -38924,7 +38923,7 @@ function filterJobConfigsByGitHubContext({ jobConfigs, context, }) {
                 return false;
         }
     })
-        .map(jobConfig => schema_1.JobConfigSchema.parse(jobConfig));
+        .map(jobParam => schema_1.JobParamSchema.parse(jobParam));
 }
 
 
@@ -38984,7 +38983,7 @@ exports.getLastCommit = getLastCommit;
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.createJobConfig = exports.loadJobConfigsFromLocalConfigFiles = void 0;
+exports.createJobParam = exports.loadJobConfigsFromLocalConfigFiles = void 0;
 const schema_1 = __nccwpck_require__(67);
 const js_yaml_1 = __nccwpck_require__(4148);
 const node_fs_1 = __nccwpck_require__(3024);
@@ -39000,7 +38999,7 @@ const loadJobConfigsFromLocalConfigFiles = async ({ rootDir, localConfigFileName
         try {
             const localConfigContent = (0, node_fs_1.readFileSync)(localConfigPath, 'utf-8');
             const localConfig = schema_1.LocalConfigSchema.parse((0, js_yaml_1.load)(localConfigContent));
-            return Object.entries(localConfig.jobs).map(([jobKey, job]) => (0, exports.createJobConfig)({
+            return Object.entries(localConfig.jobs).map(([jobKey, job]) => (0, exports.createJobParam)({
                 localConfig,
                 appPath,
                 lastCommit,
@@ -39016,23 +39015,22 @@ const loadJobConfigsFromLocalConfigFiles = async ({ rootDir, localConfigFileName
     return jobConfigs.flat();
 };
 exports.loadJobConfigsFromLocalConfigFiles = loadJobConfigsFromLocalConfigFiles;
-const createJobConfig = ({ localConfig, appPath, lastCommit, jobKey, job, context, }) => ({
+const createJobParam = ({ localConfig, appPath, lastCommit, jobKey, job, context, }) => ({
+    ...job,
     app: localConfig.app,
     app_context: {
         path: appPath,
         last_commit: lastCommit,
         label: `${localConfig.app.name} / ${jobKey}`,
     },
-    on: job.on,
-    type: job.type,
-    config: job.config,
+    params: {},
     keys: [
         ['app_path', appPath],
         ['job_key', jobKey],
         ['github_ref', context.ref],
     ],
 });
-exports.createJobConfig = createJobConfig;
+exports.createJobParam = createJobParam;
 
 
 /***/ }),
@@ -39047,8 +39045,8 @@ exports.run = void 0;
 const filterJobConfigsByGitHubContext_1 = __nccwpck_require__(9703);
 const loadJobsFromLocalConfigs_1 = __nccwpck_require__(1010);
 const run = async ({ rootDir, localConfigFileName, context, }) => {
-    return (0, filterJobConfigsByGitHubContext_1.filterJobConfigsByGitHubContext)({
-        jobConfigs: await (0, loadJobsFromLocalConfigs_1.loadJobConfigsFromLocalConfigFiles)({
+    return (0, filterJobConfigsByGitHubContext_1.filterJobParamsByGitHubContext)({
+        jobParams: await (0, loadJobsFromLocalConfigs_1.loadJobConfigsFromLocalConfigFiles)({
             rootDir,
             localConfigFileName,
             context,

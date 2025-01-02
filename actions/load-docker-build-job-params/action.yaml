@@ -1,11 +1,9 @@
-name: 'Generate Job Params for docker build'
+name: 'Load Job Params for docker build'
 author: 'Yuya Takeyama'
 
 inputs:
-  job-configs:
-    description: 'Job Configs'
-    required: true
-    default: ${{ env.MONOTONIX_JOB_CONFIGS }}
+  job-params:
+    description: 'Job Params'
   global-config-file-path:
     description: 'Global config file path'
     required: true

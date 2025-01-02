@@ -4,7 +4,7 @@
     "build": "tsc",
     "format": "prettier --write .",
     "package": "ncc build src/index.ts -o dist --source-map --license licenses.txt",
-    "test": "jest",
+    "test": "jest --passWithNoTests",
     "all": "npm run format && npm run test && npm run package"
   },
   "dependencies": {

@@ -56447,7 +56447,7 @@ exports.NEVER = parseUtil_1.INVALID;
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.JobParamSchema = exports.JobConfigSchema = exports.LocalConfigSchema = exports.GlobalConfigSchema = void 0;
+exports.JobParamsSchema = exports.JobParamSchema = exports.LocalConfigSchema = exports.GlobalConfigSchema = void 0;
 const zod_1 = __nccwpck_require__(5421);
 exports.GlobalConfigSchema = zod_1.z.object({
     job_types: zod_1.z.record(zod_1.z.string(), zod_1.z.object({}).passthrough()),
@@ -56473,11 +56473,12 @@ const AppSchema = zod_1.z.object({
     name: zod_1.z.string(),
 });
 const LocalConfigJobEventSchema = zod_1.z.intersection(PushEventScema, PullRequestEventSchema);
-const LocalConfigJobConfigSchema = zod_1.z.object({}).passthrough();
+const LocalConfigJobConfigsSchema = zod_1.z
+    .object({})
+    .catchall(zod_1.z.object({}).catchall(zod_1.z.any()));
 const LocalConfigJobSchema = zod_1.z.object({
     on: LocalConfigJobEventSchema,
-    type: zod_1.z.string(),
-    config: LocalConfigJobConfigSchema,
+    configs: LocalConfigJobConfigsSchema,
 });
 exports.LocalConfigSchema = zod_1.z.object({
     app: zod_1.z.object({
@@ -56494,17 +56495,15 @@ const AppContextSchema = zod_1.z.object({
     label: zod_1.z.string(),
 });
 const JobTargetKeys = zod_1.z.array(zod_1.z.tuple([zod_1.z.string(), zod_1.z.string()]));
-exports.JobConfigSchema = zod_1.z.object({
+exports.JobParamSchema = zod_1.z.object({
     app: AppSchema,
     app_context: AppContextSchema,
     on: LocalConfigJobEventSchema,
-    type: zod_1.z.string(),
-    config: LocalConfigJobConfigSchema,
+    configs: LocalConfigJobConfigsSchema,
+    params: zod_1.z.object({}).catchall(zod_1.z.object({}).catchall(zod_1.z.any())),
     keys: JobTargetKeys,
 });
-exports.JobParamSchema = exports.JobConfigSchema.extend({
-    param: zod_1.z.record(zod_1.z.string(), zod_1.z.any()),
-});
+exports.JobParamsSchema = zod_1.z.array(exports.JobParamSchema);
 
 
 /***/ }),
@@ -56518,11 +56517,10 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.run = void 0;
 const schema_1 = __nccwpck_require__(67);
 const client_dynamodb_1 = __nccwpck_require__(7173);
-const zod_1 = __nccwpck_require__(5421);
 const core_1 = __nccwpck_require__(7184);
 const run = async ({ jobParams, table, region, }) => {
     const client = new client_dynamodb_1.DynamoDBClient({ region });
-    const results = await Promise.all(paraseJobParams(jobParams).map(async (jobParam) => {
+    const results = await Promise.all(schema_1.JobParamsSchema.parse(JSON.parse(jobParams)).map(async (jobParam) => {
         const input = {
             TableName: table,
             KeyConditionExpression: 'pk = :pk AND sk >= :sk',
@@ -56545,9 +56543,6 @@ const run = async ({ jobParams, table, region, }) => {
     return results.filter(result => !!result);
 };
 exports.run = run;
-const paraseJobParams = (jobParams) => {
-    return zod_1.z.array(schema_1.JobParamSchema).parse(JSON.parse(jobParams));
-};
 
 
 /***/ }),
@@ -58516,13 +58511,17 @@ const run_1 = __nccwpck_require__(4795);
     try {
         const table = (0, core_1.getInput)('dynamodb-table');
         const region = (0, core_1.getInput)('dynamodb-region');
-        const jobParams = (0, core_1.getInput)('job-params');
-        const filteredJobParams = await (0, run_1.run)({
+        const jobParams = (0, core_1.getInput)('job-params') || process.env.MONOTONIX_JOB_PARAMS;
+        if (!jobParams) {
+            throw new Error('Input job-params or env $MONOTONIX_JOB_PARAMS is required');
+        }
+        const result = JSON.stringify(await (0, run_1.run)({
             jobParams,
             table,
             region,
-        });
-        (0, core_1.setOutput)('result', filteredJobParams);
+        }));
+        (0, core_1.setOutput)('result', result);
+        (0, core_1.exportVariable)('MONOTONIX_JOB_PARAMS', result);
     }
     catch (error) {
         console.error(error);

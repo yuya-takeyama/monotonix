@@ -1,5 +1,5 @@
 {
-  "name": "@monotonix/generate-generic-job-params",
+  "name": "@monotonix/load-generic-job-params",
   "scripts": {
     "build": "tsc",
     "ci-test": "jest",

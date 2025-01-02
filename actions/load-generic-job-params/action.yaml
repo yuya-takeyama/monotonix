@@ -1,13 +1,12 @@
-name: 'Generate generic Job Params'
+name: 'Load generic Job Params'
 author: 'Yuya Takeyama'
 
 inputs:
   job-type:
     description: 'Job Type to generate job params'
     required: true
-  job-configs:
-    description: 'Job Configs'
-    required: true
+  job-params:
+    description: 'Job Params'
 
 outputs:
   result:

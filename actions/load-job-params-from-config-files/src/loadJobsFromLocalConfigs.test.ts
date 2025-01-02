@@ -1,6 +1,6 @@
-import { createJobConfig } from './loadJobsFromLocalConfigs';
+import { createJobParam } from './loadJobsFromLocalConfigs';
 import { Context } from '@actions/github/lib/context';
-import { JobConfig, LocalConfig } from '@monotonix/schema';
+import { JobParam, LocalConfig, LocalConfigJob } from '@monotonix/schema';
 
 describe('createJobConfig', () => {
   // @ts-ignore
@@ -8,15 +8,16 @@ describe('createJobConfig', () => {
     ref: 'refs/heads/main',
   } as Context;
 
-  const stubJob = {
+  const stubJob: LocalConfigJob = {
     on: {
       push: {
         branches: ['main'],
       },
     },
-    type: 'build',
-    config: {
-      foo: 'FOO',
+    configs: {
+      generic: {
+        foo: 'FOO',
+      },
     },
   };
 
@@ -38,7 +39,7 @@ describe('createJobConfig', () => {
     const appPath = '/root/subdir';
     const jobKey = 'job1';
 
-    const result = createJobConfig({
+    const result = createJobParam({
       localConfig: stubLocalConfig,
       appPath,
       lastCommit: stubCommitInfo,
@@ -47,7 +48,7 @@ describe('createJobConfig', () => {
       context: stubContext,
     });
 
-    const expected: JobConfig = {
+    const expected: JobParam = {
       app: {
         name: 'test-app',
       },
@@ -61,10 +62,12 @@ describe('createJobConfig', () => {
           branches: ['main'],
         },
       },
-      type: 'build',
-      config: {
-        foo: 'FOO',
+      configs: {
+        generic: {
+          foo: 'FOO',
+        },
       },
+      params: {},
       keys: [
         ['app_path', appPath],
         ['job_key', jobKey],
@@ -78,17 +81,18 @@ describe('createJobConfig', () => {
   it('handles different job configurations', () => {
     const appPath = '/root/subdir';
     const jobKey = 'job2';
-    const differentJob = {
+    const differentJob: LocalConfigJob = {
       on: {
         pull_request: null,
       },
-      type: 'test',
-      config: {
-        bar: 'BAR',
+      configs: {
+        generic: {
+          bar: 'BAR',
+        },
       },
     };
 
-    const result = createJobConfig({
+    const result = createJobParam({
       localConfig: stubLocalConfig,
       appPath,
       lastCommit: stubCommitInfo,
@@ -97,7 +101,7 @@ describe('createJobConfig', () => {
       context: stubContext,
     });
 
-    const expected: JobConfig = {
+    const expected: JobParam = {
       app: {
         name: 'test-app',
       },
@@ -109,10 +113,12 @@ describe('createJobConfig', () => {
       on: {
         pull_request: null,
       },
-      type: 'test',
-      config: {
-        bar: 'BAR',
+      configs: {
+        generic: {
+          bar: 'BAR',
+        },
       },
+      params: {},
       keys: [
         ['app_path', appPath],
         ['job_key', jobKey],

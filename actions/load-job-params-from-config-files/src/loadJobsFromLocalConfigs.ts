@@ -1,4 +1,9 @@
-import { LocalConfigSchema, JobConfig, LocalConfig } from '@monotonix/schema';
+import {
+  LocalConfigSchema,
+  JobParam,
+  LocalConfig,
+  LocalConfigJob,
+} from '@monotonix/schema';
 import { load } from 'js-yaml';
 import { readFileSync } from 'node:fs';
 import { globSync } from 'glob';
@@ -15,7 +20,7 @@ export const loadJobConfigsFromLocalConfigFiles = async ({
   rootDir,
   localConfigFileName,
   context,
-}: loadJobConfigsFromLocalConfigFilesParams): Promise<JobConfig[]> => {
+}: loadJobConfigsFromLocalConfigFilesParams): Promise<JobParam[]> => {
   const pattern = join(rootDir, '**', localConfigFileName);
   const localConfigPaths = globSync(pattern);
 
@@ -27,8 +32,8 @@ export const loadJobConfigsFromLocalConfigFiles = async ({
         const localConfigContent = readFileSync(localConfigPath, 'utf-8');
         const localConfig = LocalConfigSchema.parse(load(localConfigContent));
         return Object.entries(localConfig.jobs).map(
-          ([jobKey, job]): JobConfig =>
-            createJobConfig({
+          ([jobKey, job]): JobParam =>
+            createJobParam({
               localConfig,
               appPath,
               lastCommit,
@@ -53,26 +58,25 @@ type createJobConfigParams = {
   appPath: string;
   lastCommit: CommitInfo;
   jobKey: string;
-  job: any;
+  job: LocalConfigJob;
   context: Context;
 };
-export const createJobConfig = ({
+export const createJobParam = ({
   localConfig,
   appPath,
   lastCommit,
   jobKey,
   job,
   context,
-}: createJobConfigParams): JobConfig => ({
+}: createJobConfigParams): JobParam => ({
+  ...job,
   app: localConfig.app,
   app_context: {
     path: appPath,
     last_commit: lastCommit,
     label: `${localConfig.app.name} / ${jobKey}`,
   },
-  on: job.on,
-  type: job.type,
-  config: job.config,
+  params: {},
   keys: [
     ['app_path', appPath],
     ['job_key', jobKey],
