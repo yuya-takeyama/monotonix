@@ -156,11 +156,11 @@ const filterJobsByAppJobStatuses = (
 };
 
 const StateItemSchema = z.object({
-  appPath: z.object({ S: z.string() }),
-  jobKey: z.object({ S: z.string() }),
-  jobStatus: z.object({ S: z.enum(['running', 'success']) }),
-  commitTs: z.object({ N: z.string() }),
-  commitHash: z.object({ S: z.string() }),
+  appPath: z.string(),
+  jobKey: z.string(),
+  jobStatus: z.enum(['running', 'success']),
+  commitTs: z.number(),
+  commitHash: z.string(),
 });
 
 type StateItem = z.infer<typeof StateItemSchema>;
@@ -187,14 +187,14 @@ const transofrmItems = (items: Record<string, any>[]) => {
         appJobStatuses[`${stateItem.appPath}#${stateItem.jobKey}`];
       if (!appJobStatus) {
         appJobStatuses[`${stateItem.appPath}#${stateItem.jobKey}`] = {
-          appPath: stateItem.appPath.S,
-          jobKey: stateItem.jobKey.S,
-          [`${stateItem.jobStatus.S}Ts`]: Number(stateItem.commitTs.N),
+          appPath: stateItem.appPath,
+          jobKey: stateItem.jobKey,
+          [`${stateItem.jobStatus}Ts`]: stateItem.commitTs,
         };
       } else {
         appJobStatuses[`${stateItem.appPath}#${stateItem.jobKey}`] = {
           ...appJobStatus,
-          [`${stateItem.jobStatus.S}Ts`]: Number(stateItem.commitTs.N),
+          [`${stateItem.jobStatus}Ts`]: stateItem.commitTs,
         };
       }
     } else {

@@ -62243,11 +62243,11 @@ const filterJobsByAppJobStatuses = (jobs, appJobStatuses) => {
     });
 };
 const StateItemSchema = zod_1.z.object({
-    appPath: zod_1.z.object({ S: zod_1.z.string() }),
-    jobKey: zod_1.z.object({ S: zod_1.z.string() }),
-    jobStatus: zod_1.z.object({ S: zod_1.z.enum(['running', 'success']) }),
-    commitTs: zod_1.z.object({ N: zod_1.z.string() }),
-    commitHash: zod_1.z.object({ S: zod_1.z.string() }),
+    appPath: zod_1.z.string(),
+    jobKey: zod_1.z.string(),
+    jobStatus: zod_1.z.enum(['running', 'success']),
+    commitTs: zod_1.z.number(),
+    commitHash: zod_1.z.string(),
 });
 const AppJobStatus = zod_1.z.object({
     appPath: zod_1.z.string(),
@@ -62266,15 +62266,15 @@ const transofrmItems = (items) => {
             const appJobStatus = appJobStatuses[`${stateItem.appPath}#${stateItem.jobKey}`];
             if (!appJobStatus) {
                 appJobStatuses[`${stateItem.appPath}#${stateItem.jobKey}`] = {
-                    appPath: stateItem.appPath.S,
-                    jobKey: stateItem.jobKey.S,
-                    [`${stateItem.jobStatus.S}Ts`]: Number(stateItem.commitTs.N),
+                    appPath: stateItem.appPath,
+                    jobKey: stateItem.jobKey,
+                    [`${stateItem.jobStatus}Ts`]: stateItem.commitTs,
                 };
             }
             else {
                 appJobStatuses[`${stateItem.appPath}#${stateItem.jobKey}`] = {
                     ...appJobStatus,
-                    [`${stateItem.jobStatus.S}Ts`]: Number(stateItem.commitTs.N),
+                    [`${stateItem.jobStatus}Ts`]: stateItem.commitTs,
                 };
             }
         }
