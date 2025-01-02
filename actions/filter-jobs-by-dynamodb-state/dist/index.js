@@ -62183,14 +62183,14 @@ const setRunningStatus = async ({ docClient, table, jobs, workflowId, githubRef,
         const putItems = jobs.map(job => ({
             PutRequest: {
                 Item: {
-                    pk: { S: `STATE#${workflowId}#${githubRef}` },
-                    sk: { S: `${job.context.app_path}#${job.context.job_key}#running` },
-                    appPath: { S: job.context.app_path },
-                    jobKey: { S: job.context.job_key },
-                    jobStatus: { S: 'running' },
-                    commitTs: { N: job.context.last_commit.timestamp.toString() },
-                    commitHash: { S: job.context.last_commit.hash },
-                    ttl: { N: (Math.floor(Date.now() / 1000) + 60 * 60).toString() },
+                    pk: `STATE#${workflowId}#${githubRef}`,
+                    sk: `${job.context.app_path}#${job.context.job_key}#running`,
+                    appPath: job.context.app_path,
+                    jobKey: job.context.job_key,
+                    jobStatus: 'running',
+                    commitTs: job.context.last_commit.timestamp,
+                    commitHash: job.context.last_commit.hash,
+                    ttl: Math.floor(Date.now() / 1000) + 60 * 60,
                 },
             },
         }));
@@ -62199,7 +62199,7 @@ const setRunningStatus = async ({ docClient, table, jobs, workflowId, githubRef,
                 [table]: putItems,
             },
         };
-        await docClient.send(new client_dynamodb_1.BatchWriteItemCommand(params));
+        await docClient.send(new lib_dynamodb_1.BatchWriteCommand(params));
     }
 };
 const partitionArray = (chunkSize, array) => {
