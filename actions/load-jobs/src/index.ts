@@ -4,11 +4,17 @@ import { run } from './run';
 
 (async () => {
   try {
+    const workflowId = getInput('workflow-id');
     const rootDir = getInput('root-dir');
     const localConfigFileName =
       getInput('local-config-file-name') || 'monotonix.yaml';
 
-    const result = await run({ rootDir, localConfigFileName, context });
+    const result = await run({
+      workflowId,
+      rootDir,
+      localConfigFileName,
+      context,
+    });
 
     setOutput('result', result);
     exportVariable('MONOTONIX_JOBS', result);

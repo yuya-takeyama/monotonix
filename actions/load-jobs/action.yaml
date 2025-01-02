@@ -3,6 +3,9 @@ description: 'Load and filter Jobs from config files'
 author: 'Yuya Takeyama'
 
 inputs:
+  workflow-id:
+    description: 'Workflow ID'
+    required: true
   root-dir:
     description: 'Root directory'
     required: true

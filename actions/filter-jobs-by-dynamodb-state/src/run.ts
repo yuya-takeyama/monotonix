@@ -1,4 +1,4 @@
-import { Jobs, JobSchema } from '@monotonix/schema';
+import { Jobs } from '@monotonix/schema';
 import {
   DynamoDBClient,
   QueryCommand,
@@ -22,7 +22,7 @@ export const run = async ({ jobs, table, region }: runParam): Promise<Jobs> => {
         FilterExpression: 'jobStatus = :success OR jobStatus = :running',
         ExpressionAttributeValues: {
           ':pk': { S: JSON.stringify(job.keys) },
-          ':sk': { N: job.app_context.last_commit.timestamp.toString() },
+          ':sk': { N: job.context.last_commit.timestamp.toString() },
           ':success': { S: 'success' },
           ':running': { S: 'running' },
         },
@@ -31,7 +31,7 @@ export const run = async ({ jobs, table, region }: runParam): Promise<Jobs> => {
       const result = await client.send(new QueryCommand(input));
       if (typeof result.Count === 'number' && result.Count > 0) {
         info(
-          `Skip: Job is already running or success: ${job.app_context.label}: ${job.app_context.last_commit.hash}`,
+          `Skip: Job is already running or success: ${job.context.label}: ${job.context.last_commit.hash}`,
         );
 
         return null;

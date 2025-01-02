@@ -41,19 +41,21 @@ describe('createJob', () => {
 
     const result = createJob({
       localConfig: stubLocalConfig,
+      workflowId: 'docker_build',
       appPath,
       lastCommit: stubCommitInfo,
       jobKey,
       job: stubJob,
-      context: stubContext,
+      githubContext: stubContext,
     });
 
     const expected: Job = {
       app: {
         name: 'test-app',
       },
-      app_context: {
-        path: appPath,
+      context: {
+        workflow_id: 'docker_build',
+        app_path: appPath,
         last_commit: stubCommitInfo,
         label: 'test-app / job1',
       },
@@ -94,19 +96,21 @@ describe('createJob', () => {
 
     const result = createJob({
       localConfig: stubLocalConfig,
+      workflowId: 'docker_build',
       appPath,
       lastCommit: stubCommitInfo,
       jobKey,
       job: differentJob,
-      context: stubContext,
+      githubContext: stubContext,
     });
 
     const expected: Job = {
       app: {
         name: 'test-app',
       },
-      app_context: {
-        path: appPath,
+      context: {
+        workflow_id: 'docker_build',
+        app_path: appPath,
         last_commit: stubCommitInfo,
         label: 'test-app / job2',
       },

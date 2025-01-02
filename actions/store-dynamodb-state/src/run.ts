@@ -31,11 +31,11 @@ export const run = async ({
       PutRequest: {
         Item: {
           pk: { S: JSON.stringify(job.keys) },
-          sk: { N: job.app_context.last_commit.timestamp.toString() },
+          sk: { N: job.context.last_commit.timestamp.toString() },
           // "status" is a reserved word in DynamoDB
           // https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/ReservedWords.html
           jobStatus: { S: status },
-          commitHash: { S: job.app_context.last_commit.hash },
+          commitHash: { S: job.context.last_commit.hash },
           ...ttlKey,
         },
       },

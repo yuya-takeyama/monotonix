@@ -30,8 +30,9 @@ describe('run', () => {
     app: {
       name: 'hello-world',
     },
-    app_context: {
-      path: '/apps/hello-world',
+    context: {
+      workflow_id: 'docker_build',
+      app_path: '/apps/hello-world',
       last_commit: {
         hash: '0000000000000000000000000000000000000000',
         timestamp: 0,

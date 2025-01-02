@@ -46205,6 +46205,9 @@ const zod_1 = __nccwpck_require__(5421);
 exports.GlobalConfigSchema = zod_1.z.object({
     job_types: zod_1.z.record(zod_1.z.string(), zod_1.z.object({}).passthrough()),
 });
+const AppSchema = zod_1.z.object({
+    name: zod_1.z.string(),
+});
 const PushEventScema = zod_1.z.object({
     push: zod_1.z
         .object({
@@ -46222,16 +46225,11 @@ const PullRequestEventSchema = zod_1.z.object({
         .optional()
         .nullable(),
 });
-const AppSchema = zod_1.z.object({
-    name: zod_1.z.string(),
-});
-const LocalConfigJobEventSchema = zod_1.z.intersection(PushEventScema, PullRequestEventSchema);
-const LocalConfigJobConfigsSchema = zod_1.z
-    .object({})
-    .catchall(zod_1.z.object({}).catchall(zod_1.z.any()));
+const JobEventSchema = zod_1.z.intersection(PushEventScema, PullRequestEventSchema);
+const JobConfigsSchema = zod_1.z.object({}).catchall(zod_1.z.object({}).catchall(zod_1.z.any()));
 const LocalConfigJobSchema = zod_1.z.object({
-    on: LocalConfigJobEventSchema,
-    configs: LocalConfigJobConfigsSchema,
+    on: JobEventSchema,
+    configs: JobConfigsSchema,
 });
 exports.LocalConfigSchema = zod_1.z.object({
     app: zod_1.z.object({
@@ -46239,8 +46237,9 @@ exports.LocalConfigSchema = zod_1.z.object({
     }),
     jobs: zod_1.z.record(zod_1.z.string(), LocalConfigJobSchema),
 });
-const AppContextSchema = zod_1.z.object({
-    path: zod_1.z.string(),
+const ContextSchema = zod_1.z.object({
+    workflow_id: zod_1.z.string(),
+    app_path: zod_1.z.string(),
     last_commit: zod_1.z.object({
         hash: zod_1.z.string(),
         timestamp: zod_1.z.number(),
@@ -46250,9 +46249,9 @@ const AppContextSchema = zod_1.z.object({
 const JobTargetKeys = zod_1.z.array(zod_1.z.tuple([zod_1.z.string(), zod_1.z.string()]));
 exports.JobSchema = zod_1.z.object({
     app: AppSchema,
-    app_context: AppContextSchema,
-    on: LocalConfigJobEventSchema,
-    configs: LocalConfigJobConfigsSchema,
+    context: ContextSchema,
+    on: JobEventSchema,
+    configs: JobConfigsSchema,
     params: zod_1.z.object({}).catchall(zod_1.z.object({}).catchall(zod_1.z.any())),
     keys: JobTargetKeys,
 });
@@ -46317,7 +46316,7 @@ function run({ globalConfig, jobs, context }) {
                             },
                         },
                     },
-                    context: job.app_context.path,
+                    context: job.context.app_path,
                     tags: generateTags({
                         committedAt: (0, utils_1.getCommittedAt)(context),
                         globalConfig,

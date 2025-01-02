@@ -55,7 +55,7 @@ export function run({ globalConfig, jobs, context }: runParams): OutputJobs {
               },
             },
           },
-          context: job.app_context.path,
+          context: job.context.app_path,
           tags: generateTags({
             committedAt: getCommittedAt(context),
             globalConfig,

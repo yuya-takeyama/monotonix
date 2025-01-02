@@ -38824,6 +38824,9 @@ const zod_1 = __nccwpck_require__(5421);
 exports.GlobalConfigSchema = zod_1.z.object({
     job_types: zod_1.z.record(zod_1.z.string(), zod_1.z.object({}).passthrough()),
 });
+const AppSchema = zod_1.z.object({
+    name: zod_1.z.string(),
+});
 const PushEventScema = zod_1.z.object({
     push: zod_1.z
         .object({
@@ -38841,16 +38844,11 @@ const PullRequestEventSchema = zod_1.z.object({
         .optional()
         .nullable(),
 });
-const AppSchema = zod_1.z.object({
-    name: zod_1.z.string(),
-});
-const LocalConfigJobEventSchema = zod_1.z.intersection(PushEventScema, PullRequestEventSchema);
-const LocalConfigJobConfigsSchema = zod_1.z
-    .object({})
-    .catchall(zod_1.z.object({}).catchall(zod_1.z.any()));
+const JobEventSchema = zod_1.z.intersection(PushEventScema, PullRequestEventSchema);
+const JobConfigsSchema = zod_1.z.object({}).catchall(zod_1.z.object({}).catchall(zod_1.z.any()));
 const LocalConfigJobSchema = zod_1.z.object({
-    on: LocalConfigJobEventSchema,
-    configs: LocalConfigJobConfigsSchema,
+    on: JobEventSchema,
+    configs: JobConfigsSchema,
 });
 exports.LocalConfigSchema = zod_1.z.object({
     app: zod_1.z.object({
@@ -38858,8 +38856,9 @@ exports.LocalConfigSchema = zod_1.z.object({
     }),
     jobs: zod_1.z.record(zod_1.z.string(), LocalConfigJobSchema),
 });
-const AppContextSchema = zod_1.z.object({
-    path: zod_1.z.string(),
+const ContextSchema = zod_1.z.object({
+    workflow_id: zod_1.z.string(),
+    app_path: zod_1.z.string(),
     last_commit: zod_1.z.object({
         hash: zod_1.z.string(),
         timestamp: zod_1.z.number(),
@@ -38869,9 +38868,9 @@ const AppContextSchema = zod_1.z.object({
 const JobTargetKeys = zod_1.z.array(zod_1.z.tuple([zod_1.z.string(), zod_1.z.string()]));
 exports.JobSchema = zod_1.z.object({
     app: AppSchema,
-    app_context: AppContextSchema,
-    on: LocalConfigJobEventSchema,
-    configs: LocalConfigJobConfigsSchema,
+    context: ContextSchema,
+    on: JobEventSchema,
+    configs: JobConfigsSchema,
     params: zod_1.z.object({}).catchall(zod_1.z.object({}).catchall(zod_1.z.any())),
     keys: JobTargetKeys,
 });
@@ -38990,7 +38989,7 @@ const node_fs_1 = __nccwpck_require__(3024);
 const glob_1 = __nccwpck_require__(2712);
 const node_path_1 = __nccwpck_require__(6760);
 const getLastCommit_1 = __nccwpck_require__(4815);
-const loadJobsFromLocalConfigFiles = async ({ rootDir, localConfigFileName, context, }) => {
+const loadJobsFromLocalConfigFiles = async ({ workflowId, rootDir, localConfigFileName, context, }) => {
     const pattern = (0, node_path_1.join)(rootDir, '**', localConfigFileName);
     const localConfigPaths = (0, glob_1.globSync)(pattern);
     const jobs = await Promise.all(localConfigPaths.map(async (localConfigPath) => {
@@ -39001,11 +39000,12 @@ const loadJobsFromLocalConfigFiles = async ({ rootDir, localConfigFileName, cont
             const localConfig = schema_1.LocalConfigSchema.parse((0, js_yaml_1.load)(localConfigContent));
             return Object.entries(localConfig.jobs).map(([jobKey, job]) => (0, exports.createJob)({
                 localConfig,
+                workflowId,
                 appPath,
                 lastCommit,
                 jobKey,
                 job,
-                context,
+                githubContext: context,
             }));
         }
         catch (err) {
@@ -39015,11 +39015,12 @@ const loadJobsFromLocalConfigFiles = async ({ rootDir, localConfigFileName, cont
     return jobs.flat();
 };
 exports.loadJobsFromLocalConfigFiles = loadJobsFromLocalConfigFiles;
-const createJob = ({ localConfig, appPath, lastCommit, jobKey, job, context, }) => ({
+const createJob = ({ localConfig, workflowId, appPath, lastCommit, jobKey, job, githubContext, }) => ({
     ...job,
     app: localConfig.app,
-    app_context: {
-        path: appPath,
+    context: {
+        workflow_id: workflowId,
+        app_path: appPath,
         last_commit: lastCommit,
         label: `${localConfig.app.name} / ${jobKey}`,
     },
@@ -39027,7 +39028,7 @@ const createJob = ({ localConfig, appPath, lastCommit, jobKey, job, context, }) 
     keys: [
         ['app_path', appPath],
         ['job_key', jobKey],
-        ['github_ref', context.ref],
+        ['github_ref', githubContext.ref],
     ],
 });
 exports.createJob = createJob;
@@ -39044,9 +39045,10 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.run = void 0;
 const filterJobsByGitHubContext_1 = __nccwpck_require__(5881);
 const loadJobsFromLocalConfigs_1 = __nccwpck_require__(1010);
-const run = async ({ rootDir, localConfigFileName, context, }) => {
+const run = async ({ workflowId, rootDir, localConfigFileName, context, }) => {
     return (0, filterJobsByGitHubContext_1.filterJobsByGitHubContext)({
         jobs: await (0, loadJobsFromLocalConfigs_1.loadJobsFromLocalConfigFiles)({
+            workflowId,
             rootDir,
             localConfigFileName,
             context,
@@ -48905,9 +48907,15 @@ const github_1 = __nccwpck_require__(5683);
 const run_1 = __nccwpck_require__(4795);
 (async () => {
     try {
+        const workflowId = (0, core_1.getInput)('workflow-id');
         const rootDir = (0, core_1.getInput)('root-dir');
         const localConfigFileName = (0, core_1.getInput)('local-config-file-name') || 'monotonix.yaml';
-        const result = await (0, run_1.run)({ rootDir, localConfigFileName, context: github_1.context });
+        const result = await (0, run_1.run)({
+            workflowId,
+            rootDir,
+            localConfigFileName,
+            context: github_1.context,
+        });
         (0, core_1.setOutput)('result', result);
         (0, core_1.exportVariable)('MONOTONIX_JOBS', result);
     }

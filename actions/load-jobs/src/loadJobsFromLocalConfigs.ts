@@ -13,11 +13,13 @@ import { Context } from '@actions/github/lib/context';
 import { CommitInfo, getLastCommit } from './getLastCommit';
 
 type loadJobsFromLocalConfigFilesParams = {
+  workflowId: string;
   rootDir: string;
   localConfigFileName: string;
   context: Context;
 };
 export const loadJobsFromLocalConfigFiles = async ({
+  workflowId,
   rootDir,
   localConfigFileName,
   context,
@@ -36,11 +38,12 @@ export const loadJobsFromLocalConfigFiles = async ({
           ([jobKey, job]): Job =>
             createJob({
               localConfig,
+              workflowId,
               appPath,
               lastCommit,
               jobKey,
               job,
-              context,
+              githubContext: context,
             }),
         );
       } catch (err) {
@@ -56,24 +59,27 @@ export const loadJobsFromLocalConfigFiles = async ({
 
 type createJobParams = {
   localConfig: LocalConfig;
+  workflowId: string;
   appPath: string;
   lastCommit: CommitInfo;
   jobKey: string;
   job: LocalConfigJob;
-  context: Context;
+  githubContext: Context;
 };
 export const createJob = ({
   localConfig,
+  workflowId,
   appPath,
   lastCommit,
   jobKey,
   job,
-  context,
+  githubContext,
 }: createJobParams): Job => ({
   ...job,
   app: localConfig.app,
-  app_context: {
-    path: appPath,
+  context: {
+    workflow_id: workflowId,
+    app_path: appPath,
     last_commit: lastCommit,
     label: `${localConfig.app.name} / ${jobKey}`,
   },
@@ -81,6 +87,6 @@ export const createJob = ({
   keys: [
     ['app_path', appPath],
     ['job_key', jobKey],
-    ['github_ref', context.ref],
+    ['github_ref', githubContext.ref],
   ],
 });

@@ -6,6 +6,10 @@ export const GlobalConfigSchema = z.object({
 
 export type GlobalConfig = z.infer<typeof GlobalConfigSchema>;
 
+const AppSchema = z.object({
+  name: z.string(),
+});
+
 const PushEventScema = z.object({
   push: z
     .object({
@@ -25,22 +29,13 @@ const PullRequestEventSchema = z.object({
     .nullable(),
 });
 
-const AppSchema = z.object({
-  name: z.string(),
-});
+const JobEventSchema = z.intersection(PushEventScema, PullRequestEventSchema);
 
-const LocalConfigJobEventSchema = z.intersection(
-  PushEventScema,
-  PullRequestEventSchema,
-);
-
-const LocalConfigJobConfigsSchema = z
-  .object({})
-  .catchall(z.object({}).catchall(z.any()));
+const JobConfigsSchema = z.object({}).catchall(z.object({}).catchall(z.any()));
 
 const LocalConfigJobSchema = z.object({
-  on: LocalConfigJobEventSchema,
-  configs: LocalConfigJobConfigsSchema,
+  on: JobEventSchema,
+  configs: JobConfigsSchema,
 });
 
 export type LocalConfigJob = z.infer<typeof LocalConfigJobSchema>;
@@ -52,8 +47,9 @@ export const LocalConfigSchema = z.object({
   jobs: z.record(z.string(), LocalConfigJobSchema),
 });
 
-const AppContextSchema = z.object({
-  path: z.string(),
+const ContextSchema = z.object({
+  workflow_id: z.string(),
+  app_path: z.string(),
   last_commit: z.object({
     hash: z.string(),
     timestamp: z.number(),
@@ -67,9 +63,9 @@ export type LocalConfig = z.infer<typeof LocalConfigSchema>;
 
 export const JobSchema = z.object({
   app: AppSchema,
-  app_context: AppContextSchema,
-  on: LocalConfigJobEventSchema,
-  configs: LocalConfigJobConfigsSchema,
+  context: ContextSchema,
+  on: JobEventSchema,
+  configs: JobConfigsSchema,
   params: z.object({}).catchall(z.object({}).catchall(z.any())),
   keys: JobTargetKeys,
 });
