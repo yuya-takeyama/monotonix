@@ -112,7 +112,7 @@ const filterJobs = async ({
       TableName: table,
       KeyConditionExpression: 'pk = :pk',
       ExpressionAttributeValues: {
-        ':pk': { S: `STATE#${workflowId}#${githubRef}` },
+        ':pk': `STATE#${workflowId}#${githubRef}`,
       },
     }),
   );

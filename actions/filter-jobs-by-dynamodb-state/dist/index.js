@@ -62214,7 +62214,7 @@ const filterJobs = async ({ docClient, table, workflowId, githubRef, jobs, }) =>
         TableName: table,
         KeyConditionExpression: 'pk = :pk',
         ExpressionAttributeValues: {
-            ':pk': { S: `STATE#${workflowId}#${githubRef}` },
+            ':pk': `STATE#${workflowId}#${githubRef}`,
         },
     }));
     if (res.Items && res.Items.length > 0) {
