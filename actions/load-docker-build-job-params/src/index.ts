@@ -14,7 +14,7 @@ try {
     );
   }
 
-  const result = JSON.stringify(run({ globalConfig, jobParams, context }));
+  const result = run({ globalConfig, jobParams, context });
 
   setOutput('result', result);
   exportVariable('MONOTONIX_JOB_PARAMS', result);

@@ -58515,11 +58515,11 @@ const run_1 = __nccwpck_require__(4795);
         if (!jobParams) {
             throw new Error('Input job-params or env $MONOTONIX_JOB_PARAMS is required');
         }
-        const result = JSON.stringify(await (0, run_1.run)({
+        const result = await (0, run_1.run)({
             jobParams,
             table,
             region,
-        }));
+        });
         (0, core_1.setOutput)('result', result);
         (0, core_1.exportVariable)('MONOTONIX_JOB_PARAMS', result);
     }

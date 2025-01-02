@@ -10,7 +10,7 @@ try {
     );
   }
 
-  const result = JSON.stringify(run(configKey, jobParams));
+  const result = run(configKey, jobParams);
 
   setOutput('result', result);
   exportVariable('MONOTONIX_JOB_PARAMS', result);

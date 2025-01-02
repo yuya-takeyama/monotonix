@@ -13,13 +13,11 @@ import { run } from './run';
       );
     }
 
-    const result = JSON.stringify(
-      await run({
-        jobParams,
-        table,
-        region,
-      }),
-    );
+    const result = await run({
+      jobParams,
+      table,
+      region,
+    });
 
     setOutput('result', result);
     exportVariable('MONOTONIX_JOB_PARAMS', result);

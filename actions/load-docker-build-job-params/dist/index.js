@@ -48361,7 +48361,7 @@ try {
     if (!jobParams) {
         throw new Error('Input job-params or env $MONOTONIX_JOB_PARAMS is required');
     }
-    const result = JSON.stringify((0, run_1.run)({ globalConfig, jobParams, context: github_1.context }));
+    const result = (0, run_1.run)({ globalConfig, jobParams, context: github_1.context });
     (0, core_1.setOutput)('result', result);
     (0, core_1.exportVariable)('MONOTONIX_JOB_PARAMS', result);
 }
