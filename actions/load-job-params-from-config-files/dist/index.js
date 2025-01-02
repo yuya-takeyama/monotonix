@@ -48907,9 +48907,9 @@ const run_1 = __nccwpck_require__(4795);
     try {
         const rootDir = (0, core_1.getInput)('root-dir');
         const localConfigFileName = (0, core_1.getInput)('local-config-file-name') || 'monotonix.yaml';
-        const jobConfigs = await (0, run_1.run)({ rootDir, localConfigFileName, context: github_1.context });
-        (0, core_1.setOutput)('result', JSON.stringify(jobConfigs));
-        (0, core_1.exportVariable)('MONOTONIX_JOB_PARAMS', JSON.stringify(jobConfigs));
+        const result = await (0, run_1.run)({ rootDir, localConfigFileName, context: github_1.context });
+        (0, core_1.setOutput)('result', result);
+        (0, core_1.exportVariable)('MONOTONIX_JOB_PARAMS', result);
     }
     catch (error) {
         console.error(error);

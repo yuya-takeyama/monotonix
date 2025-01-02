@@ -8,10 +8,10 @@ import { run } from './run';
     const localConfigFileName =
       getInput('local-config-file-name') || 'monotonix.yaml';
 
-    const jobConfigs = await run({ rootDir, localConfigFileName, context });
+    const result = await run({ rootDir, localConfigFileName, context });
 
-    setOutput('result', JSON.stringify(jobConfigs));
-    exportVariable('MONOTONIX_JOB_PARAMS', JSON.stringify(jobConfigs));
+    setOutput('result', result);
+    exportVariable('MONOTONIX_JOB_PARAMS', result);
   } catch (error) {
     console.error(error);
     setFailed(`Action failed with error: ${error}`);
