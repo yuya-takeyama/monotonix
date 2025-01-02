@@ -64172,7 +64172,7 @@ try {
     const table = (0, core_1.getInput)('dynamodb-table');
     const region = (0, core_1.getInput)('dynamodb-region');
     const jobJson = (0, core_1.getInput)('job');
-    const job = schema_1.JobSchema.parse(jobJson);
+    const job = schema_1.JobSchema.parse(JSON.parse(jobJson));
     const status = (0, core_1.getInput)('status');
     if (!(status === 'success' || status === 'failure' || status === 'cancelled')) {
         throw new Error(`Invalid status: ${status}: must be one of 'success', 'failure', or 'cancelled'`);

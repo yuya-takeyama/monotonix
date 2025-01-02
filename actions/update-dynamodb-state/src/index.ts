@@ -14,7 +14,7 @@ try {
   const table = getInput('dynamodb-table');
   const region = getInput('dynamodb-region');
   const jobJson = getInput('job');
-  const job = JobSchema.parse(jobJson);
+  const job = JobSchema.parse(JSON.parse(jobJson));
   const status = getInput('status');
   if (
     !(status === 'success' || status === 'failure' || status === 'cancelled')
