@@ -46,7 +46,6 @@ const filterJobs = async ({
     return jobs;
   }
 
-  const dedupeKey = firstJob.context.dedupe_key;
   const res = await docClient.send(
     new QueryCommand({
       TableName: table,

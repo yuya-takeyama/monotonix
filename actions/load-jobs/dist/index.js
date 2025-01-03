@@ -38990,7 +38990,7 @@ const node_fs_1 = __nccwpck_require__(3024);
 const glob_1 = __nccwpck_require__(2712);
 const node_path_1 = __nccwpck_require__(6760);
 const getLastCommit_1 = __nccwpck_require__(4815);
-const loadJobsFromLocalConfigFiles = async ({ rootDir, dedupeKey, localConfigFileName, context, }) => {
+const loadJobsFromLocalConfigFiles = async ({ rootDir, dedupeKey, requiredConfigKeys, localConfigFileName, context, }) => {
     const pattern = (0, node_path_1.join)(rootDir, '**', localConfigFileName);
     const localConfigPaths = (0, glob_1.globSync)(pattern);
     const jobs = await Promise.all(localConfigPaths.map(async (localConfigPath) => {
@@ -39013,7 +39013,9 @@ const loadJobsFromLocalConfigFiles = async ({ rootDir, dedupeKey, localConfigFil
             throw new Error(`Failed to load local config: ${localConfigPath}: ${err}`);
         }
     }));
-    return jobs.flat();
+    return jobs
+        .flat()
+        .filter(job => requiredConfigKeys.every(key => job.configs[key]));
 };
 exports.loadJobsFromLocalConfigFiles = loadJobsFromLocalConfigFiles;
 const createJob = ({ localConfig, dedupeKey, appPath, lastCommit, jobKey, job, githubContext, }) => ({
@@ -39043,11 +39045,12 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.run = void 0;
 const filterJobsByGitHubContext_1 = __nccwpck_require__(5881);
 const loadJobsFromLocalConfigs_1 = __nccwpck_require__(1010);
-const run = async ({ rootDir, dedupeKey, localConfigFileName, context, }) => {
+const run = async ({ rootDir, dedupeKey, requiredConfigKeys, localConfigFileName, context, }) => {
     return (0, filterJobsByGitHubContext_1.filterJobsByGitHubContext)({
         jobs: await (0, loadJobsFromLocalConfigs_1.loadJobsFromLocalConfigFiles)({
             rootDir,
             dedupeKey,
+            requiredConfigKeys,
             localConfigFileName,
             context,
         }),
@@ -48908,9 +48911,13 @@ const run_1 = __nccwpck_require__(4795);
         const rootDir = (0, core_1.getInput)('root-dir');
         const localConfigFileName = (0, core_1.getInput)('local-config-file-name') || 'monotonix.yaml';
         const dedupeKey = (0, core_1.getInput)('dedupe-key');
+        const requiredConfigKeys = (0, core_1.getInput)('required-config-keys')
+            .split(/\s*,\s*/)
+            .filter(Boolean);
         const result = await (0, run_1.run)({
             rootDir,
             dedupeKey,
+            requiredConfigKeys,
             localConfigFileName,
             context: github_1.context,
         });

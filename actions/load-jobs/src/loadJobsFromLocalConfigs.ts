@@ -15,12 +15,14 @@ import { CommitInfo, getLastCommit } from './getLastCommit';
 type loadJobsFromLocalConfigFilesParams = {
   rootDir: string;
   dedupeKey: string;
+  requiredConfigKeys: string[];
   localConfigFileName: string;
   context: Context;
 };
 export const loadJobsFromLocalConfigFiles = async ({
   rootDir,
   dedupeKey,
+  requiredConfigKeys,
   localConfigFileName,
   context,
 }: loadJobsFromLocalConfigFilesParams): Promise<Jobs> => {
@@ -54,7 +56,9 @@ export const loadJobsFromLocalConfigFiles = async ({
     }),
   );
 
-  return jobs.flat();
+  return jobs
+    .flat()
+    .filter(job => requiredConfigKeys.every(key => job.configs[key]));
 };
 
 type createJobParams = {

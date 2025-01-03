@@ -8,10 +8,14 @@ import { run } from './run';
     const localConfigFileName =
       getInput('local-config-file-name') || 'monotonix.yaml';
     const dedupeKey = getInput('dedupe-key');
+    const requiredConfigKeys = getInput('required-config-keys')
+      .split(/\s*,\s*/)
+      .filter(Boolean);
 
     const result = await run({
       rootDir,
       dedupeKey,
+      requiredConfigKeys,
       localConfigFileName,
       context,
     });

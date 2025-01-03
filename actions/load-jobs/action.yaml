@@ -6,6 +6,9 @@ inputs:
   root-dir:
     description: 'Root directory'
     required: true
+  required-config-keys:
+    description: 'Required config keys (comma separated)'
+    required: true
   dedupe-key:
     description: 'Dedupe key to filter jobs. app path and job key are used together.'
     required: true

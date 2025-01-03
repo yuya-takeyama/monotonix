@@ -62233,7 +62233,6 @@ const filterJobs = async ({ docClient, table, githubRef, jobs, }) => {
     if (!firstJob) {
         return jobs;
     }
-    const dedupeKey = firstJob.context.dedupe_key;
     const res = await docClient.send(new lib_dynamodb_1.QueryCommand({
         TableName: table,
         KeyConditionExpression: 'pk = :pk',
