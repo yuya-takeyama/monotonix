@@ -57924,7 +57924,7 @@ const core_1 = __nccwpck_require__(7184);
 const runPost = async ({ table, region, job, jobStatus, ttl, }) => {
     const client = new client_dynamodb_1.DynamoDBClient({ region });
     const docClient = lib_dynamodb_1.DynamoDBDocumentClient.from(client);
-    const pk = `STATE#${job.context.workflow_id}#${job.context.job_key}`;
+    const pk = `STATE#${job.context.workflow_id}#${job.context.github_ref}`;
     try {
         if (jobStatus === 'success') {
             await putSuccessState({ job, table, docClient, pk, ttl });

@@ -57926,7 +57926,7 @@ const run = async ({ table, region, job, ttl, }) => {
     (0, utils_1.saveAwsCredentialsIntoState)();
     const client = new client_dynamodb_1.DynamoDBClient({ region });
     const docClient = lib_dynamodb_1.DynamoDBDocumentClient.from(client);
-    const pk = `STATE#${job.context.workflow_id}#${job.context.job_key}`;
+    const pk = `STATE#${job.context.workflow_id}#${job.context.github_ref}`;
     try {
         await putRunningState({ job, table, docClient, pk, ttl });
     }

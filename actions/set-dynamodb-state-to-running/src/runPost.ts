@@ -28,7 +28,7 @@ export const runPost = async ({
   const client = new DynamoDBClient({ region });
   const docClient = DynamoDBDocumentClient.from(client);
 
-  const pk = `STATE#${job.context.workflow_id}#${job.context.job_key}`;
+  const pk = `STATE#${job.context.workflow_id}#${job.context.github_ref}`;
 
   try {
     if (jobStatus === 'success') {
