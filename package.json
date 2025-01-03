@@ -1,0 +1,14 @@
+{
+  "name": "monotonix",
+  "private": true,
+  "license": "MIT",
+  "workspaces": [
+    "actions/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "package": "npm run package --workspaces --if-present",
+    "test": "npm run test --workspaces"
+  }
+}

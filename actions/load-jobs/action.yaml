@@ -1,0 +1,23 @@
+name: 'Load Jobs'
+description: 'Load and filter Jobs from config files'
+author: 'Yuya Takeyama'
+
+inputs:
+  root-dir:
+    description: 'Root directory'
+    required: true
+  required-config-keys:
+    description: 'Required config keys (comma separated)'
+    required: true
+  dedupe-key:
+    description: 'Dedupe key to filter jobs. app path and job key are used together.'
+    required: true
+    default: ${{ github.ref }}
+
+outputs:
+  result:
+    description: 'Jobs'
+
+runs:
+  using: 'node20'
+  main: 'dist/index.js'

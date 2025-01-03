@@ -1,0 +1,27 @@
+name: 'Set DynamoDB state to running'
+author: 'Yuya Takeyama'
+
+inputs:
+  dynamodb-table:
+    description: 'DynamoDB Table'
+    required: true
+  dynamodb-region:
+    description: 'DynamoDB Region'
+    required: true
+  job:
+    description: 'Job'
+    required: true
+  job-status:
+    description: 'Job Status'
+    required: true
+  running-ttl:
+    description: 'TTL for running state (format: 1d, 1h, 1m, 1s)'
+    default: '1h'
+  success-ttl:
+    description: 'TTL for success state (format: 1d, 1h, 1m, 1s)'
+    default: '180d'
+
+runs:
+  using: 'node20'
+  main: 'dist/index.js'
+  post: 'dist/post/index.js'
