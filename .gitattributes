@@ -1,2 +1,2 @@
-actions/*/dist/* linguist-generated=true -diff
-packages/*/dist/* linguist-generated=true -diff
+actions/*/dist/** linguist-generated=true -diff
+packages/*/dist/** linguist-generated=true -diff

@@ -15,14 +15,6 @@ try {
   const region = getInput('dynamodb-region');
   const jobJson = getInput('job');
   const job = JobSchema.parse(JSON.parse(jobJson));
-  const status = getInput('status');
-  if (
-    !(status === 'success' || status === 'failure' || status === 'cancelled')
-  ) {
-    throw new Error(
-      `Invalid status: ${status}: must be one of 'success', 'failure', or 'cancelled'`,
-    );
-  }
 
   const now = Math.floor(Date.now() / 1000);
   let ttl: number | null = null;
@@ -33,6 +25,7 @@ try {
   } else if (getInput('ttl-in-minutes')) {
     ttl = now + Number(getInput('ttl-in-minutes')) * 60;
   }
+  const status = 'running';
 
   console.log('This is post.ts');
   console.log(
