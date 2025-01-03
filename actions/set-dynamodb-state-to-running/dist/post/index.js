@@ -60018,6 +60018,14 @@ try {
     }
     const ttlDuration = (0, utils_1.parseDuration)((0, core_1.getInput)('success-ttl'));
     const ttl = Math.floor(Date.now() / 1000) + ttlDuration;
+    console.log('Before runPost');
+    console.log(JSON.stringify({
+        table,
+        region,
+        job,
+        jobStatus,
+        ttl,
+    }, null, 2));
     (0, runPost_1.runPost)({
         table,
         region,
@@ -60025,6 +60033,7 @@ try {
         jobStatus,
         ttl,
     });
+    console.log('After runPost');
 }
 catch (error) {
     console.error(error);
