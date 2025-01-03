@@ -8,7 +8,7 @@
   ],
   "scripts": {
     "build": "tsc",
-    "test": "npx jest"
+    "test": "jest --passWithNoTests"
   },
   "dependencies": {
     "zod": "^3.24.1"

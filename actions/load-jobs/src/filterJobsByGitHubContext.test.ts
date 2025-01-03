@@ -8,7 +8,7 @@ describe('filterJobsByGitHubContext', () => {
       name: 'hello-world',
     },
     context: {
-      workflow_id: 'docker_build',
+      dedupe_key: 'refs/heads/main',
       github_ref: 'refs/heads/main',
       app_path: 'apps/hello-world',
       job_key: 'job1',
@@ -43,7 +43,7 @@ describe('filterJobsByGitHubContext', () => {
       name: 'hello-world',
     },
     context: {
-      workflow_id: 'docker_build',
+      dedupe_key: 'refs/pull/1/merge',
       github_ref: 'refs/pull/1/merge',
       app_path: 'apps/hello-world',
       job_key: 'job1',

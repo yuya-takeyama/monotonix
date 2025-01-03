@@ -41,7 +41,7 @@ describe('createJob', () => {
 
     const result = createJob({
       localConfig: stubLocalConfig,
-      workflowId: 'docker_build',
+      dedupeKey: stubContext.ref,
       appPath,
       lastCommit: stubCommitInfo,
       jobKey,
@@ -54,7 +54,7 @@ describe('createJob', () => {
         name: 'test-app',
       },
       context: {
-        workflow_id: 'docker_build',
+        dedupe_key: stubContext.ref,
         github_ref: stubContext.ref,
         app_path: appPath,
         job_key: jobKey,
@@ -93,7 +93,7 @@ describe('createJob', () => {
 
     const result = createJob({
       localConfig: stubLocalConfig,
-      workflowId: 'docker_build',
+      dedupeKey: stubContext.ref,
       appPath,
       lastCommit: stubCommitInfo,
       jobKey,
@@ -106,7 +106,7 @@ describe('createJob', () => {
         name: 'test-app',
       },
       context: {
-        workflow_id: 'docker_build',
+        dedupe_key: stubContext.ref,
         github_ref: stubContext.ref,
         app_path: appPath,
         job_key: jobKey,

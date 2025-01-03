@@ -4,14 +4,14 @@ import { run } from './run';
 
 (async () => {
   try {
-    const workflowId = getInput('workflow-id');
     const rootDir = getInput('root-dir');
     const localConfigFileName =
       getInput('local-config-file-name') || 'monotonix.yaml';
+    const dedupeKey = getInput('dedupe-key');
 
     const result = await run({
-      workflowId,
       rootDir,
+      dedupeKey,
       localConfigFileName,
       context,
     });

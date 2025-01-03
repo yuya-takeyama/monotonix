@@ -3,12 +3,13 @@ description: 'Load and filter Jobs from config files'
 author: 'Yuya Takeyama'
 
 inputs:
-  workflow-id:
-    description: 'Workflow ID'
-    required: true
   root-dir:
     description: 'Root directory'
     required: true
+  dedupe-key:
+    description: 'Dedupe key to filter jobs. app path and job key are used together.'
+    required: true
+    default: ${{ github.ref }}
 
 outputs:
   result:

@@ -24,7 +24,7 @@ export const run = async ({
 
   const client = new DynamoDBClient({ region });
   const docClient = DynamoDBDocumentClient.from(client);
-  const pk = `STATE#${job.context.workflow_id}#${job.context.github_ref}`;
+  const pk = `STATE#${job.context.dedupe_key}`;
 
   try {
     await putRunningState({ job, table, docClient, pk, ttl });

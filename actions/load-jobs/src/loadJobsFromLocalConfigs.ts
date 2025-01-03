@@ -13,14 +13,14 @@ import { Context } from '@actions/github/lib/context';
 import { CommitInfo, getLastCommit } from './getLastCommit';
 
 type loadJobsFromLocalConfigFilesParams = {
-  workflowId: string;
   rootDir: string;
+  dedupeKey: string;
   localConfigFileName: string;
   context: Context;
 };
 export const loadJobsFromLocalConfigFiles = async ({
-  workflowId,
   rootDir,
+  dedupeKey,
   localConfigFileName,
   context,
 }: loadJobsFromLocalConfigFilesParams): Promise<Jobs> => {
@@ -38,7 +38,7 @@ export const loadJobsFromLocalConfigFiles = async ({
           ([jobKey, job]): Job =>
             createJob({
               localConfig,
-              workflowId,
+              dedupeKey,
               appPath,
               lastCommit,
               jobKey,
@@ -59,7 +59,7 @@ export const loadJobsFromLocalConfigFiles = async ({
 
 type createJobParams = {
   localConfig: LocalConfig;
-  workflowId: string;
+  dedupeKey: string;
   appPath: string;
   lastCommit: CommitInfo;
   jobKey: string;
@@ -68,7 +68,7 @@ type createJobParams = {
 };
 export const createJob = ({
   localConfig,
-  workflowId,
+  dedupeKey,
   appPath,
   lastCommit,
   jobKey,
@@ -78,7 +78,7 @@ export const createJob = ({
   ...job,
   app: localConfig.app,
   context: {
-    workflow_id: workflowId,
+    dedupe_key: dedupeKey,
     github_ref: githubContext.ref,
     app_path: appPath,
     job_key: jobKey,

@@ -38828,7 +38828,7 @@ const AppSchema = zod_1.z.object({
     name: zod_1.z.string(),
 });
 const ContextSchema = zod_1.z.object({
-    workflow_id: zod_1.z.string(),
+    dedupe_key: zod_1.z.string(),
     github_ref: zod_1.z.string(),
     app_path: zod_1.z.string(),
     last_commit: zod_1.z.object({
@@ -38990,7 +38990,7 @@ const node_fs_1 = __nccwpck_require__(3024);
 const glob_1 = __nccwpck_require__(2712);
 const node_path_1 = __nccwpck_require__(6760);
 const getLastCommit_1 = __nccwpck_require__(4815);
-const loadJobsFromLocalConfigFiles = async ({ workflowId, rootDir, localConfigFileName, context, }) => {
+const loadJobsFromLocalConfigFiles = async ({ rootDir, dedupeKey, localConfigFileName, context, }) => {
     const pattern = (0, node_path_1.join)(rootDir, '**', localConfigFileName);
     const localConfigPaths = (0, glob_1.globSync)(pattern);
     const jobs = await Promise.all(localConfigPaths.map(async (localConfigPath) => {
@@ -39001,7 +39001,7 @@ const loadJobsFromLocalConfigFiles = async ({ workflowId, rootDir, localConfigFi
             const localConfig = schema_1.LocalConfigSchema.parse((0, js_yaml_1.load)(localConfigContent));
             return Object.entries(localConfig.jobs).map(([jobKey, job]) => (0, exports.createJob)({
                 localConfig,
-                workflowId,
+                dedupeKey,
                 appPath,
                 lastCommit,
                 jobKey,
@@ -39016,11 +39016,11 @@ const loadJobsFromLocalConfigFiles = async ({ workflowId, rootDir, localConfigFi
     return jobs.flat();
 };
 exports.loadJobsFromLocalConfigFiles = loadJobsFromLocalConfigFiles;
-const createJob = ({ localConfig, workflowId, appPath, lastCommit, jobKey, job, githubContext, }) => ({
+const createJob = ({ localConfig, dedupeKey, appPath, lastCommit, jobKey, job, githubContext, }) => ({
     ...job,
     app: localConfig.app,
     context: {
-        workflow_id: workflowId,
+        dedupe_key: dedupeKey,
         github_ref: githubContext.ref,
         app_path: appPath,
         job_key: jobKey,
@@ -39043,11 +39043,11 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.run = void 0;
 const filterJobsByGitHubContext_1 = __nccwpck_require__(5881);
 const loadJobsFromLocalConfigs_1 = __nccwpck_require__(1010);
-const run = async ({ workflowId, rootDir, localConfigFileName, context, }) => {
+const run = async ({ rootDir, dedupeKey, localConfigFileName, context, }) => {
     return (0, filterJobsByGitHubContext_1.filterJobsByGitHubContext)({
         jobs: await (0, loadJobsFromLocalConfigs_1.loadJobsFromLocalConfigFiles)({
-            workflowId,
             rootDir,
+            dedupeKey,
             localConfigFileName,
             context,
         }),
@@ -48905,12 +48905,12 @@ const github_1 = __nccwpck_require__(5683);
 const run_1 = __nccwpck_require__(4795);
 (async () => {
     try {
-        const workflowId = (0, core_1.getInput)('workflow-id');
         const rootDir = (0, core_1.getInput)('root-dir');
         const localConfigFileName = (0, core_1.getInput)('local-config-file-name') || 'monotonix.yaml';
+        const dedupeKey = (0, core_1.getInput)('dedupe-key');
         const result = await (0, run_1.run)({
-            workflowId,
             rootDir,
+            dedupeKey,
             localConfigFileName,
             context: github_1.context,
         });

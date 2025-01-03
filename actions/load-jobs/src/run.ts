@@ -3,21 +3,21 @@ import { loadJobsFromLocalConfigFiles } from './loadJobsFromLocalConfigs';
 import { Context } from '@actions/github/lib/context';
 
 type runParams = {
-  workflowId: string;
   rootDir: string;
+  dedupeKey: string;
   localConfigFileName: string;
   context: Context;
 };
 export const run = async ({
-  workflowId,
   rootDir,
+  dedupeKey,
   localConfigFileName,
   context,
 }: runParams) => {
   return filterJobsByGitHubContext({
     jobs: await loadJobsFromLocalConfigFiles({
-      workflowId,
       rootDir,
+      dedupeKey,
       localConfigFileName,
       context,
     }),

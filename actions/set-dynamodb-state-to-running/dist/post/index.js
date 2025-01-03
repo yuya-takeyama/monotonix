@@ -57859,7 +57859,7 @@ const AppSchema = zod_1.z.object({
     name: zod_1.z.string(),
 });
 const ContextSchema = zod_1.z.object({
-    workflow_id: zod_1.z.string(),
+    dedupe_key: zod_1.z.string(),
     github_ref: zod_1.z.string(),
     app_path: zod_1.z.string(),
     last_commit: zod_1.z.object({
@@ -57931,7 +57931,7 @@ const runPost = async ({ table, region, job, jobStatus, ttl, }) => {
         },
     });
     const docClient = lib_dynamodb_1.DynamoDBDocumentClient.from(client);
-    const pk = `STATE#${job.context.workflow_id}#${job.context.github_ref}`;
+    const pk = `STATE#${job.context.dedupe_key}`;
     try {
         if (jobStatus === 'success') {
             await putSuccessState({ job, table, docClient, pk, ttl });

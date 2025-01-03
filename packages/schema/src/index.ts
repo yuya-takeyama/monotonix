@@ -11,7 +11,7 @@ const AppSchema = z.object({
 });
 
 const ContextSchema = z.object({
-  workflow_id: z.string(),
+  dedupe_key: z.string(),
   github_ref: z.string(),
   app_path: z.string(),
   last_commit: z.object({
