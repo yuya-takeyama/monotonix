@@ -10,6 +10,16 @@ export function filterJobsByGitHubContext({
   jobs,
   context,
 }: filterJobsByGitHubContextParams): Job[] {
+  console.log(
+    JSON.stringify(
+      {
+        jobs,
+        context,
+      },
+      null,
+      2,
+    ),
+  );
   return jobs
     .filter(job => {
       switch (context.eventName) {

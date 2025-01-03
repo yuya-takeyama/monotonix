@@ -38890,6 +38890,10 @@ exports.filterJobsByGitHubContext = filterJobsByGitHubContext;
 const schema_1 = __nccwpck_require__(67);
 const minimatch_1 = __nccwpck_require__(8286);
 function filterJobsByGitHubContext({ jobs, context, }) {
+    console.log(JSON.stringify({
+        jobs,
+        context,
+    }, null, 2));
     return jobs
         .filter(job => {
         switch (context.eventName) {
