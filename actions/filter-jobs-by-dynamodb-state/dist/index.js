@@ -62220,17 +62220,17 @@ const dynamodb_common_1 = __nccwpck_require__(9266);
 const run = async ({ workflowId, githubRef, jobs, table, region, }) => {
     const client = new client_dynamodb_1.DynamoDBClient({ region });
     const docClient = lib_dynamodb_1.DynamoDBDocumentClient.from(client);
-    const filteredJobs = await filterJobs({
+    return filterJobs({
         docClient,
         workflowId,
         githubRef,
         jobs,
         table,
     });
-    return filteredJobs;
 };
 exports.run = run;
 const filterJobs = async ({ docClient, table, workflowId, githubRef, jobs, }) => {
+    console.log(`STATE#${workflowId}#${githubRef}`);
     const res = await docClient.send(new lib_dynamodb_1.QueryCommand({
         TableName: table,
         KeyConditionExpression: 'pk = :pk',

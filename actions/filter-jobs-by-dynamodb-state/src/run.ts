@@ -22,15 +22,13 @@ export const run = async ({
   const client = new DynamoDBClient({ region });
   const docClient = DynamoDBDocumentClient.from(client);
 
-  const filteredJobs = await filterJobs({
+  return filterJobs({
     docClient,
     workflowId,
     githubRef,
     jobs,
     table,
   });
-
-  return filteredJobs;
 };
 
 type filterJobsParams = {
@@ -47,6 +45,7 @@ const filterJobs = async ({
   githubRef,
   jobs,
 }: filterJobsParams) => {
+  console.log(`STATE#${workflowId}#${githubRef}`);
   const res = await docClient.send(
     new QueryCommand({
       TableName: table,
