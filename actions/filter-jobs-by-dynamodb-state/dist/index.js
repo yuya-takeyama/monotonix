@@ -62217,24 +62217,28 @@ const lib_dynamodb_1 = __nccwpck_require__(2415);
 const core_1 = __nccwpck_require__(7184);
 const zod_1 = __nccwpck_require__(5421);
 const dynamodb_common_1 = __nccwpck_require__(9266);
-const run = async ({ workflowId, githubRef, jobs, table, region, }) => {
+const run = async ({ githubRef, jobs, table, region, }) => {
     const client = new client_dynamodb_1.DynamoDBClient({ region });
     const docClient = lib_dynamodb_1.DynamoDBDocumentClient.from(client);
     return filterJobs({
         docClient,
-        workflowId,
         githubRef,
         jobs,
         table,
     });
 };
 exports.run = run;
-const filterJobs = async ({ docClient, table, workflowId, githubRef, jobs, }) => {
+const filterJobs = async ({ docClient, table, githubRef, jobs, }) => {
+    const firstJob = jobs[0];
+    if (!firstJob) {
+        return jobs;
+    }
+    const dedupeKey = firstJob.context.dedupe_key;
     const res = await docClient.send(new lib_dynamodb_1.QueryCommand({
         TableName: table,
         KeyConditionExpression: 'pk = :pk',
         ExpressionAttributeValues: {
-            ':pk': `STATE#${workflowId}#${githubRef}`,
+            ':pk': `STATE#${firstJob.context.dedupe_key}`,
         },
     }));
     if (res.Items && res.Items.length > 0) {
@@ -64265,10 +64269,6 @@ const run_1 = __nccwpck_require__(4795);
 const schema_1 = __nccwpck_require__(67);
 (async () => {
     try {
-        const workflowId = (0, core_1.getInput)('workflow-id') || process.env.MONOTONIX_WORKFLOW_ID;
-        if (!workflowId) {
-            throw new Error('Input workflow-id or env $MONOTONIX_WORKFLOW_ID is required');
-        }
         const table = (0, core_1.getInput)('dynamodb-table');
         const region = (0, core_1.getInput)('dynamodb-region');
         const jobsJson = (0, core_1.getInput)('jobs') || process.env.MONOTONIX_JOBS;
@@ -64277,7 +64277,6 @@ const schema_1 = __nccwpck_require__(67);
         }
         const jobs = schema_1.JobsSchema.parse(JSON.parse(jobsJson));
         const result = await (0, run_1.run)({
-            workflowId,
             githubRef: github_1.context.ref,
             jobs,
             table,

@@ -2,8 +2,6 @@ name: 'Filter Jobs by DynamoDB state'
 author: 'Yuya Takeyama'
 
 inputs:
-  workflow-id:
-    description: 'Workflow ID'
   jobs:
     description: 'Jobs'
   dynamodb-table:

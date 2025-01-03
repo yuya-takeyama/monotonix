@@ -6,14 +6,12 @@ import { z } from 'zod';
 import { StateItemSchema, StateItem } from '@monotonix/dynamodb-common';
 
 type runParam = {
-  workflowId: string;
   githubRef: string;
   jobs: Jobs;
   table: string;
   region: string;
 };
 export const run = async ({
-  workflowId,
   githubRef,
   jobs,
   table,
@@ -24,7 +22,6 @@ export const run = async ({
 
   return filterJobs({
     docClient,
-    workflowId,
     githubRef,
     jobs,
     table,
@@ -34,23 +31,28 @@ export const run = async ({
 type filterJobsParams = {
   docClient: DynamoDBDocumentClient;
   table: string;
-  workflowId: string;
   githubRef: string;
   jobs: Jobs;
 };
 const filterJobs = async ({
   docClient,
   table,
-  workflowId,
   githubRef,
   jobs,
 }: filterJobsParams) => {
+  const firstJob = jobs[0];
+
+  if (!firstJob) {
+    return jobs;
+  }
+
+  const dedupeKey = firstJob.context.dedupe_key;
   const res = await docClient.send(
     new QueryCommand({
       TableName: table,
       KeyConditionExpression: 'pk = :pk',
       ExpressionAttributeValues: {
-        ':pk': `STATE#${workflowId}#${githubRef}`,
+        ':pk': `STATE#${firstJob.context.dedupe_key}`,
       },
     }),
   );

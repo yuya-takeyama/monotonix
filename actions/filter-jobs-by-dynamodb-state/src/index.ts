@@ -5,13 +5,6 @@ import { JobsSchema } from '@monotonix/schema';
 
 (async () => {
   try {
-    const workflowId =
-      getInput('workflow-id') || process.env.MONOTONIX_WORKFLOW_ID;
-    if (!workflowId) {
-      throw new Error(
-        'Input workflow-id or env $MONOTONIX_WORKFLOW_ID is required',
-      );
-    }
     const table = getInput('dynamodb-table');
     const region = getInput('dynamodb-region');
     const jobsJson = getInput('jobs') || process.env.MONOTONIX_JOBS;
@@ -21,7 +14,6 @@ import { JobsSchema } from '@monotonix/schema';
     const jobs = JobsSchema.parse(JSON.parse(jobsJson));
 
     const result = await run({
-      workflowId,
       githubRef: context.ref,
       jobs,
       table,
