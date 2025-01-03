@@ -43,7 +43,7 @@ import { GitHub } from '@actions/github/lib/utils';
       attempt_number: Number(process.env.GITHUB_RUN_ATTEMPT),
     });
     const jobId = jobs.data.jobs[1]!.id;
-    const actionJob = octokit.rest.actions.getJobForWorkflowRun({
+    const actionJob = await octokit.rest.actions.getJobForWorkflowRun({
       owner: context.repo.owner,
       repo: context.repo.repo,
       job_id: jobId,

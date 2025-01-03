@@ -36439,7 +36439,7 @@ const github_1 = __nccwpck_require__(5683);
             attempt_number: Number(process.env.GITHUB_RUN_ATTEMPT),
         });
         const jobId = jobs.data.jobs[1].id;
-        const actionJob = octokit.rest.actions.getJobForWorkflowRun({
+        const actionJob = await octokit.rest.actions.getJobForWorkflowRun({
             owner: github_1.context.repo.owner,
             repo: github_1.context.repo.repo,
             job_id: jobId,
