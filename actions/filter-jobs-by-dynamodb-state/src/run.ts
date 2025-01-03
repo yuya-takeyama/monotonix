@@ -45,7 +45,6 @@ const filterJobs = async ({
   githubRef,
   jobs,
 }: filterJobsParams) => {
-  console.log(`STATE#${workflowId}#${githubRef}`);
   const res = await docClient.send(
     new QueryCommand({
       TableName: table,
@@ -57,7 +56,6 @@ const filterJobs = async ({
   );
 
   if (res.Items && res.Items.length > 0) {
-    console.log(`res.Items: ${JSON.stringify(res.Items)}`);
     return filterJobsByAppJobStatuses(jobs, transofrmItems(res.Items));
   } else {
     return jobs;
@@ -68,7 +66,6 @@ const filterJobsByAppJobStatuses = (
   jobs: Jobs,
   appJobStatuses: AppJobStatuses,
 ) => {
-  console.log(`appJobStatuses: ${JSON.stringify(appJobStatuses)}`);
   return jobs.filter(job => {
     const appJobStatus =
       appJobStatuses[`${job.context.app_path}#${job.context.job_key}`];

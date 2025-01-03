@@ -62230,7 +62230,6 @@ const run = async ({ workflowId, githubRef, jobs, table, region, }) => {
 };
 exports.run = run;
 const filterJobs = async ({ docClient, table, workflowId, githubRef, jobs, }) => {
-    console.log(`STATE#${workflowId}#${githubRef}`);
     const res = await docClient.send(new lib_dynamodb_1.QueryCommand({
         TableName: table,
         KeyConditionExpression: 'pk = :pk',
@@ -62239,7 +62238,6 @@ const filterJobs = async ({ docClient, table, workflowId, githubRef, jobs, }) =>
         },
     }));
     if (res.Items && res.Items.length > 0) {
-        console.log(`res.Items: ${JSON.stringify(res.Items)}`);
         return filterJobsByAppJobStatuses(jobs, transofrmItems(res.Items));
     }
     else {
@@ -62247,7 +62245,6 @@ const filterJobs = async ({ docClient, table, workflowId, githubRef, jobs, }) =>
     }
 };
 const filterJobsByAppJobStatuses = (jobs, appJobStatuses) => {
-    console.log(`appJobStatuses: ${JSON.stringify(appJobStatuses)}`);
     return jobs.filter(job => {
         const appJobStatus = appJobStatuses[`${job.context.app_path}#${job.context.job_key}`];
         if (appJobStatus) {
