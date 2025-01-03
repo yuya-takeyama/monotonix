@@ -30,12 +30,18 @@ import { context, getOctokit } from '@actions/github';
 
     const octokit = getOctokit(process.env.GITHUB_TOKEN!);
 
-    const workflowRun = await octokit.rest.actions.getWorkflowRun({
+    console.log(`JOB_ID: ${process.env.GITHUB_JOB}`);
+    console.log(`context.job: ${context.job}`);
+    console.log(`context.run_id: ${context.runId}`);
+    console.log(`RUN_ATTEMPT: ${process.env.GITHUB_RUN_ATTEMPT}`);
+
+    const jobs = await octokit.rest.actions.listJobsForWorkflowRunAttempt({
       owner: context.repo.owner,
       repo: context.repo.repo,
       run_id: context.runId,
+      attempt_number: Number(process.env.GITHUB_RUN_ATTEMPT),
     });
-    console.log(`JOB_ID: ${process.env.GITHUB_JOB}`);
+
     /*
     const jobForWorkflowRun = await octokit.rest.actions.getJobForWorkflowRun({
       owner: context.repo.owner,
@@ -50,8 +56,7 @@ import { context, getOctokit } from '@actions/github';
         {
           workflowId,
           githubRef: context.ref,
-          workflowRun,
-          //    jobForWorkflowRun,
+          jobs,
           job,
           table,
           region,

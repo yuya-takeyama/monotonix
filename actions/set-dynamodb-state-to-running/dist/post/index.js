@@ -36428,12 +36428,16 @@ const github_1 = __nccwpck_require__(5683);
         }
         const status = 'running';
         const octokit = (0, github_1.getOctokit)(process.env.GITHUB_TOKEN);
-        const workflowRun = await octokit.rest.actions.getWorkflowRun({
+        console.log(`JOB_ID: ${process.env.GITHUB_JOB}`);
+        console.log(`context.job: ${github_1.context.job}`);
+        console.log(`context.run_id: ${github_1.context.runId}`);
+        console.log(`RUN_ATTEMPT: ${process.env.GITHUB_RUN_ATTEMPT}`);
+        const jobs = await octokit.rest.actions.listJobsForWorkflowRunAttempt({
             owner: github_1.context.repo.owner,
             repo: github_1.context.repo.repo,
             run_id: github_1.context.runId,
+            attempt_number: Number(process.env.GITHUB_RUN_ATTEMPT),
         });
-        console.log(`JOB_ID: ${process.env.GITHUB_JOB}`);
         /*
         const jobForWorkflowRun = await octokit.rest.actions.getJobForWorkflowRun({
           owner: context.repo.owner,
@@ -36445,8 +36449,7 @@ const github_1 = __nccwpck_require__(5683);
         console.log(JSON.stringify({
             workflowId,
             githubRef: github_1.context.ref,
-            workflowRun,
-            //    jobForWorkflowRun,
+            jobs,
             job,
             table,
             region,
