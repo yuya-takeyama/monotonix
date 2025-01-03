@@ -34,6 +34,7 @@ export const run = async ({
     table,
   });
 
+  /*
   await setRunningStatus({
     docClient,
     table,
@@ -41,6 +42,7 @@ export const run = async ({
     workflowId,
     githubRef,
   });
+  */
 
   return filteredJobs;
 };
