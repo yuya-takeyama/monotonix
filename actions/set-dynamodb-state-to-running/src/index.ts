@@ -16,6 +16,7 @@ try {
   const jobJson = getInput('job');
   const job = JobSchema.parse(JSON.parse(jobJson));
   const status = 'running';
+  console.log(`###input job-status: ${getInput('job-status')}`);
 
   const now = Math.floor(Date.now() / 1000);
   let ttl: number | null = null;

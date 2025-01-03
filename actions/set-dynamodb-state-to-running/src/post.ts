@@ -18,6 +18,8 @@ import { GitHub } from '@actions/github/lib/utils';
     const jobJson = getInput('job');
     const job = JobSchema.parse(JSON.parse(jobJson));
 
+    console.log(`###input job-status: ${getInput('job-status')}`);
+
     const now = Math.floor(Date.now() / 1000);
     let ttl: number | null = null;
     if (getInput('ttl-in-days')) {

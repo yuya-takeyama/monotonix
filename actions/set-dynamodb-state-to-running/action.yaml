@@ -11,6 +11,9 @@ inputs:
   job:
     description: 'Job'
     required: true
+  job-status:
+    description: 'Job Status'
+    required: true
   ttl-in-days:
     description: 'TTL in days'
     required: false

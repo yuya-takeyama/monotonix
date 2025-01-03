@@ -36415,6 +36415,7 @@ try {
     const jobJson = (0, core_1.getInput)('job');
     const job = schema_1.JobSchema.parse(JSON.parse(jobJson));
     const status = 'running';
+    console.log(`###input job-status: ${(0, core_1.getInput)('job-status')}`);
     const now = Math.floor(Date.now() / 1000);
     let ttl = null;
     if ((0, core_1.getInput)('ttl-in-days')) {
