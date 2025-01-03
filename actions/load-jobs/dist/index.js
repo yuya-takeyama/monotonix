@@ -38898,8 +38898,8 @@ function filterJobsByGitHubContext({ jobs, context, }) {
         .filter(job => {
         switch (context.eventName) {
             case 'push':
-                if (job.on.push) {
-                    if (job.on.push.branches) {
+                if ('push' in job.on) {
+                    if (job.on.push && job.on.push.branches) {
                         const branchName = context.ref.replace(/^refs\/heads\//, '');
                         const result = job.on.push.branches.some(branch => (0, minimatch_1.minimatch)(branchName, branch));
                         if (result) {
@@ -38911,8 +38911,8 @@ function filterJobsByGitHubContext({ jobs, context, }) {
                     }
                 }
             case 'pull_request':
-                if (job.on.pull_request) {
-                    if (job.on.pull_request.branches) {
+                if ('pull_request' in job.on) {
+                    if (job.on.pull_request && job.on.pull_request.branches) {
                         const result = job.on.pull_request.branches.some(branch => 
                         // @ts-ignore
                         (0, minimatch_1.minimatch)(context.ref_name, branch));
