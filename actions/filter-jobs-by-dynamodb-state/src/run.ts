@@ -1,10 +1,6 @@
 import { Jobs } from '@monotonix/schema';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import {
-  BatchWriteCommand,
-  DynamoDBDocumentClient,
-  QueryCommand,
-} from '@aws-sdk/lib-dynamodb';
+import { DynamoDBDocumentClient, QueryCommand } from '@aws-sdk/lib-dynamodb';
 import { info, warning } from '@actions/core';
 import { z } from 'zod';
 import { StateItemSchema, StateItem } from '@monotonix/dynamodb-common';
@@ -34,66 +30,7 @@ export const run = async ({
     table,
   });
 
-  /*
-  await setRunningStatus({
-    docClient,
-    table,
-    jobs: filteredJobs,
-    workflowId,
-    githubRef,
-  });
-  */
-
   return filteredJobs;
-};
-
-const setRunningStatus = async ({
-  docClient,
-  table,
-  jobs,
-  workflowId,
-  githubRef,
-}: {
-  docClient: DynamoDBDocumentClient;
-  table: string;
-  jobs: Jobs;
-  workflowId: string;
-  githubRef: string;
-}) => {
-  const chunkedJobs = partitionArray(25, jobs);
-
-  for (const jobs of chunkedJobs) {
-    const putItems = jobs.map(job => ({
-      PutRequest: {
-        Item: {
-          pk: `STATE#${workflowId}#${githubRef}`,
-          sk: `${job.context.app_path}#${job.context.job_key}#running`,
-          appPath: job.context.app_path,
-          jobKey: job.context.job_key,
-          jobStatus: 'running',
-          commitTs: job.context.last_commit.timestamp,
-          commitHash: job.context.last_commit.hash,
-          ttl: Math.floor(Date.now() / 1000) + 60 * 60,
-        },
-      },
-    }));
-
-    const params = {
-      RequestItems: {
-        [table]: putItems,
-      },
-    };
-
-    await docClient.send(new BatchWriteCommand(params));
-  }
-};
-
-const partitionArray = <T>(chunkSize: number, array: T[]): T[][] => {
-  const result = [];
-  for (let i = 0; i < array.length; i += chunkSize) {
-    result.push(array.slice(i, i + chunkSize));
-  }
-  return result;
 };
 
 type filterJobsParams = {
@@ -158,17 +95,17 @@ const filterJobsByAppJobStatuses = (
   });
 };
 
-const AppJobStatus = z.object({
+const AppJobStatusSchema = z.object({
   appPath: z.string(),
   jobKey: z.string(),
   runningTs: z.number().optional(),
   successTs: z.number().optional(),
 });
 
-const AppJobStatusesSchema = z.record(z.string(), AppJobStatus);
+const AppJobStatusesSchema = z.record(z.string(), AppJobStatusSchema);
 type AppJobStatuses = z.infer<typeof AppJobStatusesSchema>;
 
-const transofrmItems = (items: Record<string, any>[]) => {
+const transofrmItems = (items: Record<string, any>[]): AppJobStatuses => {
   const appJobStatuses: AppJobStatuses = {};
 
   for (const item of items) {

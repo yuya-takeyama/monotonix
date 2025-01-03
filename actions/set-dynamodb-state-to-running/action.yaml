@@ -14,15 +14,12 @@ inputs:
   job-status:
     description: 'Job Status'
     required: true
-  ttl-in-days:
-    description: 'TTL in days'
-    required: false
-  ttl-in-hours:
-    description: 'TTL in hours'
-    required: false
-  ttl-in-minutes:
-    description: 'TTL in minutes'
-    required: false
+  running-ttl:
+    description: 'TTL for running state (format: 1d, 1h, 1m, 1s)'
+    default: '1h'
+  success-ttl:
+    description: 'TTL for success state (format: 1d, 1h, 1m, 1s)'
+    default: '180d'
 
 runs:
   using: 'node20'
