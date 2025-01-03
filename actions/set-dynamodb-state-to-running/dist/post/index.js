@@ -57922,7 +57922,6 @@ const client_dynamodb_1 = __nccwpck_require__(7173);
 const lib_dynamodb_1 = __nccwpck_require__(2415);
 const core_1 = __nccwpck_require__(7184);
 const runPost = async ({ table, region, job, jobStatus, ttl, }) => {
-    console.log('DEBUG: runPost');
     const client = new client_dynamodb_1.DynamoDBClient({
         region,
         credentials: {
@@ -57933,15 +57932,12 @@ const runPost = async ({ table, region, job, jobStatus, ttl, }) => {
     });
     const docClient = lib_dynamodb_1.DynamoDBDocumentClient.from(client);
     const pk = `STATE#${job.context.workflow_id}#${job.context.github_ref}`;
-    console.log('DEBUG: putRunningState');
     try {
         if (jobStatus === 'success') {
             await putSuccessState({ job, table, docClient, pk, ttl });
         }
-        console.log('DEBUG: putRunningState done');
     }
     catch (err) {
-        console.log(`DEBUG: putRunningState error: ${err}`);
         if (err instanceof client_dynamodb_1.ConditionalCheckFailedException) {
             (0, core_1.notice)(`${job.context.label}: A newer commit is already set to state as success`);
             // No need to let it fail
@@ -57952,12 +57948,9 @@ const runPost = async ({ table, region, job, jobStatus, ttl, }) => {
     }
     finally {
         try {
-            console.log('DEBUG: deleteRunningState');
             await deleteRunningState({ job, table, docClient, pk });
-            console.log('DEBUG: deleteRunningState done');
         }
         catch (err) {
-            console.log(`DEBUG: deleteRunningState error: ${err}`);
             if (err instanceof client_dynamodb_1.ConditionalCheckFailedException) {
                 (0, core_1.notice)(`${job.context.label}: A newer commit is already running`);
                 // No need to let it fail
@@ -58012,7 +58005,7 @@ const deleteRunningState = async ({ job, table, docClient, pk, }) => {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.getAwsCredentialsFromState = exports.saveAwsCredentialsIntoState = exports.parseDuration = void 0;
+exports.wrapFunctionWithEnv = exports.getAwsCredentialsFromState = exports.saveAwsCredentialsIntoState = exports.parseDuration = void 0;
 const core_1 = __nccwpck_require__(7184);
 const parseDuration = (duration) => {
     const regex = /(\d+)(\D+)/g;
@@ -58069,6 +58062,34 @@ const getAwsCredentialsFromState = () => {
     };
 };
 exports.getAwsCredentialsFromState = getAwsCredentialsFromState;
+const wrapFunctionWithEnv = (originalFunction, tempEnv) => {
+    return (...args) => {
+        const originalEnv = {};
+        for (const [key, value] of Object.entries(tempEnv)) {
+            originalEnv[key] = process.env[key];
+            if (value !== undefined) {
+                process.env[key] = value;
+            }
+            else {
+                delete process.env[key];
+            }
+        }
+        try {
+            return originalFunction(...args);
+        }
+        finally {
+            for (const [key, value] of Object.entries(originalEnv)) {
+                if (value !== undefined) {
+                    process.env[key] = value;
+                }
+                else {
+                    delete process.env[key];
+                }
+            }
+        }
+    };
+};
+exports.wrapFunctionWithEnv = wrapFunctionWithEnv;
 
 
 /***/ }),
@@ -60035,7 +60056,7 @@ const core_1 = __nccwpck_require__(7184);
 const runPost_1 = __nccwpck_require__(6357);
 const schema_1 = __nccwpck_require__(67);
 const utils_1 = __nccwpck_require__(7583);
-const wrappedRunPost = wrapFunctionWithEnv(runPost_1.runPost, (0, utils_1.getAwsCredentialsFromState)());
+const runPostWithAwsCredentials = (0, utils_1.wrapFunctionWithEnv)(runPost_1.runPost, (0, utils_1.getAwsCredentialsFromState)());
 try {
     const table = (0, core_1.getInput)('dynamodb-table');
     const region = (0, core_1.getInput)('dynamodb-region');
@@ -60049,45 +60070,16 @@ try {
     }
     const ttlDuration = (0, utils_1.parseDuration)((0, core_1.getInput)('success-ttl'));
     const ttl = Math.floor(Date.now() / 1000) + ttlDuration;
-    wrappedRunPost({
+    runPostWithAwsCredentials({
         table,
         region,
         job,
         jobStatus,
         ttl,
     });
-    console.log('After runPost');
 }
 catch (error) {
-    console.error(error);
     (0, core_1.setFailed)(`Action failed with error: ${error}`);
-}
-function wrapFunctionWithEnv(originalFunction, tempEnv) {
-    return (...args) => {
-        const originalEnv = {};
-        for (const [key, value] of Object.entries(tempEnv)) {
-            originalEnv[key] = process.env[key];
-            if (value !== undefined) {
-                process.env[key] = value;
-            }
-            else {
-                delete process.env[key];
-            }
-        }
-        try {
-            return originalFunction(...args);
-        }
-        finally {
-            for (const [key, value] of Object.entries(originalEnv)) {
-                if (value !== undefined) {
-                    process.env[key] = value;
-                }
-                else {
-                    delete process.env[key];
-                }
-            }
-        }
-    };
 }
 
 })();

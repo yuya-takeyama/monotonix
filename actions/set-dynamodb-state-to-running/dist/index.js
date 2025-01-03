@@ -57969,7 +57969,7 @@ const putRunningState = async ({ job, table, docClient, pk, ttl, }) => {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.getAwsCredentialsFromState = exports.saveAwsCredentialsIntoState = exports.parseDuration = void 0;
+exports.wrapFunctionWithEnv = exports.getAwsCredentialsFromState = exports.saveAwsCredentialsIntoState = exports.parseDuration = void 0;
 const core_1 = __nccwpck_require__(7184);
 const parseDuration = (duration) => {
     const regex = /(\d+)(\D+)/g;
@@ -58026,6 +58026,34 @@ const getAwsCredentialsFromState = () => {
     };
 };
 exports.getAwsCredentialsFromState = getAwsCredentialsFromState;
+const wrapFunctionWithEnv = (originalFunction, tempEnv) => {
+    return (...args) => {
+        const originalEnv = {};
+        for (const [key, value] of Object.entries(tempEnv)) {
+            originalEnv[key] = process.env[key];
+            if (value !== undefined) {
+                process.env[key] = value;
+            }
+            else {
+                delete process.env[key];
+            }
+        }
+        try {
+            return originalFunction(...args);
+        }
+        finally {
+            for (const [key, value] of Object.entries(originalEnv)) {
+                if (value !== undefined) {
+                    process.env[key] = value;
+                }
+                else {
+                    delete process.env[key];
+                }
+            }
+        }
+    };
+};
+exports.wrapFunctionWithEnv = wrapFunctionWithEnv;
 
 
 /***/ }),

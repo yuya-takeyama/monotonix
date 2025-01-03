@@ -72,3 +72,33 @@ export const getAwsCredentialsFromState = () => {
     AWS_SESSION_TOKEN: getState('MONOTONIX_DYNAMODB_STATE_AWS_SESSION_TOKEN'),
   };
 };
+
+export const wrapFunctionWithEnv = <T extends (...args: any[]) => any>(
+  originalFunction: T,
+  tempEnv: Record<string, string | undefined>,
+): ((...args: Parameters<T>) => ReturnType<T>) => {
+  return (...args: Parameters<T>): ReturnType<T> => {
+    const originalEnv: Record<string, string | undefined> = {};
+
+    for (const [key, value] of Object.entries(tempEnv)) {
+      originalEnv[key] = process.env[key];
+      if (value !== undefined) {
+        process.env[key] = value;
+      } else {
+        delete process.env[key];
+      }
+    }
+
+    try {
+      return originalFunction(...args);
+    } finally {
+      for (const [key, value] of Object.entries(originalEnv)) {
+        if (value !== undefined) {
+          process.env[key] = value;
+        } else {
+          delete process.env[key];
+        }
+      }
+    }
+  };
+};
