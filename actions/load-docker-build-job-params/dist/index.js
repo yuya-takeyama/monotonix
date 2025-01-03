@@ -46279,6 +46279,55 @@ function loadGlobalConfig(globalConfigFilePath) {
 
 /***/ }),
 
+/***/ 3924:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.generateSemverDatetimeTag = exports.generateImageReferences = void 0;
+exports.getCommittedAt = getCommittedAt;
+const path_1 = __nccwpck_require__(6928);
+const luxon_1 = __nccwpck_require__(9888);
+const generateImageReferences = ({ context, globalConfig, inputJob, }) => {
+    const registry = inputJob.configs.docker_build.registry;
+    if (registry.type === 'aws') {
+        const repository = globalConfig.job_types.docker_build.registries.aws.repositories[inputJob.configs.docker_build.registry.aws.repository];
+        if (!repository) {
+            throw new Error(`Repository not found from Global Config: ${inputJob.configs.docker_build.registry.aws.repository}`);
+        }
+        switch (inputJob.configs.docker_build.tagging) {
+            case 'always_latest':
+                return [`${(0, path_1.join)(repository.base_url, inputJob.app.name)}:latest`];
+            case 'semver_datetime':
+                return [
+                    `${(0, path_1.join)(repository.base_url, inputJob.app.name)}:${(0, exports.generateSemverDatetimeTag)(context)}`,
+                ];
+            case 'pull_request':
+                if (!context.payload.pull_request) {
+                    throw new Error(`Tagging strategy "pull_request" requires a pull request`);
+                }
+                return [
+                    `${(0, path_1.join)(repository.base_url, inputJob.app.name)}:${context.payload.pull_request.number}`,
+                ];
+            default:
+                throw new Error(`Unsupported tagging: ${inputJob.configs.docker_build.tagging} for environment: ${registry.type}`);
+        }
+    }
+    throw new Error(`Unsupported environment: ${registry.type}`);
+};
+exports.generateImageReferences = generateImageReferences;
+const generateSemverDatetimeTag = (context) => {
+    return `0.0.${luxon_1.DateTime.fromSeconds(getCommittedAt(context)).toFormat('yyyyMMddHHmmss')}`;
+};
+exports.generateSemverDatetimeTag = generateSemverDatetimeTag;
+function getCommittedAt(context) {
+    return new Date(context.payload.head_commit.timestamp).getTime() / 1000;
+}
+
+
+/***/ }),
+
 /***/ 4795:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
@@ -46286,9 +46335,7 @@ function loadGlobalConfig(globalConfigFilePath) {
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.run = run;
-const utils_1 = __nccwpck_require__(7583);
-const path_1 = __nccwpck_require__(6928);
-const luxon_1 = __nccwpck_require__(9888);
+const generateImageReferences_1 = __nccwpck_require__(3924);
 function run({ globalConfig, jobs, context }) {
     return jobs.map((job) => {
         const localDockerBuildConfig = job.configs.docker_build;
@@ -46318,7 +46365,7 @@ function run({ globalConfig, jobs, context }) {
                         },
                     },
                     context: job.context.app_path,
-                    tags: generateTags({
+                    tags: (0, generateImageReferences_1.generateImageReferences)({
                         context,
                         globalConfig,
                         inputJob: job,
@@ -46328,29 +46375,6 @@ function run({ globalConfig, jobs, context }) {
             },
         };
     });
-}
-function generateTags({ context, globalConfig, inputJob, }) {
-    const registry = inputJob.configs.docker_build.registry;
-    if (registry.type === 'aws') {
-        const repository = globalConfig.job_types.docker_build.registries.aws.repositories[inputJob.configs.docker_build.registry.aws.repository];
-        if (!repository) {
-            throw new Error(`Repository not found from Global Config: ${inputJob.configs.docker_build.registry.aws.repository}`);
-        }
-        switch (inputJob.configs.docker_build.tagging) {
-            case 'always_latest':
-                return [`${(0, path_1.join)(repository.base_url, inputJob.app.name)}:latest`];
-            case 'semver_datetime':
-                return [
-                    `${(0, path_1.join)(repository.base_url, inputJob.app.name)}:${generateSemverDatetimeTag(context)}`,
-                ];
-            default:
-                throw new Error(`Unsupported tagging: ${inputJob.configs.docker_build.tagging} for environment: ${registry.type}`);
-        }
-    }
-    throw new Error(`Unsupported environment: ${registry.type}`);
-}
-function generateSemverDatetimeTag(context) {
-    return `0.0.${luxon_1.DateTime.fromSeconds((0, utils_1.getCommittedAt)(context)).toFormat('yyyyMMddHHmmss')}`;
 }
 
 
@@ -46393,7 +46417,7 @@ const InputJobSchema = schema_1.JobSchema.extend({
                     repository: zod_1.z.string(),
                 }),
             }),
-            tagging: zod_1.z.enum(['always_latest', 'semver_datetime']),
+            tagging: zod_1.z.enum(['always_latest', 'semver_datetime', 'pull_request']),
             platforms: zod_1.z.array(zod_1.z.string()),
         }),
     }),
@@ -46421,20 +46445,6 @@ const OutputJobSchema = InputJobSchema.extend({
     }),
 });
 exports.OutputJobsSchema = zod_1.z.array(OutputJobSchema);
-
-
-/***/ }),
-
-/***/ 7583:
-/***/ ((__unused_webpack_module, exports) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.getCommittedAt = getCommittedAt;
-function getCommittedAt(context) {
-    return new Date(context.payload.head_commit.timestamp).getTime() / 1000;
-}
 
 
 /***/ }),

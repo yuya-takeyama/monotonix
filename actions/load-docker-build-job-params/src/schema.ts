@@ -40,7 +40,7 @@ const InputJobSchema = JobSchema.extend({
           repository: z.string(),
         }),
       }),
-      tagging: z.enum(['always_latest', 'semver_datetime']),
+      tagging: z.enum(['always_latest', 'semver_datetime', 'pull_request']),
       platforms: z.array(z.string()),
     }),
   }),

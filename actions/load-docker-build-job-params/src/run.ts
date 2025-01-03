@@ -1,14 +1,11 @@
-import { getCommittedAt } from './utils';
 import {
   InputJobs,
-  InputJob,
   OutputJobs,
   OutputJob,
   DockerBuildGlobalConfig,
 } from './schema';
 import { Context } from '@actions/github/lib/context';
-import { join } from 'path';
-import { DateTime } from 'luxon';
+import { generateImageReferences } from './generateImageReferences';
 
 type runParams = {
   globalConfig: DockerBuildGlobalConfig;
@@ -56,7 +53,7 @@ export function run({ globalConfig, jobs, context }: runParams): OutputJobs {
             },
           },
           context: job.context.app_path,
-          tags: generateTags({
+          tags: generateImageReferences({
             context,
             globalConfig,
             inputJob: job,
@@ -66,51 +63,4 @@ export function run({ globalConfig, jobs, context }: runParams): OutputJobs {
       },
     };
   });
-}
-
-type generateTagsType = {
-  context: Context;
-  globalConfig: DockerBuildGlobalConfig;
-  inputJob: InputJob;
-};
-function generateTags({
-  context,
-  globalConfig,
-  inputJob,
-}: generateTagsType): string[] {
-  const registry = inputJob.configs.docker_build.registry;
-
-  if (registry.type === 'aws') {
-    const repository =
-      globalConfig.job_types.docker_build.registries.aws.repositories[
-        inputJob.configs.docker_build.registry.aws.repository
-      ];
-    if (!repository) {
-      throw new Error(
-        `Repository not found from Global Config: ${inputJob.configs.docker_build.registry.aws.repository}`,
-      );
-    }
-
-    switch (inputJob.configs.docker_build.tagging) {
-      case 'always_latest':
-        return [`${join(repository.base_url, inputJob.app.name)}:latest`];
-      case 'semver_datetime':
-        return [
-          `${join(
-            repository.base_url,
-            inputJob.app.name,
-          )}:${generateSemverDatetimeTag(context)}`,
-        ];
-      default:
-        throw new Error(
-          `Unsupported tagging: ${inputJob.configs.docker_build.tagging} for environment: ${registry.type}`,
-        );
-    }
-  }
-
-  throw new Error(`Unsupported environment: ${registry.type}`);
-}
-
-function generateSemverDatetimeTag(context: Context): string {
-  return `0.0.${DateTime.fromSeconds(getCommittedAt(context)).toFormat('yyyyMMddHHmmss')}`;
 }
