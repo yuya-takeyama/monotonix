@@ -46319,7 +46319,7 @@ function run({ globalConfig, jobs, context }) {
                     },
                     context: job.context.app_path,
                     tags: generateTags({
-                        committedAt: (0, utils_1.getCommittedAt)(context),
+                        context,
                         globalConfig,
                         inputJob: job,
                     }).join(','),
@@ -46329,7 +46329,7 @@ function run({ globalConfig, jobs, context }) {
         };
     });
 }
-function generateTags({ committedAt, globalConfig, inputJob, }) {
+function generateTags({ context, globalConfig, inputJob, }) {
     const registry = inputJob.configs.docker_build.registry;
     if (registry.type === 'aws') {
         const repository = globalConfig.job_types.docker_build.registries.aws.repositories[inputJob.configs.docker_build.registry.aws.repository];
@@ -46341,7 +46341,7 @@ function generateTags({ committedAt, globalConfig, inputJob, }) {
                 return [`${(0, path_1.join)(repository.base_url, inputJob.app.name)}:latest`];
             case 'semver_datetime':
                 return [
-                    `${(0, path_1.join)(repository.base_url, inputJob.app.name)}:${generateSemverDatetimeTag(committedAt)}`,
+                    `${(0, path_1.join)(repository.base_url, inputJob.app.name)}:${generateSemverDatetimeTag(context)}`,
                 ];
             default:
                 throw new Error(`Unsupported tagging: ${inputJob.configs.docker_build.tagging} for environment: ${registry.type}`);
@@ -46349,8 +46349,8 @@ function generateTags({ committedAt, globalConfig, inputJob, }) {
     }
     throw new Error(`Unsupported environment: ${registry.type}`);
 }
-function generateSemverDatetimeTag(committedAt) {
-    return `0.0.${luxon_1.DateTime.fromSeconds(committedAt).toFormat('yyyyMMddHHmmss')}`;
+function generateSemverDatetimeTag(context) {
+    return `0.0.${luxon_1.DateTime.fromSeconds((0, utils_1.getCommittedAt)(context)).toFormat('yyyyMMddHHmmss')}`;
 }
 
 

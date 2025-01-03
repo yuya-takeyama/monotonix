@@ -1,4 +1,3 @@
-import { context } from '@actions/github';
 import { Context } from '@actions/github/lib/context';
 
 export function getCommittedAt(context: Context) {

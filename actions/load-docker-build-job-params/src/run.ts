@@ -57,7 +57,7 @@ export function run({ globalConfig, jobs, context }: runParams): OutputJobs {
           },
           context: job.context.app_path,
           tags: generateTags({
-            committedAt: getCommittedAt(context),
+            context,
             globalConfig,
             inputJob: job,
           }).join(','),
@@ -69,12 +69,12 @@ export function run({ globalConfig, jobs, context }: runParams): OutputJobs {
 }
 
 type generateTagsType = {
-  committedAt: number;
+  context: Context;
   globalConfig: DockerBuildGlobalConfig;
   inputJob: InputJob;
 };
 function generateTags({
-  committedAt,
+  context,
   globalConfig,
   inputJob,
 }: generateTagsType): string[] {
@@ -99,7 +99,7 @@ function generateTags({
           `${join(
             repository.base_url,
             inputJob.app.name,
-          )}:${generateSemverDatetimeTag(committedAt)}`,
+          )}:${generateSemverDatetimeTag(context)}`,
         ];
       default:
         throw new Error(
@@ -111,6 +111,6 @@ function generateTags({
   throw new Error(`Unsupported environment: ${registry.type}`);
 }
 
-function generateSemverDatetimeTag(committedAt: number): string {
-  return `0.0.${DateTime.fromSeconds(committedAt).toFormat('yyyyMMddHHmmss')}`;
+function generateSemverDatetimeTag(context: Context): string {
+  return `0.0.${DateTime.fromSeconds(getCommittedAt(context)).toFormat('yyyyMMddHHmmss')}`;
 }
