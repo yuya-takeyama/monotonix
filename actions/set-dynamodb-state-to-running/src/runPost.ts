@@ -43,8 +43,10 @@ export const runPost = async ({
       notice(
         `${job.context.label}: A newer commit is already set to state as success`,
       );
+      // No need to let it fail
+    } else {
+      throw err;
     }
-    // No need to let it fail
   } finally {
     try {
       console.log('DEBUG: deleteRunningState');
@@ -55,6 +57,8 @@ export const runPost = async ({
       if (err instanceof ConditionalCheckFailedException) {
         notice(`${job.context.label}: A newer commit is already running`);
         // No need to let it fail
+      } else {
+        throw err;
       }
     }
   }

@@ -57937,8 +57937,11 @@ const runPost = async ({ table, region, job, jobStatus, ttl, }) => {
         console.log(`DEBUG: putRunningState error: ${err}`);
         if (err instanceof client_dynamodb_1.ConditionalCheckFailedException) {
             (0, core_1.notice)(`${job.context.label}: A newer commit is already set to state as success`);
+            // No need to let it fail
         }
-        // No need to let it fail
+        else {
+            throw err;
+        }
     }
     finally {
         try {
@@ -57951,6 +57954,9 @@ const runPost = async ({ table, region, job, jobStatus, ttl, }) => {
             if (err instanceof client_dynamodb_1.ConditionalCheckFailedException) {
                 (0, core_1.notice)(`${job.context.label}: A newer commit is already running`);
                 // No need to let it fail
+            }
+            else {
+                throw err;
             }
         }
     }
