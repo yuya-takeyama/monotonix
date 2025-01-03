@@ -57969,7 +57969,7 @@ const putRunningState = async ({ job, table, docClient, pk, ttl, }) => {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.saveAwsCredentialsIntoState = exports.parseDuration = void 0;
+exports.getAwsCredentialsFromState = exports.saveAwsCredentialsIntoState = exports.parseDuration = void 0;
 const core_1 = __nccwpck_require__(7184);
 const parseDuration = (duration) => {
     const regex = /(\d+)(\D+)/g;
@@ -58016,6 +58016,16 @@ const saveAwsCredentialsIntoState = () => {
     (0, core_1.saveState)('MONOTONIX_DYNAMODB_STATE_AWS_SESSION_TOKEN', process.env.AWS_SESSION_TOKEN);
 };
 exports.saveAwsCredentialsIntoState = saveAwsCredentialsIntoState;
+const getAwsCredentialsFromState = () => {
+    return {
+        AWS_DEFAULT_REGION: (0, core_1.getState)('MONOTONIX_DYNAMODB_STATE_AWS_DEFAULT_REGION'),
+        AWS_REGION: (0, core_1.getState)('MONOTONIX_DYNAMODB_STATE_AWS_REGION'),
+        AWS_ACCESS_KEY_ID: (0, core_1.getState)('MONOTONIX_DYNAMODB_STATE_AWS_ACCESS_KEY_ID'),
+        AWS_SECRET_ACCESS_KEY: (0, core_1.getState)('MONOTONIX_DYNAMODB_STATE_AWS_SECRET_ACCESS_KEY'),
+        AWS_SESSION_TOKEN: (0, core_1.getState)('MONOTONIX_DYNAMODB_STATE_AWS_SESSION_TOKEN'),
+    };
+};
+exports.getAwsCredentialsFromState = getAwsCredentialsFromState;
 
 
 /***/ }),

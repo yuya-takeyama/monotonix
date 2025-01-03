@@ -1,7 +1,12 @@
 import { getInput, setFailed } from '@actions/core';
 import { runPost } from './runPost';
 import { JobSchema } from '@monotonix/schema';
-import { parseDuration } from './utils';
+import { getAwsCredentialsFromState, parseDuration } from './utils';
+
+const wrappedRunPost = wrapFunctionWithEnv(
+  runPost,
+  getAwsCredentialsFromState(),
+);
 
 try {
   const table = getInput('dynamodb-table');
@@ -19,21 +24,7 @@ try {
   const ttlDuration = parseDuration(getInput('success-ttl'));
   const ttl = Math.floor(Date.now() / 1000) + ttlDuration;
 
-  console.log('Before runPost');
-  console.log(
-    JSON.stringify(
-      {
-        table,
-        region,
-        job,
-        jobStatus,
-        ttl,
-      },
-      null,
-      2,
-    ),
-  );
-  runPost({
+  wrappedRunPost({
     table,
     region,
     job,
@@ -44,4 +35,34 @@ try {
 } catch (error) {
   console.error(error);
   setFailed(`Action failed with error: ${error}`);
+}
+
+function wrapFunctionWithEnv<T extends (...args: any[]) => any>(
+  originalFunction: T,
+  tempEnv: Record<string, string | undefined>,
+): (...args: Parameters<T>) => ReturnType<T> {
+  return (...args: Parameters<T>): ReturnType<T> => {
+    const originalEnv: Record<string, string | undefined> = {};
+
+    for (const [key, value] of Object.entries(tempEnv)) {
+      originalEnv[key] = process.env[key];
+      if (value !== undefined) {
+        process.env[key] = value;
+      } else {
+        delete process.env[key];
+      }
+    }
+
+    try {
+      return originalFunction(...args);
+    } finally {
+      for (const [key, value] of Object.entries(originalEnv)) {
+        if (value !== undefined) {
+          process.env[key] = value;
+        } else {
+          delete process.env[key];
+        }
+      }
+    }
+  };
 }

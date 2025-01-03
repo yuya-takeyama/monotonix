@@ -26,7 +26,14 @@ export const runPost = async ({
   ttl,
 }: runPostParam): Promise<void> => {
   console.log('DEBUG: runPost');
-  const client = new DynamoDBClient({ region });
+  const client = new DynamoDBClient({
+    region,
+    credentials: {
+      accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
+      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+      sessionToken: process.env.AWS_SESSION_TOKEN!,
+    },
+  });
   const docClient = DynamoDBDocumentClient.from(client);
 
   const pk = `STATE#${job.context.workflow_id}#${job.context.github_ref}`;

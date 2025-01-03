@@ -1,4 +1,4 @@
-import { saveState } from '@actions/core';
+import { saveState, getState } from '@actions/core';
 
 export const parseDuration = (duration: string): number => {
   const regex = /(\d+)(\D+)/g;
@@ -59,4 +59,16 @@ export const saveAwsCredentialsIntoState = () => {
     'MONOTONIX_DYNAMODB_STATE_AWS_SESSION_TOKEN',
     process.env.AWS_SESSION_TOKEN,
   );
+};
+
+export const getAwsCredentialsFromState = () => {
+  return {
+    AWS_DEFAULT_REGION: getState('MONOTONIX_DYNAMODB_STATE_AWS_DEFAULT_REGION'),
+    AWS_REGION: getState('MONOTONIX_DYNAMODB_STATE_AWS_REGION'),
+    AWS_ACCESS_KEY_ID: getState('MONOTONIX_DYNAMODB_STATE_AWS_ACCESS_KEY_ID'),
+    AWS_SECRET_ACCESS_KEY: getState(
+      'MONOTONIX_DYNAMODB_STATE_AWS_SECRET_ACCESS_KEY',
+    ),
+    AWS_SESSION_TOKEN: getState('MONOTONIX_DYNAMODB_STATE_AWS_SESSION_TOKEN'),
+  };
 };

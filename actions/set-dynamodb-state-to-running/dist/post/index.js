@@ -57923,7 +57923,14 @@ const lib_dynamodb_1 = __nccwpck_require__(2415);
 const core_1 = __nccwpck_require__(7184);
 const runPost = async ({ table, region, job, jobStatus, ttl, }) => {
     console.log('DEBUG: runPost');
-    const client = new client_dynamodb_1.DynamoDBClient({ region });
+    const client = new client_dynamodb_1.DynamoDBClient({
+        region,
+        credentials: {
+            accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+            secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+            sessionToken: process.env.AWS_SESSION_TOKEN,
+        },
+    });
     const docClient = lib_dynamodb_1.DynamoDBDocumentClient.from(client);
     const pk = `STATE#${job.context.workflow_id}#${job.context.github_ref}`;
     console.log('DEBUG: putRunningState');
@@ -58005,7 +58012,7 @@ const deleteRunningState = async ({ job, table, docClient, pk, }) => {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.saveAwsCredentialsIntoState = exports.parseDuration = void 0;
+exports.getAwsCredentialsFromState = exports.saveAwsCredentialsIntoState = exports.parseDuration = void 0;
 const core_1 = __nccwpck_require__(7184);
 const parseDuration = (duration) => {
     const regex = /(\d+)(\D+)/g;
@@ -58052,6 +58059,16 @@ const saveAwsCredentialsIntoState = () => {
     (0, core_1.saveState)('MONOTONIX_DYNAMODB_STATE_AWS_SESSION_TOKEN', process.env.AWS_SESSION_TOKEN);
 };
 exports.saveAwsCredentialsIntoState = saveAwsCredentialsIntoState;
+const getAwsCredentialsFromState = () => {
+    return {
+        AWS_DEFAULT_REGION: (0, core_1.getState)('MONOTONIX_DYNAMODB_STATE_AWS_DEFAULT_REGION'),
+        AWS_REGION: (0, core_1.getState)('MONOTONIX_DYNAMODB_STATE_AWS_REGION'),
+        AWS_ACCESS_KEY_ID: (0, core_1.getState)('MONOTONIX_DYNAMODB_STATE_AWS_ACCESS_KEY_ID'),
+        AWS_SECRET_ACCESS_KEY: (0, core_1.getState)('MONOTONIX_DYNAMODB_STATE_AWS_SECRET_ACCESS_KEY'),
+        AWS_SESSION_TOKEN: (0, core_1.getState)('MONOTONIX_DYNAMODB_STATE_AWS_SESSION_TOKEN'),
+    };
+};
+exports.getAwsCredentialsFromState = getAwsCredentialsFromState;
 
 
 /***/ }),
@@ -60018,6 +60035,7 @@ const core_1 = __nccwpck_require__(7184);
 const runPost_1 = __nccwpck_require__(6357);
 const schema_1 = __nccwpck_require__(67);
 const utils_1 = __nccwpck_require__(7583);
+const wrappedRunPost = wrapFunctionWithEnv(runPost_1.runPost, (0, utils_1.getAwsCredentialsFromState)());
 try {
     const table = (0, core_1.getInput)('dynamodb-table');
     const region = (0, core_1.getInput)('dynamodb-region');
@@ -60031,15 +60049,7 @@ try {
     }
     const ttlDuration = (0, utils_1.parseDuration)((0, core_1.getInput)('success-ttl'));
     const ttl = Math.floor(Date.now() / 1000) + ttlDuration;
-    console.log('Before runPost');
-    console.log(JSON.stringify({
-        table,
-        region,
-        job,
-        jobStatus,
-        ttl,
-    }, null, 2));
-    (0, runPost_1.runPost)({
+    wrappedRunPost({
         table,
         region,
         job,
@@ -60051,6 +60061,33 @@ try {
 catch (error) {
     console.error(error);
     (0, core_1.setFailed)(`Action failed with error: ${error}`);
+}
+function wrapFunctionWithEnv(originalFunction, tempEnv) {
+    return (...args) => {
+        const originalEnv = {};
+        for (const [key, value] of Object.entries(tempEnv)) {
+            originalEnv[key] = process.env[key];
+            if (value !== undefined) {
+                process.env[key] = value;
+            }
+            else {
+                delete process.env[key];
+            }
+        }
+        try {
+            return originalFunction(...args);
+        }
+        finally {
+            for (const [key, value] of Object.entries(originalEnv)) {
+                if (value !== undefined) {
+                    process.env[key] = value;
+                }
+                else {
+                    delete process.env[key];
+                }
+            }
+        }
+    };
 }
 
 })();
