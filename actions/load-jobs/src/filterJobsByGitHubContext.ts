@@ -28,6 +28,8 @@ export const filterJobsByGitHubContext = ({
             }
           }
 
+          return false;
+
         case 'pull_request':
           if ('pull_request' in job.on) {
             if (job.on.pull_request && job.on.pull_request.branches) {
