@@ -57,10 +57,17 @@ import { GitHub } from '@actions/github/lib/utils';
     });
     */
 
+    const githubJobContext = JSON.parse(process.env.GITHUB_JOB_CONTEXT!);
+    const githubJobsContext = JSON.parse(process.env.GITHUB_JOBS_CONTEXT!);
+    const githubStepContext = JSON.parse(process.env.GITHUB_STEP_CONTEXT!);
+
     console.log('This is post.ts');
     console.log(
       JSON.stringify(
         {
+          githubJobContext,
+          githubJobsContext,
+          githubStepContext,
           workflowId,
           jobId,
           githubRef: context.ref,
