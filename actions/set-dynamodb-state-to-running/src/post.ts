@@ -2,6 +2,7 @@ import { getInput, setFailed } from '@actions/core';
 import { run } from './run';
 import { JobSchema } from '@monotonix/schema';
 import { context, getOctokit } from '@actions/github';
+import { GitHub } from '@actions/github/lib/utils';
 
 (async () => {
   try {
@@ -41,6 +42,12 @@ import { context, getOctokit } from '@actions/github';
       run_id: context.runId,
       attempt_number: Number(process.env.GITHUB_RUN_ATTEMPT),
     });
+    const jobId = jobs.data.jobs[1]!.id;
+    const actionJob = octokit.rest.actions.getJobForWorkflowRun({
+      owner: context.repo.owner,
+      repo: context.repo.repo,
+      job_id: jobId,
+    });
 
     /*
     const jobForWorkflowRun = await octokit.rest.actions.getJobForWorkflowRun({
@@ -55,8 +62,11 @@ import { context, getOctokit } from '@actions/github';
       JSON.stringify(
         {
           workflowId,
+          jobId,
           githubRef: context.ref,
           jobs,
+          actionJob,
+          context,
           job,
           table,
           region,
