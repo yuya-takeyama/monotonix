@@ -6,21 +6,11 @@ type filterJobsByGitHubContextParams = {
   jobs: Job[];
   context: Context;
 };
-export function filterJobsByGitHubContext({
+export const filterJobsByGitHubContext = ({
   jobs,
   context,
-}: filterJobsByGitHubContextParams): Job[] {
-  console.log(
-    JSON.stringify(
-      {
-        jobs,
-        context,
-      },
-      null,
-      2,
-    ),
-  );
-  return jobs
+}: filterJobsByGitHubContextParams): Job[] =>
+  jobs
     .filter(job => {
       switch (context.eventName) {
         case 'push':
@@ -57,4 +47,3 @@ export function filterJobsByGitHubContext({
       }
     })
     .map(job => JobSchema.parse(job));
-}

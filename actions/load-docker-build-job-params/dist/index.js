@@ -46308,7 +46308,7 @@ const generateImageReferences = ({ context, globalConfig, inputJob, }) => {
                     throw new Error(`Tagging strategy "pull_request" requires a pull request`);
                 }
                 return [
-                    `${(0, path_1.join)(repository.base_url, inputJob.app.name)}:${context.payload.pull_request.number}`,
+                    `${(0, path_1.join)(repository.base_url, inputJob.app.name)}:pr-${context.payload.pull_request.number}`,
                 ];
             default:
                 throw new Error(`Unsupported tagging: ${inputJob.configs.docker_build.tagging} for environment: ${registry.type}`);

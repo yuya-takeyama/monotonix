@@ -38886,49 +38886,44 @@ exports.JobsSchema = zod_1.z.array(exports.JobSchema);
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.filterJobsByGitHubContext = filterJobsByGitHubContext;
+exports.filterJobsByGitHubContext = void 0;
 const schema_1 = __nccwpck_require__(67);
 const minimatch_1 = __nccwpck_require__(8286);
-function filterJobsByGitHubContext({ jobs, context, }) {
-    console.log(JSON.stringify({
-        jobs,
-        context,
-    }, null, 2));
-    return jobs
-        .filter(job => {
-        switch (context.eventName) {
-            case 'push':
-                if ('push' in job.on) {
-                    if (job.on.push && job.on.push.branches) {
-                        const branchName = context.ref.replace(/^refs\/heads\//, '');
-                        const result = job.on.push.branches.some(branch => (0, minimatch_1.minimatch)(branchName, branch));
-                        if (result) {
-                            return true;
-                        }
-                    }
-                    else {
+const filterJobsByGitHubContext = ({ jobs, context, }) => jobs
+    .filter(job => {
+    switch (context.eventName) {
+        case 'push':
+            if ('push' in job.on) {
+                if (job.on.push && job.on.push.branches) {
+                    const branchName = context.ref.replace(/^refs\/heads\//, '');
+                    const result = job.on.push.branches.some(branch => (0, minimatch_1.minimatch)(branchName, branch));
+                    if (result) {
                         return true;
                     }
                 }
-            case 'pull_request':
-                if ('pull_request' in job.on) {
-                    if (job.on.pull_request && job.on.pull_request.branches) {
-                        const result = job.on.pull_request.branches.some(branch => 
-                        // @ts-ignore
-                        (0, minimatch_1.minimatch)(context.ref_name, branch));
-                        if (result) {
-                            return true;
-                        }
-                    }
-                    else {
+                else {
+                    return true;
+                }
+            }
+        case 'pull_request':
+            if ('pull_request' in job.on) {
+                if (job.on.pull_request && job.on.pull_request.branches) {
+                    const result = job.on.pull_request.branches.some(branch => 
+                    // @ts-ignore
+                    (0, minimatch_1.minimatch)(context.ref_name, branch));
+                    if (result) {
                         return true;
                     }
                 }
-                return false;
-        }
-    })
-        .map(job => schema_1.JobSchema.parse(job));
-}
+                else {
+                    return true;
+                }
+            }
+            return false;
+    }
+})
+    .map(job => schema_1.JobSchema.parse(job));
+exports.filterJobsByGitHubContext = filterJobsByGitHubContext;
 
 
 /***/ }),

@@ -46,7 +46,7 @@ export const generateImageReferences = ({
         }
 
         return [
-          `${join(repository.base_url, inputJob.app.name)}:${context.payload.pull_request.number}`,
+          `${join(repository.base_url, inputJob.app.name)}:pr-${context.payload.pull_request.number}`,
         ];
 
       default:
