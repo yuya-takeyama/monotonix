@@ -36452,12 +36452,10 @@ const github_1 = __nccwpck_require__(5683);
         });
         */
         const githubJobContext = JSON.parse(process.env.MONOTONIX_GITHUB_JOB_CONTEXT);
-        const githubJobsContext = JSON.parse(process.env.MONOTONIX_GITHUB_JOBS_CONTEXT);
         const githubStepContext = JSON.parse(process.env.MONOTONIX_GITHUB_STEP_CONTEXT);
         console.log('This is post.ts');
         console.log(JSON.stringify({
             githubJobContext,
-            githubJobsContext,
             githubStepContext,
             workflowId,
             jobId,
