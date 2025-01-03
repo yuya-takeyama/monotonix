@@ -36405,42 +36405,51 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 const core_1 = __nccwpck_require__(7184);
 const schema_1 = __nccwpck_require__(67);
 const github_1 = __nccwpck_require__(5683);
-try {
-    const workflowId = (0, core_1.getInput)('workflow-id') || process.env.MONOTONIX_WORKFLOW_ID;
-    if (!workflowId) {
-        throw new Error('Input workflow-id or env $MONOTONIX_WORKFLOW_ID is required');
+(async () => {
+    try {
+        const workflowId = (0, core_1.getInput)('workflow-id') || process.env.MONOTONIX_WORKFLOW_ID;
+        if (!workflowId) {
+            throw new Error('Input workflow-id or env $MONOTONIX_WORKFLOW_ID is required');
+        }
+        const table = (0, core_1.getInput)('dynamodb-table');
+        const region = (0, core_1.getInput)('dynamodb-region');
+        const jobJson = (0, core_1.getInput)('job');
+        const job = schema_1.JobSchema.parse(JSON.parse(jobJson));
+        const now = Math.floor(Date.now() / 1000);
+        let ttl = null;
+        if ((0, core_1.getInput)('ttl-in-days')) {
+            ttl = now + Number((0, core_1.getInput)('ttl-in-days')) * 24 * 60 * 60;
+        }
+        else if ((0, core_1.getInput)('ttl-in-hours')) {
+            ttl = now + Number((0, core_1.getInput)('ttl-in-hours')) * 60 * 60;
+        }
+        else if ((0, core_1.getInput)('ttl-in-minutes')) {
+            ttl = now + Number((0, core_1.getInput)('ttl-in-minutes')) * 60;
+        }
+        const status = 'running';
+        const octokit = (0, github_1.getOctokit)(process.env.GITHUB_TOKEN);
+        const workflowRun = await octokit.rest.actions.getWorkflowRun({
+            owner: github_1.context.repo.owner,
+            repo: github_1.context.repo.repo,
+            run_id: github_1.context.runId,
+        });
+        console.log('This is post.ts');
+        console.log(JSON.stringify({
+            workflowId,
+            githubRef: github_1.context.ref,
+            workflowRun,
+            job,
+            table,
+            region,
+            status,
+            ttl,
+        }, null, 2));
     }
-    const table = (0, core_1.getInput)('dynamodb-table');
-    const region = (0, core_1.getInput)('dynamodb-region');
-    const jobJson = (0, core_1.getInput)('job');
-    const job = schema_1.JobSchema.parse(JSON.parse(jobJson));
-    const now = Math.floor(Date.now() / 1000);
-    let ttl = null;
-    if ((0, core_1.getInput)('ttl-in-days')) {
-        ttl = now + Number((0, core_1.getInput)('ttl-in-days')) * 24 * 60 * 60;
+    catch (error) {
+        console.error(error);
+        (0, core_1.setFailed)(`Action failed with error: ${error}`);
     }
-    else if ((0, core_1.getInput)('ttl-in-hours')) {
-        ttl = now + Number((0, core_1.getInput)('ttl-in-hours')) * 60 * 60;
-    }
-    else if ((0, core_1.getInput)('ttl-in-minutes')) {
-        ttl = now + Number((0, core_1.getInput)('ttl-in-minutes')) * 60;
-    }
-    const status = 'running';
-    console.log('This is post.ts');
-    console.log(JSON.stringify({
-        workflowId,
-        githubRef: github_1.context.ref,
-        job,
-        table,
-        region,
-        status,
-        ttl,
-    }, null, 2));
-}
-catch (error) {
-    console.error(error);
-    (0, core_1.setFailed)(`Action failed with error: ${error}`);
-}
+})();
 
 })();
 
