@@ -36428,6 +36428,7 @@ const github_1 = __nccwpck_require__(5683);
         }
         const status = 'running';
         const octokit = (0, github_1.getOctokit)(process.env.GITHUB_TOKEN);
+        console.log(`MONOTONIX_GITHUB_JOB_CONTEXT: ${process.env.MONOTONIX_GITHUB_JOB_CONTEXT}`);
         console.log(`JOB_ID: ${process.env.GITHUB_JOB}`);
         console.log(`context.job: ${github_1.context.job}`);
         console.log(`context.run_id: ${github_1.context.runId}`);

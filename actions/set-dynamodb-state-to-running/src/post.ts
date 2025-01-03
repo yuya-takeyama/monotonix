@@ -31,6 +31,9 @@ import { GitHub } from '@actions/github/lib/utils';
 
     const octokit = getOctokit(process.env.GITHUB_TOKEN!);
 
+    console.log(
+      `MONOTONIX_GITHUB_JOB_CONTEXT: ${process.env.MONOTONIX_GITHUB_JOB_CONTEXT}`,
+    );
     console.log(`JOB_ID: ${process.env.GITHUB_JOB}`);
     console.log(`context.job: ${context.job}`);
     console.log(`context.run_id: ${context.runId}`);

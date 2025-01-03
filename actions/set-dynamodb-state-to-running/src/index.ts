@@ -27,6 +27,9 @@ try {
     ttl = now + Number(getInput('ttl-in-minutes')) * 60;
   }
 
+  console.log(
+    `MONOTONIX_GITHUB_JOB_CONTEXT: ${process.env.MONOTONIX_GITHUB_JOB_CONTEXT}`,
+  );
   console.log('This is index.ts');
   console.log(
     JSON.stringify(
