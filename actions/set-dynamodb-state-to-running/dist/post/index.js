@@ -36451,9 +36451,9 @@ const github_1 = __nccwpck_require__(5683);
           job_id: Number(process.env.GITHUB_JOB!),
         });
         */
-        const githubJobContext = JSON.parse(process.env.GITHUB_JOB_CONTEXT);
-        const githubJobsContext = JSON.parse(process.env.GITHUB_JOBS_CONTEXT);
-        const githubStepContext = JSON.parse(process.env.GITHUB_STEP_CONTEXT);
+        const githubJobContext = JSON.parse(process.env.MONOTONIX_GITHUB_JOB_CONTEXT);
+        const githubJobsContext = JSON.parse(process.env.MONOTONIX_GITHUB_JOBS_CONTEXT);
+        const githubStepContext = JSON.parse(process.env.MONOTONIX_GITHUB_STEP_CONTEXT);
         console.log('This is post.ts');
         console.log(JSON.stringify({
             githubJobContext,
