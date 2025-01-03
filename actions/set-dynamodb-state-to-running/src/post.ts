@@ -34,15 +34,22 @@ try {
     ttl = now + Number(getInput('ttl-in-minutes')) * 60;
   }
 
-  run({
-    workflowId,
-    githubRef: context.ref,
-    job,
-    table,
-    region,
-    status,
-    ttl,
-  });
+  console.log('This is post.ts');
+  console.log(
+    JSON.stringify(
+      {
+        workflowId,
+        githubRef: context.ref,
+        job,
+        table,
+        region,
+        status,
+        ttl,
+      },
+      null,
+      2,
+    ),
+  );
 } catch (error) {
   console.error(error);
   setFailed(`Action failed with error: ${error}`);

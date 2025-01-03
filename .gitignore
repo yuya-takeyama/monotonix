@@ -96,6 +96,10 @@ out
 !actions/*/dist/index.js.map
 !actions/*/dist/licenses.txt
 !actions/*/dist/sourcemap-register.js
+!actions/*/dist/post/index.js
+!actions/*/dist/post/index.js.map
+!actions/*/dist/post/licenses.txt
+!actions/*/dist/post/sourcemap-register.js
 
 # Gatsby files
 .cache/

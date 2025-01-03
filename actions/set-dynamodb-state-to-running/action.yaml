@@ -1,4 +1,4 @@
-name: 'Update DynamoDB State'
+name: 'Set DynamoDB state to running'
 author: 'Yuya Takeyama'
 
 inputs:
@@ -10,9 +10,6 @@ inputs:
     required: true
   job:
     description: 'Job'
-    required: true
-  status:
-    description: 'Job Status (Use job.status)'
     required: true
   ttl-in-days:
     description: 'TTL in days'
@@ -27,3 +24,4 @@ inputs:
 runs:
   using: 'node20'
   main: 'dist/index.js'
+  post: 'dist/post/index.js'
