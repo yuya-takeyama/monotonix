@@ -62254,12 +62254,12 @@ const filterJobsByAppJobStatuses = (jobs, appJobStatuses) => {
         if (appJobStatus) {
             if (appJobStatus.successTs &&
                 appJobStatus.successTs >= job.context.last_commit.timestamp) {
-                (0, core_1.info)(`Skip: Job is already success: ${job.context.label}: ${job.context.last_commit.hash}`);
+                (0, core_1.info)(`${job.context.label}: ${job.context.last_commit.hash}: Skip: Job is already in success state`);
                 return false;
             }
             if (appJobStatus.runningTs &&
                 appJobStatus.runningTs >= job.context.last_commit.timestamp) {
-                (0, core_1.info)(`Skip: Job is already running: ${job.context.label}: ${job.context.last_commit.hash}`);
+                (0, core_1.info)(`${job.context.label}: ${job.context.last_commit.hash}: Skip: Job is already in running state`);
                 return false;
             }
         }

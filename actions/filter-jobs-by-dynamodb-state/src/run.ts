@@ -77,7 +77,7 @@ const filterJobsByAppJobStatuses = (
         appJobStatus.successTs >= job.context.last_commit.timestamp
       ) {
         info(
-          `Skip: Job is already success: ${job.context.label}: ${job.context.last_commit.hash}`,
+          `${job.context.label}: ${job.context.last_commit.hash}: Skip: Job is already in success state`,
         );
         return false;
       }
@@ -86,7 +86,7 @@ const filterJobsByAppJobStatuses = (
         appJobStatus.runningTs >= job.context.last_commit.timestamp
       ) {
         info(
-          `Skip: Job is already running: ${job.context.label}: ${job.context.last_commit.hash}`,
+          `${job.context.label}: ${job.context.last_commit.hash}: Skip: Job is already in running state`,
         );
         return false;
       }
