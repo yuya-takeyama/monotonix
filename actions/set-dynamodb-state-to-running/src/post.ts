@@ -36,11 +36,13 @@ import { context, getOctokit } from '@actions/github';
       run_id: context.runId,
     });
     console.log(`JOB_ID: ${process.env.GITHUB_JOB}`);
+    /*
     const jobForWorkflowRun = await octokit.rest.actions.getJobForWorkflowRun({
       owner: context.repo.owner,
       repo: context.repo.repo,
       job_id: Number(process.env.GITHUB_JOB!),
     });
+    */
 
     console.log('This is post.ts');
     console.log(
@@ -49,7 +51,7 @@ import { context, getOctokit } from '@actions/github';
           workflowId,
           githubRef: context.ref,
           workflowRun,
-          jobForWorkflowRun,
+          //    jobForWorkflowRun,
           job,
           table,
           region,

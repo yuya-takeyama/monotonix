@@ -36433,17 +36433,20 @@ const github_1 = __nccwpck_require__(5683);
             repo: github_1.context.repo.repo,
             run_id: github_1.context.runId,
         });
+        console.log(`JOB_ID: ${process.env.GITHUB_JOB}`);
+        /*
         const jobForWorkflowRun = await octokit.rest.actions.getJobForWorkflowRun({
-            owner: github_1.context.repo.owner,
-            repo: github_1.context.repo.repo,
-            job_id: Number(process.env.GITHUB_JOB),
+          owner: context.repo.owner,
+          repo: context.repo.repo,
+          job_id: Number(process.env.GITHUB_JOB!),
         });
+        */
         console.log('This is post.ts');
         console.log(JSON.stringify({
             workflowId,
             githubRef: github_1.context.ref,
             workflowRun,
-            jobForWorkflowRun,
+            //    jobForWorkflowRun,
             job,
             table,
             region,
