@@ -43,7 +43,7 @@ export const runPost = async ({
   } catch (err) {
     if (err instanceof ConditionalCheckFailedException) {
       notice(
-        `${job.context.label}: A newer commit is already set to state as success`,
+        `${job.context.label}: A newer or the same commit is already in success state`,
       );
       // No need to let it fail
     } else {

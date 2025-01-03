@@ -57939,7 +57939,7 @@ const runPost = async ({ table, region, job, jobStatus, ttl, }) => {
     }
     catch (err) {
         if (err instanceof client_dynamodb_1.ConditionalCheckFailedException) {
-            (0, core_1.notice)(`${job.context.label}: A newer commit is already set to state as success`);
+            (0, core_1.notice)(`${job.context.label}: A newer or the same commit is already in success state`);
             // No need to let it fail
         }
         else {

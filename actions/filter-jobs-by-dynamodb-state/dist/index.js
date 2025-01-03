@@ -62239,6 +62239,7 @@ const filterJobs = async ({ docClient, table, workflowId, githubRef, jobs, }) =>
         },
     }));
     if (res.Items && res.Items.length > 0) {
+        console.log(`res.Items: ${JSON.stringify(res.Items)}`);
         return filterJobsByAppJobStatuses(jobs, transofrmItems(res.Items));
     }
     else {
@@ -62246,6 +62247,7 @@ const filterJobs = async ({ docClient, table, workflowId, githubRef, jobs, }) =>
     }
 };
 const filterJobsByAppJobStatuses = (jobs, appJobStatuses) => {
+    console.log(`appJobStatuses: ${JSON.stringify(appJobStatuses)}`);
     return jobs.filter(job => {
         const appJobStatus = appJobStatuses[`${job.context.app_path}#${job.context.job_key}`];
         if (appJobStatus) {
