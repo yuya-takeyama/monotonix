@@ -57922,15 +57922,19 @@ const client_dynamodb_1 = __nccwpck_require__(7173);
 const lib_dynamodb_1 = __nccwpck_require__(2415);
 const core_1 = __nccwpck_require__(7184);
 const runPost = async ({ table, region, job, jobStatus, ttl, }) => {
+    console.log('DEBUG: runPost');
     const client = new client_dynamodb_1.DynamoDBClient({ region });
     const docClient = lib_dynamodb_1.DynamoDBDocumentClient.from(client);
     const pk = `STATE#${job.context.workflow_id}#${job.context.github_ref}`;
+    console.log('DEBUG: putRunningState');
     try {
         if (jobStatus === 'success') {
             await putSuccessState({ job, table, docClient, pk, ttl });
         }
+        console.log('DEBUG: putRunningState done');
     }
     catch (err) {
+        console.log(`DEBUG: putRunningState error: ${err}`);
         if (err instanceof client_dynamodb_1.ConditionalCheckFailedException) {
             (0, core_1.notice)(`${job.context.label}: A newer commit is already set to state as success`);
         }
@@ -57938,9 +57942,12 @@ const runPost = async ({ table, region, job, jobStatus, ttl, }) => {
     }
     finally {
         try {
+            console.log('DEBUG: deleteRunningState');
             await deleteRunningState({ job, table, docClient, pk });
+            console.log('DEBUG: deleteRunningState done');
         }
         catch (err) {
+            console.log(`DEBUG: deleteRunningState error: ${err}`);
             if (err instanceof client_dynamodb_1.ConditionalCheckFailedException) {
                 (0, core_1.notice)(`${job.context.label}: A newer commit is already running`);
                 // No need to let it fail
