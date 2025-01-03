@@ -1,0 +1,17 @@
+name: 'Filter Jobs by changed files'
+author: 'Yuya Takeyama'
+
+inputs:
+  github-token:
+    description: 'GitHub Token'
+    default: ${{ github.token }}
+  jobs:
+    description: 'Jobs'
+
+outputs:
+  result:
+    description: 'Filtered Jobs'
+
+runs:
+  using: 'node20'
+  main: 'dist/index.js'
