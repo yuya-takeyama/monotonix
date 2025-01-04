@@ -12,7 +12,10 @@ inputs:
   dedupe-key:
     description: 'Dedupe key to filter jobs. app path and job key are used together.'
     required: true
-    default: ${{ github.ref }}
+    # Default value:
+    # - pull_request or pull_request_target: pr/{number}
+    # - otherwise: github.ref (e.g. refs/heads/main)
+    default: ${{ startsWith(github.event_name, 'pull_request') && format('pr/{0}', github.event.pull_request.number) || github.ref }}
 
 outputs:
   result:
