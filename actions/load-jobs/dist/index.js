@@ -38899,7 +38899,6 @@ const schema_1 = __nccwpck_require__(67);
 const minimatch_1 = __nccwpck_require__(8286);
 const filterJobsByEvent = ({ jobs, event, }) => jobs
     .filter(job => {
-    console.log(JSON.stringify({ event, jobs }, null, 2));
     switch (event.eventName) {
         case 'push':
             if ('push' in job.on) {
@@ -39022,10 +39021,6 @@ const loadJobsFromLocalConfigFiles = async ({ rootDir, dedupeKey, requiredConfig
         try {
             const localConfigContent = (0, node_fs_1.readFileSync)(localConfigPath, 'utf-8');
             const localConfig = schema_1.LocalConfigSchema.parse((0, js_yaml_1.load)(localConfigContent));
-            console.log('### CONFIG START');
-            console.log(localConfigContent);
-            console.log('### CONFIG END');
-            console.log(JSON.stringify(localConfig, null, 2));
             return Object.entries(localConfig.jobs).map(([jobKey, job]) => (0, exports.createJob)({
                 localConfig,
                 dedupeKey,

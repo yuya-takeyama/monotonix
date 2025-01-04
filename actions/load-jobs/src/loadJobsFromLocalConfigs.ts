@@ -36,10 +36,7 @@ export const loadJobsFromLocalConfigFiles = async ({
       try {
         const localConfigContent = readFileSync(localConfigPath, 'utf-8');
         const localConfig = LocalConfigSchema.parse(load(localConfigContent));
-        console.log('### CONFIG START');
-        console.log(localConfigContent);
-        console.log('### CONFIG END');
-        console.log(JSON.stringify(localConfig, null, 2));
+
         return Object.entries(localConfig.jobs).map(
           ([jobKey, job]): Job =>
             createJob({
