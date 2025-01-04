@@ -1,4 +1,4 @@
-import { filterJobsByGitHubContext } from './filterJobsByGitHubContext';
+import { filterJobsByEvent } from './filterJobsByGitHubContext';
 import { Job } from '@monotonix/schema';
 import { Event } from './schema';
 
@@ -105,7 +105,7 @@ describe('filterJobsByGitHubContext', () => {
         ref: 'refs/heads/main',
       };
       expect(
-        filterJobsByGitHubContext({
+        filterJobsByEvent({
           jobs: stubLocalConfigs,
           // @ts-expect-error
           event,
@@ -119,7 +119,7 @@ describe('filterJobsByGitHubContext', () => {
         ref: 'refs/heads/feature',
       };
       expect(
-        filterJobsByGitHubContext({
+        filterJobsByEvent({
           jobs: stubLocalConfigs,
           // @ts-expect-error
           event,
@@ -146,7 +146,7 @@ describe('filterJobsByGitHubContext', () => {
           },
         };
         expect(
-          filterJobsByGitHubContext({
+          filterJobsByEvent({
             jobs: stubLocalConfigs,
             // @ts-expect-error
             event,
@@ -185,7 +185,7 @@ describe('filterJobsByGitHubContext', () => {
           },
         };
         expect(
-          filterJobsByGitHubContext({
+          filterJobsByEvent({
             jobs: localConfigsWithBranchSpecified,
             // @ts-expect-error
             event,
@@ -209,7 +209,7 @@ describe('filterJobsByGitHubContext', () => {
           },
         };
         expect(
-          filterJobsByGitHubContext({
+          filterJobsByEvent({
             jobs: localConfigsWithBranchSpecified,
             // @ts-expect-error
             event,
@@ -237,7 +237,7 @@ describe('filterJobsByGitHubContext', () => {
           },
         };
         expect(
-          filterJobsByGitHubContext({
+          filterJobsByEvent({
             jobs: stubLocalConfigs,
             // @ts-expect-error
             event,
@@ -276,7 +276,7 @@ describe('filterJobsByGitHubContext', () => {
           },
         };
         expect(
-          filterJobsByGitHubContext({
+          filterJobsByEvent({
             jobs: localConfigsWithBranchSpecified,
             // @ts-expect-error
             event,
@@ -300,7 +300,7 @@ describe('filterJobsByGitHubContext', () => {
           },
         };
         expect(
-          filterJobsByGitHubContext({
+          filterJobsByEvent({
             jobs: localConfigsWithBranchSpecified,
             // @ts-expect-error
             event,

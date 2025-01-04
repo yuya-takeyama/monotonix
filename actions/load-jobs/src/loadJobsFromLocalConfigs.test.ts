@@ -1,5 +1,4 @@
 import { createJob } from './loadJobsFromLocalConfigs';
-import { Context } from '@actions/github/lib/context';
 import { Job, LocalConfig, LocalConfigJob } from '@monotonix/schema';
 import { Event } from './schema';
 

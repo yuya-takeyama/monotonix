@@ -1,4 +1,4 @@
-import { filterJobsByGitHubContext } from './filterJobsByGitHubContext';
+import { filterJobsByEvent } from './filterJobsByGitHubContext';
 import { loadJobsFromLocalConfigFiles } from './loadJobsFromLocalConfigs';
 import { Event } from './schema';
 
@@ -16,7 +16,7 @@ export const run = async ({
   localConfigFileName,
   event,
 }: runParams) => {
-  return filterJobsByGitHubContext({
+  return filterJobsByEvent({
     jobs: await loadJobsFromLocalConfigFiles({
       rootDir,
       dedupeKey,

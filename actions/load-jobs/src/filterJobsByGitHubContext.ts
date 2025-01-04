@@ -1,16 +1,15 @@
-import { Context } from '@actions/github/lib/context';
 import { Job, JobSchema } from '@monotonix/schema';
 import { minimatch } from 'minimatch';
-import { Event, EventSchema } from './schema';
+import { Event } from './schema';
 
-type filterJobsByGitHubContextParams = {
+type filterJobsByEventParams = {
   jobs: Job[];
   event: Event;
 };
-export const filterJobsByGitHubContext = ({
+export const filterJobsByEvent = ({
   jobs,
   event,
-}: filterJobsByGitHubContextParams): Job[] =>
+}: filterJobsByEventParams): Job[] =>
   jobs
     .filter(job => {
       switch (event.eventName) {
