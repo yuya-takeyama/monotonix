@@ -38899,6 +38899,7 @@ const schema_1 = __nccwpck_require__(67);
 const minimatch_1 = __nccwpck_require__(8286);
 const filterJobsByEvent = ({ jobs, event, }) => jobs
     .filter(job => {
+    console.log(JSON.stringify({ event, jobs }, null, 2));
     switch (event.eventName) {
         case 'push':
             if ('push' in job.on) {

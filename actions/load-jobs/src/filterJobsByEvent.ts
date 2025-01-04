@@ -12,6 +12,7 @@ export const filterJobsByEvent = ({
 }: filterJobsByEventParams): Job[] =>
   jobs
     .filter(job => {
+      console.log(JSON.stringify({ event, jobs }, null, 2));
       switch (event.eventName) {
         case 'push':
           if ('push' in job.on) {
