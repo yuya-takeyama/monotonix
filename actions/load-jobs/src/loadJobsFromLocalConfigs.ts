@@ -9,22 +9,22 @@ import { load } from 'js-yaml';
 import { readFileSync } from 'node:fs';
 import { globSync } from 'glob';
 import { join, dirname } from 'node:path';
-import { Context } from '@actions/github/lib/context';
 import { CommitInfo, getLastCommit } from './getLastCommit';
+import { Event } from './schema';
 
 type loadJobsFromLocalConfigFilesParams = {
   rootDir: string;
   dedupeKey: string;
   requiredConfigKeys: string[];
   localConfigFileName: string;
-  context: Context;
+  event: Event;
 };
 export const loadJobsFromLocalConfigFiles = async ({
   rootDir,
   dedupeKey,
   requiredConfigKeys,
   localConfigFileName,
-  context,
+  event,
 }: loadJobsFromLocalConfigFilesParams): Promise<Jobs> => {
   const pattern = join(rootDir, '**', localConfigFileName);
   const localConfigPaths = globSync(pattern);
@@ -45,7 +45,7 @@ export const loadJobsFromLocalConfigFiles = async ({
               lastCommit,
               jobKey,
               job,
-              githubContext: context,
+              event,
             }),
         );
       } catch (err) {
@@ -68,7 +68,7 @@ type createJobParams = {
   lastCommit: CommitInfo;
   jobKey: string;
   job: LocalConfigJob;
-  githubContext: Context;
+  event: Event;
 };
 export const createJob = ({
   localConfig,
@@ -77,13 +77,13 @@ export const createJob = ({
   lastCommit,
   jobKey,
   job,
-  githubContext,
+  event,
 }: createJobParams): Job => ({
   ...job,
   app: localConfig.app,
   context: {
     dedupe_key: dedupeKey,
-    github_ref: githubContext.ref,
+    github_ref: event.ref,
     app_path: appPath,
     job_key: jobKey,
     last_commit: lastCommit,

@@ -1,12 +1,12 @@
 import { createJob } from './loadJobsFromLocalConfigs';
 import { Context } from '@actions/github/lib/context';
 import { Job, LocalConfig, LocalConfigJob } from '@monotonix/schema';
+import { Event } from './schema';
 
 describe('createJob', () => {
-  // @ts-ignore
-  const stubContext = {
+  const stubEvent: Pick<Event, 'ref'> = {
     ref: 'refs/heads/main',
-  } as Context;
+  };
 
   const stubJob: LocalConfigJob = {
     on: {
@@ -41,12 +41,13 @@ describe('createJob', () => {
 
     const result = createJob({
       localConfig: stubLocalConfig,
-      dedupeKey: stubContext.ref,
+      dedupeKey: stubEvent.ref,
       appPath,
       lastCommit: stubCommitInfo,
       jobKey,
       job: stubJob,
-      githubContext: stubContext,
+      // @ts-expect-error
+      event: stubEvent,
     });
 
     const expected: Job = {
@@ -54,8 +55,8 @@ describe('createJob', () => {
         name: 'test-app',
       },
       context: {
-        dedupe_key: stubContext.ref,
-        github_ref: stubContext.ref,
+        dedupe_key: stubEvent.ref,
+        github_ref: stubEvent.ref,
         app_path: appPath,
         job_key: jobKey,
         last_commit: stubCommitInfo,
@@ -93,12 +94,13 @@ describe('createJob', () => {
 
     const result = createJob({
       localConfig: stubLocalConfig,
-      dedupeKey: stubContext.ref,
+      dedupeKey: stubEvent.ref,
       appPath,
       lastCommit: stubCommitInfo,
       jobKey,
       job: differentJob,
-      githubContext: stubContext,
+      // @ts-expect-error
+      event: stubEvent,
     });
 
     const expected: Job = {
@@ -106,8 +108,8 @@ describe('createJob', () => {
         name: 'test-app',
       },
       context: {
-        dedupe_key: stubContext.ref,
-        github_ref: stubContext.ref,
+        dedupe_key: stubEvent.ref,
+        github_ref: stubEvent.ref,
         app_path: appPath,
         job_key: jobKey,
         last_commit: stubCommitInfo,

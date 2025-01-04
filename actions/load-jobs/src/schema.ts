@@ -1,40 +1,46 @@
 import { z } from 'zod';
 
 const BaseEventSchema = z.object({
-  event_name: z.string(),
+  eventName: z.string(),
   ref: z.string(),
 });
 
 const PullRequestEventSchema = BaseEventSchema.extend({
-  event_name: z.literal('pull_request'),
+  eventName: z.literal('pull_request'),
   ref: z.string().regex(/^refs\/pull\/\d+\/merge$/),
   sha: z.string().regex(/^[0-9a-f]{40}$/),
-  head_ref: z.string(),
-  base_ref: z.string(),
-  event: z.object({
-    number: z.number(),
+  payload: z.object({
     pull_request: z.object({
       number: z.number(),
+      base: z.object({
+        ref: z.string(),
+      }),
+      head: z.object({
+        ref: z.string(),
+      }),
     }),
   }),
 });
 
 const PullRequestTargetEventSchema = BaseEventSchema.extend({
-  event_name: z.literal('pull_request_target'),
+  eventName: z.literal('pull_request_target'),
   ref: z.string().regex(/^refs\/heads\//),
   sha: z.string().regex(/^[0-9a-f]{40}$/),
-  head_ref: z.string(),
-  base_ref: z.string(),
-  event: z.object({
-    number: z.number(),
+  payload: z.object({
     pull_request: z.object({
       number: z.number(),
+      base: z.object({
+        ref: z.string(),
+      }),
+      head: z.object({
+        ref: z.string(),
+      }),
     }),
   }),
 });
 
 const PushEventScema = BaseEventSchema.extend({
-  event_name: z.literal('push'),
+  eventName: z.literal('push'),
   ref: z.string().regex(/^refs\/heads\//),
   sha: z.string().regex(/^[0-9a-f]{40}$/),
 });
@@ -43,4 +49,9 @@ export const EventSchema = z.union([
   PullRequestEventSchema,
   PullRequestTargetEventSchema,
   PushEventScema,
+  BaseEventSchema.extend({
+    eventName: z.enum(['workflow_dispatch', 'schedule', 'repository_dispatch']),
+  }),
 ]);
+
+export type Event = z.infer<typeof EventSchema>;

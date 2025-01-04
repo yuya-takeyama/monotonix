@@ -1,6 +1,7 @@
 import { getInput, setFailed, setOutput, exportVariable } from '@actions/core';
 import { context } from '@actions/github';
 import { run } from './run';
+import { EventSchema } from './schema';
 
 (async () => {
   try {
@@ -11,13 +12,14 @@ import { run } from './run';
     const requiredConfigKeys = getInput('required-config-keys')
       .split(/\s*,\s*/)
       .filter(Boolean);
+    const event = EventSchema.parse(context);
 
     const result = await run({
       rootDir,
       dedupeKey,
       requiredConfigKeys,
       localConfigFileName,
-      context,
+      event,
     });
 
     setOutput('result', result);

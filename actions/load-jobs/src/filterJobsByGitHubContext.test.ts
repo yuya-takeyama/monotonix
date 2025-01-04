@@ -1,6 +1,6 @@
-import { Context } from '@actions/github/lib/context';
 import { filterJobsByGitHubContext } from './filterJobsByGitHubContext';
 import { Job } from '@monotonix/schema';
+import { Event } from './schema';
 
 describe('filterJobsByGitHubContext', () => {
   const pushMainJob: Job = {
@@ -100,29 +100,29 @@ describe('filterJobsByGitHubContext', () => {
 
   describe('push event', () => {
     it('should return jobs that match the branch', () => {
-      // @ts-expect-error
-      const context: Context = {
+      const event: Partial<Event> = {
         eventName: 'push',
         ref: 'refs/heads/main',
       };
       expect(
         filterJobsByGitHubContext({
           jobs: stubLocalConfigs,
-          context,
+          // @ts-expect-error
+          event,
         }),
       ).toStrictEqual([pushMainJob]);
     });
 
     it('should not return jobs that do not match the branch', () => {
-      // @ts-expect-error
-      const context: Context = {
+      const event: Partial<Event> = {
         eventName: 'push',
         ref: 'refs/heads/feature',
       };
       expect(
         filterJobsByGitHubContext({
           jobs: stubLocalConfigs,
-          context,
+          // @ts-expect-error
+          event,
         }),
       ).toStrictEqual([]);
     });
@@ -131,21 +131,31 @@ describe('filterJobsByGitHubContext', () => {
   describe('pull_request event', () => {
     describe('when no branches are specified', () => {
       it('always returns jobs for pull_request event', () => {
-        const context: Context = {
+        const event: Partial<Event> = {
           eventName: 'pull_request',
-          // @ts-expect-error
-          base_ref: 'main',
+          payload: {
+            pull_request: {
+              number: 1,
+              base: {
+                ref: 'main',
+              },
+              head: {
+                ref: 'feature',
+              },
+            },
+          },
         };
         expect(
           filterJobsByGitHubContext({
             jobs: stubLocalConfigs,
-            context,
+            // @ts-expect-error
+            event,
           }),
         ).toStrictEqual([pullRequestJob]);
       });
     });
 
-    describe('when a branch branch is specified', () => {
+    describe('when a branch is specified', () => {
       const localConfigsWithBranchSpecified = [
         {
           ...pullRequestJob,
@@ -160,29 +170,49 @@ describe('filterJobsByGitHubContext', () => {
         localConfigsWithBranchSpecified[0];
 
       it('returns jobs that match the branch', () => {
-        const context: Context = {
+        const event: Partial<Event> = {
           eventName: 'pull_request',
-          // @ts-expect-error
-          base_ref: 'main',
+          payload: {
+            pull_request: {
+              number: 1,
+              base: {
+                ref: 'main',
+              },
+              head: {
+                ref: 'feature',
+              },
+            },
+          },
         };
         expect(
           filterJobsByGitHubContext({
             jobs: localConfigsWithBranchSpecified,
-            context,
+            // @ts-expect-error
+            event,
           }),
         ).toStrictEqual([pullRequestJobWithBranchSpecified]);
       });
 
       it('does not return jobs that do not match the branch', () => {
-        const context: Context = {
+        const event: Partial<Event> = {
           eventName: 'pull_request',
-          // @ts-expect-error
-          base_ref: 'feature',
+          payload: {
+            pull_request: {
+              number: 1,
+              base: {
+                ref: 'feature',
+              },
+              head: {
+                ref: 'another-feature',
+              },
+            },
+          },
         };
         expect(
           filterJobsByGitHubContext({
             jobs: localConfigsWithBranchSpecified,
-            context,
+            // @ts-expect-error
+            event,
           }),
         ).toStrictEqual([]);
       });
@@ -192,21 +222,31 @@ describe('filterJobsByGitHubContext', () => {
   describe('pull_request_target event', () => {
     describe('when no branches are specified', () => {
       it('always returns jobs for pull_request_target event', () => {
-        const context: Context = {
+        const event: Partial<Event> = {
           eventName: 'pull_request_target',
-          // @ts-expect-error
-          base_ref: 'main',
+          payload: {
+            pull_request: {
+              number: 1,
+              base: {
+                ref: 'main',
+              },
+              head: {
+                ref: 'feature',
+              },
+            },
+          },
         };
         expect(
           filterJobsByGitHubContext({
             jobs: stubLocalConfigs,
-            context,
+            // @ts-expect-error
+            event,
           }),
         ).toStrictEqual([pullRequestTargetJob]);
       });
     });
 
-    describe('when a branch branch is specified', () => {
+    describe('when a branch is specified', () => {
       const localConfigsWithBranchSpecified = [
         {
           ...pullRequestTargetJob,
@@ -221,29 +261,49 @@ describe('filterJobsByGitHubContext', () => {
         localConfigsWithBranchSpecified[0];
 
       it('returns jobs that match the branch', () => {
-        const context: Context = {
+        const event: Partial<Event> = {
           eventName: 'pull_request_target',
-          // @ts-expect-error
-          base_ref: 'main',
+          payload: {
+            pull_request: {
+              number: 1,
+              base: {
+                ref: 'main',
+              },
+              head: {
+                ref: 'feature',
+              },
+            },
+          },
         };
         expect(
           filterJobsByGitHubContext({
             jobs: localConfigsWithBranchSpecified,
-            context,
+            // @ts-expect-error
+            event,
           }),
         ).toStrictEqual([pullRequestTargetJobWithBranchSpecified]);
       });
 
       it('does not return jobs that do not match the branch', () => {
-        const context: Context = {
+        const event: Partial<Event> = {
           eventName: 'pull_request_target',
-          // @ts-expect-error
-          base_ref: 'feature',
+          payload: {
+            pull_request: {
+              number: 1,
+              base: {
+                ref: 'feature',
+              },
+              head: {
+                ref: 'another-feature',
+              },
+            },
+          },
         };
         expect(
           filterJobsByGitHubContext({
             jobs: localConfigsWithBranchSpecified,
-            context,
+            // @ts-expect-error
+            event,
           }),
         ).toStrictEqual([]);
       });

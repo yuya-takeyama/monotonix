@@ -1,24 +1,23 @@
 import { Context } from '@actions/github/lib/context';
 import { Job, JobSchema } from '@monotonix/schema';
 import { minimatch } from 'minimatch';
-//import { EventSchema } from './schema';
+import { Event, EventSchema } from './schema';
 
 type filterJobsByGitHubContextParams = {
   jobs: Job[];
-  context: Context;
+  event: Event;
 };
 export const filterJobsByGitHubContext = ({
   jobs,
-  context,
+  event,
 }: filterJobsByGitHubContextParams): Job[] =>
   jobs
     .filter(job => {
-      console.log(JSON.stringify(context));
-      switch (context.eventName) {
+      switch (event.eventName) {
         case 'push':
           if ('push' in job.on) {
             if (job.on.push && job.on.push.branches) {
-              const branchName = context.ref.replace(/^refs\/heads\//, '');
+              const branchName = event.ref.replace(/^refs\/heads\//, '');
               const result = job.on.push.branches.some(branch =>
                 minimatch(branchName, branch),
               );
@@ -36,8 +35,7 @@ export const filterJobsByGitHubContext = ({
           if ('pull_request' in job.on) {
             if (job.on.pull_request && job.on.pull_request.branches) {
               const result = job.on.pull_request.branches.some(branch =>
-                // @ts-ignore
-                minimatch(context.base_ref, branch),
+                minimatch(event.payload.pull_request.base.ref, branch),
               );
               if (result) {
                 return true;
@@ -56,8 +54,7 @@ export const filterJobsByGitHubContext = ({
               job.on.pull_request_target.branches
             ) {
               const result = job.on.pull_request_target.branches.some(branch =>
-                // @ts-ignore
-                minimatch(context.base_ref, branch),
+                minimatch(event.payload.pull_request.base.ref, branch),
               );
               if (result) {
                 return true;
@@ -68,6 +65,9 @@ export const filterJobsByGitHubContext = ({
           }
 
           return false;
+
+        default:
+          throw new Error(`Unsupported event: ${event.eventName}`);
       }
     })
     .map(job => JobSchema.parse(job));

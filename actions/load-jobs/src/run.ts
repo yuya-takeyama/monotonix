@@ -1,20 +1,20 @@
 import { filterJobsByGitHubContext } from './filterJobsByGitHubContext';
 import { loadJobsFromLocalConfigFiles } from './loadJobsFromLocalConfigs';
-import { Context } from '@actions/github/lib/context';
+import { Event } from './schema';
 
 type runParams = {
   rootDir: string;
   dedupeKey: string;
   requiredConfigKeys: string[];
   localConfigFileName: string;
-  context: Context;
+  event: Event;
 };
 export const run = async ({
   rootDir,
   dedupeKey,
   requiredConfigKeys,
   localConfigFileName,
-  context,
+  event,
 }: runParams) => {
   return filterJobsByGitHubContext({
     jobs: await loadJobsFromLocalConfigFiles({
@@ -22,8 +22,8 @@ export const run = async ({
       dedupeKey,
       requiredConfigKeys,
       localConfigFileName,
-      context,
+      event,
     }),
-    context,
+    event,
   });
 };
