@@ -38888,23 +38888,22 @@ exports.JobsSchema = zod_1.z.array(exports.JobSchema);
 
 /***/ }),
 
-/***/ 5881:
+/***/ 3935:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.filterJobsByGitHubContext = void 0;
+exports.filterJobsByEvent = void 0;
 const schema_1 = __nccwpck_require__(67);
 const minimatch_1 = __nccwpck_require__(8286);
-const filterJobsByGitHubContext = ({ jobs, context, }) => jobs
+const filterJobsByEvent = ({ jobs, event, }) => jobs
     .filter(job => {
-    console.log(JSON.stringify(context));
-    switch (context.eventName) {
+    switch (event.eventName) {
         case 'push':
             if ('push' in job.on) {
                 if (job.on.push && job.on.push.branches) {
-                    const branchName = context.ref.replace(/^refs\/heads\//, '');
+                    const branchName = event.ref.replace(/^refs\/heads\//, '');
                     const result = job.on.push.branches.some(branch => (0, minimatch_1.minimatch)(branchName, branch));
                     if (result) {
                         return true;
@@ -38918,9 +38917,7 @@ const filterJobsByGitHubContext = ({ jobs, context, }) => jobs
         case 'pull_request':
             if ('pull_request' in job.on) {
                 if (job.on.pull_request && job.on.pull_request.branches) {
-                    const result = job.on.pull_request.branches.some(branch => 
-                    // @ts-ignore
-                    (0, minimatch_1.minimatch)(context.base_ref, branch));
+                    const result = job.on.pull_request.branches.some(branch => (0, minimatch_1.minimatch)(event.payload.pull_request.base.ref, branch));
                     if (result) {
                         return true;
                     }
@@ -38934,9 +38931,7 @@ const filterJobsByGitHubContext = ({ jobs, context, }) => jobs
             if ('pull_request_target' in job.on) {
                 if (job.on.pull_request_target &&
                     job.on.pull_request_target.branches) {
-                    const result = job.on.pull_request_target.branches.some(branch => 
-                    // @ts-ignore
-                    (0, minimatch_1.minimatch)(context.base_ref, branch));
+                    const result = job.on.pull_request_target.branches.some(branch => (0, minimatch_1.minimatch)(event.payload.pull_request.base.ref, branch));
                     if (result) {
                         return true;
                     }
@@ -38946,10 +38941,12 @@ const filterJobsByGitHubContext = ({ jobs, context, }) => jobs
                 }
             }
             return false;
+        default:
+            throw new Error(`Unsupported event: ${event.eventName}`);
     }
 })
     .map(job => schema_1.JobSchema.parse(job));
-exports.filterJobsByGitHubContext = filterJobsByGitHubContext;
+exports.filterJobsByEvent = filterJobsByEvent;
 
 
 /***/ }),
@@ -39015,7 +39012,7 @@ const node_fs_1 = __nccwpck_require__(3024);
 const glob_1 = __nccwpck_require__(2712);
 const node_path_1 = __nccwpck_require__(6760);
 const getLastCommit_1 = __nccwpck_require__(4815);
-const loadJobsFromLocalConfigFiles = async ({ rootDir, dedupeKey, requiredConfigKeys, localConfigFileName, context, }) => {
+const loadJobsFromLocalConfigFiles = async ({ rootDir, dedupeKey, requiredConfigKeys, localConfigFileName, event, }) => {
     const pattern = (0, node_path_1.join)(rootDir, '**', localConfigFileName);
     const localConfigPaths = (0, glob_1.globSync)(pattern);
     const jobs = await Promise.all(localConfigPaths.map(async (localConfigPath) => {
@@ -39031,7 +39028,7 @@ const loadJobsFromLocalConfigFiles = async ({ rootDir, dedupeKey, requiredConfig
                 lastCommit,
                 jobKey,
                 job,
-                githubContext: context,
+                event,
             }));
         }
         catch (err) {
@@ -39043,12 +39040,12 @@ const loadJobsFromLocalConfigFiles = async ({ rootDir, dedupeKey, requiredConfig
         .filter(job => requiredConfigKeys.every(key => job.configs[key]));
 };
 exports.loadJobsFromLocalConfigFiles = loadJobsFromLocalConfigFiles;
-const createJob = ({ localConfig, dedupeKey, appPath, lastCommit, jobKey, job, githubContext, }) => ({
+const createJob = ({ localConfig, dedupeKey, appPath, lastCommit, jobKey, job, event, }) => ({
     ...job,
     app: localConfig.app,
     context: {
         dedupe_key: dedupeKey,
-        github_ref: githubContext.ref,
+        github_ref: event.ref,
         app_path: appPath,
         job_key: jobKey,
         last_commit: lastCommit,
@@ -39068,21 +39065,82 @@ exports.createJob = createJob;
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.run = void 0;
-const filterJobsByGitHubContext_1 = __nccwpck_require__(5881);
+const filterJobsByEvent_1 = __nccwpck_require__(3935);
 const loadJobsFromLocalConfigs_1 = __nccwpck_require__(1010);
-const run = async ({ rootDir, dedupeKey, requiredConfigKeys, localConfigFileName, context, }) => {
-    return (0, filterJobsByGitHubContext_1.filterJobsByGitHubContext)({
+const run = async ({ rootDir, dedupeKey, requiredConfigKeys, localConfigFileName, event, }) => {
+    return (0, filterJobsByEvent_1.filterJobsByEvent)({
         jobs: await (0, loadJobsFromLocalConfigs_1.loadJobsFromLocalConfigFiles)({
             rootDir,
             dedupeKey,
             requiredConfigKeys,
             localConfigFileName,
-            context,
+            event,
         }),
-        context,
+        event,
     });
 };
 exports.run = run;
+
+
+/***/ }),
+
+/***/ 855:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.EventSchema = void 0;
+const zod_1 = __nccwpck_require__(5421);
+const BaseEventSchema = zod_1.z.object({
+    eventName: zod_1.z.string(),
+    ref: zod_1.z.string(),
+});
+const PullRequestEventSchema = BaseEventSchema.extend({
+    eventName: zod_1.z.literal('pull_request'),
+    ref: zod_1.z.string().regex(/^refs\/pull\/\d+\/merge$/),
+    sha: zod_1.z.string().regex(/^[0-9a-f]{40}$/),
+    payload: zod_1.z.object({
+        pull_request: zod_1.z.object({
+            number: zod_1.z.number(),
+            base: zod_1.z.object({
+                ref: zod_1.z.string(),
+            }),
+            head: zod_1.z.object({
+                ref: zod_1.z.string(),
+            }),
+        }),
+    }),
+});
+const PullRequestTargetEventSchema = BaseEventSchema.extend({
+    eventName: zod_1.z.literal('pull_request_target'),
+    ref: zod_1.z.string().regex(/^refs\/heads\//),
+    sha: zod_1.z.string().regex(/^[0-9a-f]{40}$/),
+    payload: zod_1.z.object({
+        pull_request: zod_1.z.object({
+            number: zod_1.z.number(),
+            base: zod_1.z.object({
+                ref: zod_1.z.string(),
+            }),
+            head: zod_1.z.object({
+                ref: zod_1.z.string(),
+            }),
+        }),
+    }),
+});
+const PushEventScema = BaseEventSchema.extend({
+    eventName: zod_1.z.literal('push'),
+    ref: zod_1.z.string().regex(/^refs\/heads\//),
+    sha: zod_1.z.string().regex(/^[0-9a-f]{40}$/),
+});
+exports.EventSchema = zod_1.z.union([
+    PullRequestEventSchema,
+    PullRequestTargetEventSchema,
+    PushEventScema,
+    BaseEventSchema.extend({
+        eventName: zod_1.z.enum(['workflow_dispatch', 'schedule', 'repository_dispatch']),
+    }),
+]);
 
 
 /***/ }),
@@ -48931,6 +48989,7 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 const core_1 = __nccwpck_require__(7184);
 const github_1 = __nccwpck_require__(5683);
 const run_1 = __nccwpck_require__(4795);
+const schema_1 = __nccwpck_require__(855);
 (async () => {
     try {
         const rootDir = (0, core_1.getInput)('root-dir');
@@ -48939,12 +48998,13 @@ const run_1 = __nccwpck_require__(4795);
         const requiredConfigKeys = (0, core_1.getInput)('required-config-keys')
             .split(/\s*,\s*/)
             .filter(Boolean);
+        const event = schema_1.EventSchema.parse(github_1.context);
         const result = await (0, run_1.run)({
             rootDir,
             dedupeKey,
             requiredConfigKeys,
             localConfigFileName,
-            context: github_1.context,
+            event,
         });
         (0, core_1.setOutput)('result', result);
         (0, core_1.exportVariable)('MONOTONIX_JOBS', result);

@@ -1,4 +1,4 @@
-import { filterJobsByEvent } from './filterJobsByGitHubContext';
+import { filterJobsByEvent } from './filterJobsByEvent';
 import { loadJobsFromLocalConfigFiles } from './loadJobsFromLocalConfigs';
 import { Event } from './schema';
 
