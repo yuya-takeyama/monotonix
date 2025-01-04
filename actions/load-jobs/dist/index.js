@@ -38855,7 +38855,15 @@ const PullRequestEventSchema = zod_1.z.object({
         .optional()
         .nullable(),
 });
-const JobEventSchema = zod_1.z.intersection(PushEventScema, PullRequestEventSchema);
+const PullRequestTargetEventSchema = zod_1.z.object({
+    pull_request_target: zod_1.z
+        .object({
+        branches: zod_1.z.array(zod_1.z.string()).optional(),
+    })
+        .optional()
+        .nullable(),
+});
+const JobEventSchema = zod_1.z.intersection(PushEventScema, zod_1.z.intersection(PullRequestEventSchema, PullRequestTargetEventSchema));
 const JobConfigsSchema = zod_1.z.object({}).catchall(zod_1.z.object({}).catchall(zod_1.z.any()));
 const LocalConfigJobSchema = zod_1.z.object({
     on: JobEventSchema,
@@ -38891,6 +38899,7 @@ const schema_1 = __nccwpck_require__(67);
 const minimatch_1 = __nccwpck_require__(8286);
 const filterJobsByGitHubContext = ({ jobs, context, }) => jobs
     .filter(job => {
+    console.log(JSON.stringify(context));
     switch (context.eventName) {
         case 'push':
             if ('push' in job.on) {
@@ -38911,7 +38920,23 @@ const filterJobsByGitHubContext = ({ jobs, context, }) => jobs
                 if (job.on.pull_request && job.on.pull_request.branches) {
                     const result = job.on.pull_request.branches.some(branch => 
                     // @ts-ignore
-                    (0, minimatch_1.minimatch)(context.ref_name, branch));
+                    (0, minimatch_1.minimatch)(context.base_ref, branch));
+                    if (result) {
+                        return true;
+                    }
+                }
+                else {
+                    return true;
+                }
+            }
+            return false;
+        case 'pull_request_target':
+            if ('pull_request_target' in job.on) {
+                if (job.on.pull_request_target &&
+                    job.on.pull_request_target.branches) {
+                    const result = job.on.pull_request_target.branches.some(branch => 
+                    // @ts-ignore
+                    (0, minimatch_1.minimatch)(context.base_ref, branch));
                     if (result) {
                         return true;
                     }

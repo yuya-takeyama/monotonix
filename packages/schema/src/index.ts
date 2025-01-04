@@ -41,7 +41,19 @@ const PullRequestEventSchema = z.object({
     .nullable(),
 });
 
-const JobEventSchema = z.intersection(PushEventScema, PullRequestEventSchema);
+const PullRequestTargetEventSchema = z.object({
+  pull_request_target: z
+    .object({
+      branches: z.array(z.string()).optional(),
+    })
+    .optional()
+    .nullable(),
+});
+
+const JobEventSchema = z.intersection(
+  PushEventScema,
+  z.intersection(PullRequestEventSchema, PullRequestTargetEventSchema),
+);
 
 const JobConfigsSchema = z.object({}).catchall(z.object({}).catchall(z.any()));
 

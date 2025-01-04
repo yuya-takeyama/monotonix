@@ -57886,7 +57886,15 @@ const PullRequestEventSchema = zod_1.z.object({
         .optional()
         .nullable(),
 });
-const JobEventSchema = zod_1.z.intersection(PushEventScema, PullRequestEventSchema);
+const PullRequestTargetEventSchema = zod_1.z.object({
+    pull_request_target: zod_1.z
+        .object({
+        branches: zod_1.z.array(zod_1.z.string()).optional(),
+    })
+        .optional()
+        .nullable(),
+});
+const JobEventSchema = zod_1.z.intersection(PushEventScema, zod_1.z.intersection(PullRequestEventSchema, PullRequestTargetEventSchema));
 const JobConfigsSchema = zod_1.z.object({}).catchall(zod_1.z.object({}).catchall(zod_1.z.any()));
 const LocalConfigJobSchema = zod_1.z.object({
     on: JobEventSchema,

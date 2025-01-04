@@ -1,6 +1,7 @@
 import { Context } from '@actions/github/lib/context';
 import { Job, JobSchema } from '@monotonix/schema';
 import { minimatch } from 'minimatch';
+//import { EventSchema } from './schema';
 
 type filterJobsByGitHubContextParams = {
   jobs: Job[];
@@ -12,6 +13,7 @@ export const filterJobsByGitHubContext = ({
 }: filterJobsByGitHubContextParams): Job[] =>
   jobs
     .filter(job => {
+      console.log(JSON.stringify(context));
       switch (context.eventName) {
         case 'push':
           if ('push' in job.on) {
@@ -35,7 +37,27 @@ export const filterJobsByGitHubContext = ({
             if (job.on.pull_request && job.on.pull_request.branches) {
               const result = job.on.pull_request.branches.some(branch =>
                 // @ts-ignore
-                minimatch(context.ref_name, branch),
+                minimatch(context.base_ref, branch),
+              );
+              if (result) {
+                return true;
+              }
+            } else {
+              return true;
+            }
+          }
+
+          return false;
+
+        case 'pull_request_target':
+          if ('pull_request_target' in job.on) {
+            if (
+              job.on.pull_request_target &&
+              job.on.pull_request_target.branches
+            ) {
+              const result = job.on.pull_request_target.branches.some(branch =>
+                // @ts-ignore
+                minimatch(context.base_ref, branch),
               );
               if (result) {
                 return true;
