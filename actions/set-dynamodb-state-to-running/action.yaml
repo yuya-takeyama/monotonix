@@ -14,6 +14,7 @@ inputs:
   job-status:
     description: 'Job Status. job.status is suitable'
     required: true
+    default: ${{ job.status }}
   running-ttl:
     description: 'TTL for running state (format: 1d, 1h, 1m, 1s)'
     default: '1h'
