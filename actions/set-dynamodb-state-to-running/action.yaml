@@ -12,7 +12,7 @@ inputs:
     description: 'JSON string of a single Job'
     required: true
   job-status:
-    description: 'Job Status. job.status is suitable'
+    description: 'Job Status. Just use the default value.'
     required: true
     default: ${{ job.status }}
   running-ttl:
