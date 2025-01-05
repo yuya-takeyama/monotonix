@@ -6,23 +6,16 @@ import { z } from 'zod';
 import { StateItemSchema, StateItem } from '@monotonix/dynamodb-common';
 
 type runParam = {
-  githubRef: string;
   jobs: Jobs;
   table: string;
   region: string;
 };
-export const run = async ({
-  githubRef,
-  jobs,
-  table,
-  region,
-}: runParam): Promise<Jobs> => {
+export const run = async ({ jobs, table, region }: runParam): Promise<Jobs> => {
   const client = new DynamoDBClient({ region });
   const docClient = DynamoDBDocumentClient.from(client);
 
   return filterJobs({
     docClient,
-    githubRef,
     jobs,
     table,
   });
@@ -31,15 +24,9 @@ export const run = async ({
 type filterJobsParams = {
   docClient: DynamoDBDocumentClient;
   table: string;
-  githubRef: string;
   jobs: Jobs;
 };
-const filterJobs = async ({
-  docClient,
-  table,
-  githubRef,
-  jobs,
-}: filterJobsParams) => {
+const filterJobs = async ({ docClient, table, jobs }: filterJobsParams) => {
   const firstJob = jobs[0];
 
   if (!firstJob) {

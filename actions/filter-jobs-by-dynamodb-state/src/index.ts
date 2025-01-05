@@ -1,5 +1,4 @@
 import { exportVariable, getInput, setFailed, setOutput } from '@actions/core';
-import { context } from '@actions/github';
 import { run } from './run';
 import { JobsSchema } from '@monotonix/schema';
 
@@ -14,7 +13,6 @@ import { JobsSchema } from '@monotonix/schema';
     const jobs = JobsSchema.parse(JSON.parse(jobsJson));
 
     const result = await run({
-      githubRef: context.ref,
       jobs,
       table,
       region,
