@@ -1,0 +1,35 @@
+name: 'Set DynamoDB state to running'
+author: 'Yuya Takeyama'
+
+inputs:
+  dynamodb-table:
+    description: 'DynamoDB Table'
+    required: true
+  dynamodb-region:
+    description: 'DynamoDB Region'
+    required: true
+  job:
+    description: 'JSON string of a single Job'
+    required: true
+  job-status:
+    description: 'Job Status. Just use the default value.'
+    required: true
+    default: ${{ job.status }}
+  running-ttl:
+    description: 'TTL for running state (format: 1d, 1h, 1m, 1s)'
+    default: '1h'
+  success-ttl:
+    description: 'TTL for success state (format: 1d, 1h, 1m, 1s)'
+    # Default value:
+    # - pull_request or pull_request_target: 7d
+    # - otherwise: 180d
+    #
+    # In general, PRs are merged or closed within a few days.
+    # So it's not beneficial to keep the state for a long time.
+    # But some special branches like `main` or `release` are kept for a long time not to be rolled back accidentally.
+    default: ${{ startsWith(github.event_name, 'pull_request') && '7d' || '180d' }}
+
+runs:
+  using: 'node20'
+  main: 'dist/index.js'
+  post: 'dist/post/index.js'

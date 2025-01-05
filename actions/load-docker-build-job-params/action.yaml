@@ -1,0 +1,21 @@
+name: 'Load Job Params for docker build'
+author: 'Yuya Takeyama'
+
+inputs:
+  jobs:
+    description: 'Jobs'
+  global-config-file-path:
+    description: 'Global config file path'
+    required: true
+  datetime-tag-timezone:
+    description: 'Timezone for datetime tag'
+    required: false
+    default: 'UTC'
+
+outputs:
+  result:
+    description: 'Jobs'
+
+runs:
+  using: 'node20'
+  main: 'dist/index.js'

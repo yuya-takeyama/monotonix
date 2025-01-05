@@ -1,0 +1,20 @@
+name: 'Filter Jobs by DynamoDB state'
+author: 'Yuya Takeyama'
+
+inputs:
+  jobs:
+    description: 'Jobs'
+  dynamodb-table:
+    description: 'DynamoDB Table'
+    required: true
+  dynamodb-region:
+    description: 'DynamoDB Region'
+    required: true
+
+outputs:
+  result:
+    description: 'Filtered Jobs'
+
+runs:
+  using: 'node20'
+  main: 'dist/index.js'
