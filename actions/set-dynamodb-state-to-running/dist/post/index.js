@@ -3285,7 +3285,7 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.ruleSet = void 0;
 const H = "required", I = "type", J = "fn", K = "argv", L = "ref", M = "url", N = "properties", O = "headers";
 const a = false, b = "isSet", c = "error", d = "endpoint", e = "tree", f = "PartitionResult", g = "stringEquals", h = "not", i = { [H]: false, [I]: "String" }, j = { [H]: true, "default": false, [I]: "Boolean" }, k = { [J]: "booleanEquals", [K]: [{ [L]: "UseFIPS" }, true] }, l = { [J]: "booleanEquals", [K]: [{ [L]: "UseDualStack" }, true] }, m = {}, n = { [L]: "Region" }, o = { [J]: b, [K]: [{ [L]: "AccountIdEndpointMode" }] }, p = { [L]: "AccountIdEndpointMode" }, q = { [J]: b, [K]: [{ [L]: "AccountId" }] }, r = { [L]: "AccountId" }, s = { [J]: g, [K]: [{ [J]: "getAttr", [K]: [{ [L]: f }, "name"] }, "aws"] }, t = { [J]: "getAttr", [K]: [{ [L]: f }, "name"] }, u = { [J]: h, [K]: [k] }, v = { [J]: h, [K]: [l] }, w = { [J]: "booleanEquals", [K]: [{ [J]: "getAttr", [K]: [{ [L]: f }, "supportsFIPS"] }, true] }, x = { [J]: "booleanEquals", [K]: [{ [J]: "getAttr", [K]: [{ [L]: f }, "supportsDualStack"] }, true] }, y = { [M]: "https://dynamodb-fips.{Region}.{PartitionResult#dualStackDnsSuffix}", [N]: {}, [O]: {} }, z = { "conditions": [o, { [J]: g, [K]: [p, "disabled"] }], [d]: { [M]: "https://dynamodb.{Region}.{PartitionResult#dnsSuffix}", [N]: {}, [O]: {} }, [I]: d }, A = { [d]: { [M]: "https://dynamodb.{Region}.{PartitionResult#dnsSuffix}", [N]: {}, [O]: {} }, [I]: d }, B = { [M]: "https://dynamodb-fips.{Region}.{PartitionResult#dnsSuffix}", [N]: {}, [O]: {} }, C = { [M]: "https://dynamodb.{Region}.{PartitionResult#dualStackDnsSuffix}", [N]: {}, [O]: {} }, D = [k], E = [l], F = [n], G = [o, { [J]: g, [K]: [p, "disabled"] }];
-const _data = { version: "1.0", parameters: { Region: i, UseDualStack: j, UseFIPS: j, Endpoint: i, AccountId: i, AccountIdEndpointMode: i }, rules: [{ conditions: [{ [J]: b, [K]: [{ [L]: "Endpoint" }] }], rules: [{ conditions: D, error: "Invalid Configuration: FIPS and custom endpoint are not supported", [I]: c }, { conditions: E, error: "Invalid Configuration: Dualstack and custom endpoint are not supported", [I]: c }, { endpoint: { [M]: "{Endpoint}", [N]: m, [O]: m }, [I]: d }], [I]: e }, { conditions: [{ [J]: b, [K]: F }], rules: [{ conditions: [{ [J]: "aws.partition", [K]: F, assign: f }], rules: [{ conditions: [{ [J]: g, [K]: [n, "local"] }], rules: [{ conditions: D, error: "Invalid Configuration: FIPS and local endpoint are not supported", [I]: c }, { conditions: E, error: "Invalid Configuration: Dualstack and local endpoint are not supported", [I]: c }, { endpoint: { [M]: "http://localhost:8000", [N]: { authSchemes: [{ signingRegion: "us-east-1", signingName: "dynamodb", name: "sigv4" }] }, [O]: m }, [I]: d }], [I]: e }, { conditions: [o, { [J]: g, [K]: [p, "required"] }, { [J]: h, [K]: [q] }], error: "AccountIdEndpointMode is required but no AccountID was provided or able to be loaded.", [I]: c }, { conditions: [q, s, u, v, { [J]: h, [K]: [{ [J]: "isValidHostLabel", [K]: [r, a] }] }], error: "Credentials-sourced account ID parameter is invalid", [I]: c }, { conditions: [k, l], rules: [{ conditions: [w, x], rules: [{ conditions: G, endpoint: y, [I]: d }, { endpoint: y, [I]: d }], [I]: e }, { error: "FIPS and DualStack are enabled, but this partition does not support one or both", [I]: c }], [I]: e }, { conditions: D, rules: [{ conditions: [w], rules: [{ conditions: [{ [J]: g, [K]: [t, "aws-us-gov"] }], rules: [z, A], [I]: e }, { conditions: G, endpoint: B, [I]: d }, { endpoint: B, [I]: d }], [I]: e }, { error: "FIPS is enabled but this partition does not support FIPS", [I]: c }], [I]: e }, { conditions: E, rules: [{ conditions: [x], rules: [{ conditions: G, endpoint: C, [I]: d }, { endpoint: C, [I]: d }], [I]: e }, { error: "DualStack is enabled but this partition does not support DualStack", [I]: c }], [I]: e }, z, { conditions: [q, s, u, v], endpoint: { [M]: "https://{AccountId}.ddb.{Region}.{PartitionResult#dnsSuffix}", [N]: m, [O]: m }, [I]: d }, A], [I]: e }], [I]: e }, { error: "Invalid Configuration: Missing Region", [I]: c }] };
+const _data = { version: "1.0", parameters: { Region: i, UseDualStack: j, UseFIPS: j, Endpoint: i, AccountId: i, AccountIdEndpointMode: i }, rules: [{ conditions: [{ [J]: b, [K]: [{ [L]: "Endpoint" }] }], rules: [{ conditions: D, error: "Invalid Configuration: FIPS and custom endpoint are not supported", [I]: c }, { conditions: E, error: "Invalid Configuration: Dualstack and custom endpoint are not supported", [I]: c }, { endpoint: { [M]: "{Endpoint}", [N]: m, [O]: m }, [I]: d }], [I]: e }, { conditions: [{ [J]: b, [K]: F }], rules: [{ conditions: [{ [J]: "aws.partition", [K]: F, assign: f }], rules: [{ conditions: [{ [J]: g, [K]: [n, "local"] }], rules: [{ conditions: D, error: "Invalid Configuration: FIPS and local endpoint are not supported", [I]: c }, { conditions: E, error: "Invalid Configuration: Dualstack and local endpoint are not supported", [I]: c }, { endpoint: { [M]: "http://localhost:8000", [N]: { authSchemes: [{ name: "sigv4", signingName: "dynamodb", signingRegion: "us-east-1" }] }, [O]: m }, [I]: d }], [I]: e }, { conditions: [o, { [J]: g, [K]: [p, "required"] }, { [J]: h, [K]: [q] }], error: "AccountIdEndpointMode is required but no AccountID was provided or able to be loaded.", [I]: c }, { conditions: [q, s, u, v, { [J]: h, [K]: [{ [J]: "isValidHostLabel", [K]: [r, a] }] }], error: "Credentials-sourced account ID parameter is invalid", [I]: c }, { conditions: [k, l], rules: [{ conditions: [w, x], rules: [{ conditions: G, endpoint: y, [I]: d }, { endpoint: y, [I]: d }], [I]: e }, { error: "FIPS and DualStack are enabled, but this partition does not support one or both", [I]: c }], [I]: e }, { conditions: D, rules: [{ conditions: [w], rules: [{ conditions: [{ [J]: g, [K]: [t, "aws-us-gov"] }], rules: [z, A], [I]: e }, { conditions: G, endpoint: B, [I]: d }, { endpoint: B, [I]: d }], [I]: e }, { error: "FIPS is enabled but this partition does not support FIPS", [I]: c }], [I]: e }, { conditions: E, rules: [{ conditions: [x], rules: [{ conditions: G, endpoint: C, [I]: d }, { endpoint: C, [I]: d }], [I]: e }, { error: "DualStack is enabled but this partition does not support DualStack", [I]: c }], [I]: e }, z, { conditions: [q, s, u, v], endpoint: { [M]: "https://{AccountId}.ddb.{Region}.{PartitionResult#dnsSuffix}", [N]: m, [O]: m }, [I]: d }, A], [I]: e }], [I]: e }, { error: "Invalid Configuration: Missing Region", [I]: c }] };
 exports.ruleSet = _data;
 
 
@@ -3513,7 +3513,10 @@ var import_uuid = __nccwpck_require__(8404);
 
 // src/models/DynamoDBServiceException.ts
 var import_smithy_client = __nccwpck_require__(8015);
-var _DynamoDBServiceException = class _DynamoDBServiceException extends import_smithy_client.ServiceException {
+var DynamoDBServiceException = class _DynamoDBServiceException extends import_smithy_client.ServiceException {
+  static {
+    __name(this, "DynamoDBServiceException");
+  }
   /**
    * @internal
    */
@@ -3522,8 +3525,6 @@ var _DynamoDBServiceException = class _DynamoDBServiceException extends import_s
     Object.setPrototypeOf(this, _DynamoDBServiceException.prototype);
   }
 };
-__name(_DynamoDBServiceException, "DynamoDBServiceException");
-var DynamoDBServiceException = _DynamoDBServiceException;
 
 // src/models/models_0.ts
 var ApproximateCreationDateTimePrecision = {
@@ -3586,7 +3587,12 @@ var TimeToLiveStatus = {
   ENABLED: "ENABLED",
   ENABLING: "ENABLING"
 };
-var _BackupInUseException = class _BackupInUseException extends DynamoDBServiceException {
+var BackupInUseException = class _BackupInUseException extends DynamoDBServiceException {
+  static {
+    __name(this, "BackupInUseException");
+  }
+  name = "BackupInUseException";
+  $fault = "client";
   /**
    * @internal
    */
@@ -3596,14 +3602,15 @@ var _BackupInUseException = class _BackupInUseException extends DynamoDBServiceE
       $fault: "client",
       ...opts
     });
-    this.name = "BackupInUseException";
-    this.$fault = "client";
     Object.setPrototypeOf(this, _BackupInUseException.prototype);
   }
 };
-__name(_BackupInUseException, "BackupInUseException");
-var BackupInUseException = _BackupInUseException;
-var _BackupNotFoundException = class _BackupNotFoundException extends DynamoDBServiceException {
+var BackupNotFoundException = class _BackupNotFoundException extends DynamoDBServiceException {
+  static {
+    __name(this, "BackupNotFoundException");
+  }
+  name = "BackupNotFoundException";
+  $fault = "client";
   /**
    * @internal
    */
@@ -3613,13 +3620,9 @@ var _BackupNotFoundException = class _BackupNotFoundException extends DynamoDBSe
       $fault: "client",
       ...opts
     });
-    this.name = "BackupNotFoundException";
-    this.$fault = "client";
     Object.setPrototypeOf(this, _BackupNotFoundException.prototype);
   }
 };
-__name(_BackupNotFoundException, "BackupNotFoundException");
-var BackupNotFoundException = _BackupNotFoundException;
 var BackupTypeFilter = {
   ALL: "ALL",
   AWS_BACKUP: "AWS_BACKUP",
@@ -3648,7 +3651,12 @@ var BatchStatementErrorCodeEnum = {
   TransactionConflict: "TransactionConflict",
   ValidationError: "ValidationError"
 };
-var _InternalServerError = class _InternalServerError extends DynamoDBServiceException {
+var InternalServerError = class _InternalServerError extends DynamoDBServiceException {
+  static {
+    __name(this, "InternalServerError");
+  }
+  name = "InternalServerError";
+  $fault = "server";
   /**
    * @internal
    */
@@ -3658,14 +3666,15 @@ var _InternalServerError = class _InternalServerError extends DynamoDBServiceExc
       $fault: "server",
       ...opts
     });
-    this.name = "InternalServerError";
-    this.$fault = "server";
     Object.setPrototypeOf(this, _InternalServerError.prototype);
   }
 };
-__name(_InternalServerError, "InternalServerError");
-var InternalServerError = _InternalServerError;
-var _RequestLimitExceeded = class _RequestLimitExceeded extends DynamoDBServiceException {
+var RequestLimitExceeded = class _RequestLimitExceeded extends DynamoDBServiceException {
+  static {
+    __name(this, "RequestLimitExceeded");
+  }
+  name = "RequestLimitExceeded";
+  $fault = "client";
   /**
    * @internal
    */
@@ -3675,14 +3684,16 @@ var _RequestLimitExceeded = class _RequestLimitExceeded extends DynamoDBServiceE
       $fault: "client",
       ...opts
     });
-    this.name = "RequestLimitExceeded";
-    this.$fault = "client";
     Object.setPrototypeOf(this, _RequestLimitExceeded.prototype);
   }
 };
-__name(_RequestLimitExceeded, "RequestLimitExceeded");
-var RequestLimitExceeded = _RequestLimitExceeded;
-var _InvalidEndpointException = class _InvalidEndpointException extends DynamoDBServiceException {
+var InvalidEndpointException = class _InvalidEndpointException extends DynamoDBServiceException {
+  static {
+    __name(this, "InvalidEndpointException");
+  }
+  name = "InvalidEndpointException";
+  $fault = "client";
+  Message;
   /**
    * @internal
    */
@@ -3692,15 +3703,16 @@ var _InvalidEndpointException = class _InvalidEndpointException extends DynamoDB
       $fault: "client",
       ...opts
     });
-    this.name = "InvalidEndpointException";
-    this.$fault = "client";
     Object.setPrototypeOf(this, _InvalidEndpointException.prototype);
     this.Message = opts.Message;
   }
 };
-__name(_InvalidEndpointException, "InvalidEndpointException");
-var InvalidEndpointException = _InvalidEndpointException;
-var _ProvisionedThroughputExceededException = class _ProvisionedThroughputExceededException extends DynamoDBServiceException {
+var ProvisionedThroughputExceededException = class _ProvisionedThroughputExceededException extends DynamoDBServiceException {
+  static {
+    __name(this, "ProvisionedThroughputExceededException");
+  }
+  name = "ProvisionedThroughputExceededException";
+  $fault = "client";
   /**
    * @internal
    */
@@ -3710,14 +3722,15 @@ var _ProvisionedThroughputExceededException = class _ProvisionedThroughputExceed
       $fault: "client",
       ...opts
     });
-    this.name = "ProvisionedThroughputExceededException";
-    this.$fault = "client";
     Object.setPrototypeOf(this, _ProvisionedThroughputExceededException.prototype);
   }
 };
-__name(_ProvisionedThroughputExceededException, "ProvisionedThroughputExceededException");
-var ProvisionedThroughputExceededException = _ProvisionedThroughputExceededException;
-var _ResourceNotFoundException = class _ResourceNotFoundException extends DynamoDBServiceException {
+var ResourceNotFoundException = class _ResourceNotFoundException extends DynamoDBServiceException {
+  static {
+    __name(this, "ResourceNotFoundException");
+  }
+  name = "ResourceNotFoundException";
+  $fault = "client";
   /**
    * @internal
    */
@@ -3727,18 +3740,19 @@ var _ResourceNotFoundException = class _ResourceNotFoundException extends Dynamo
       $fault: "client",
       ...opts
     });
-    this.name = "ResourceNotFoundException";
-    this.$fault = "client";
     Object.setPrototypeOf(this, _ResourceNotFoundException.prototype);
   }
 };
-__name(_ResourceNotFoundException, "ResourceNotFoundException");
-var ResourceNotFoundException = _ResourceNotFoundException;
 var ReturnItemCollectionMetrics = {
   NONE: "NONE",
   SIZE: "SIZE"
 };
-var _ItemCollectionSizeLimitExceededException = class _ItemCollectionSizeLimitExceededException extends DynamoDBServiceException {
+var ItemCollectionSizeLimitExceededException = class _ItemCollectionSizeLimitExceededException extends DynamoDBServiceException {
+  static {
+    __name(this, "ItemCollectionSizeLimitExceededException");
+  }
+  name = "ItemCollectionSizeLimitExceededException";
+  $fault = "client";
   /**
    * @internal
    */
@@ -3748,13 +3762,9 @@ var _ItemCollectionSizeLimitExceededException = class _ItemCollectionSizeLimitEx
       $fault: "client",
       ...opts
     });
-    this.name = "ItemCollectionSizeLimitExceededException";
-    this.$fault = "client";
     Object.setPrototypeOf(this, _ItemCollectionSizeLimitExceededException.prototype);
   }
 };
-__name(_ItemCollectionSizeLimitExceededException, "ItemCollectionSizeLimitExceededException");
-var ItemCollectionSizeLimitExceededException = _ItemCollectionSizeLimitExceededException;
 var ComparisonOperator = {
   BEGINS_WITH: "BEGINS_WITH",
   BETWEEN: "BETWEEN",
@@ -3782,7 +3792,12 @@ var PointInTimeRecoveryStatus = {
   DISABLED: "DISABLED",
   ENABLED: "ENABLED"
 };
-var _ContinuousBackupsUnavailableException = class _ContinuousBackupsUnavailableException extends DynamoDBServiceException {
+var ContinuousBackupsUnavailableException = class _ContinuousBackupsUnavailableException extends DynamoDBServiceException {
+  static {
+    __name(this, "ContinuousBackupsUnavailableException");
+  }
+  name = "ContinuousBackupsUnavailableException";
+  $fault = "client";
   /**
    * @internal
    */
@@ -3792,13 +3807,9 @@ var _ContinuousBackupsUnavailableException = class _ContinuousBackupsUnavailable
       $fault: "client",
       ...opts
     });
-    this.name = "ContinuousBackupsUnavailableException";
-    this.$fault = "client";
     Object.setPrototypeOf(this, _ContinuousBackupsUnavailableException.prototype);
   }
 };
-__name(_ContinuousBackupsUnavailableException, "ContinuousBackupsUnavailableException");
-var ContinuousBackupsUnavailableException = _ContinuousBackupsUnavailableException;
 var ContributorInsightsAction = {
   DISABLE: "DISABLE",
   ENABLE: "ENABLE"
@@ -3810,7 +3821,12 @@ var ContributorInsightsStatus = {
   ENABLING: "ENABLING",
   FAILED: "FAILED"
 };
-var _LimitExceededException = class _LimitExceededException extends DynamoDBServiceException {
+var LimitExceededException = class _LimitExceededException extends DynamoDBServiceException {
+  static {
+    __name(this, "LimitExceededException");
+  }
+  name = "LimitExceededException";
+  $fault = "client";
   /**
    * @internal
    */
@@ -3820,14 +3836,15 @@ var _LimitExceededException = class _LimitExceededException extends DynamoDBServ
       $fault: "client",
       ...opts
     });
-    this.name = "LimitExceededException";
-    this.$fault = "client";
     Object.setPrototypeOf(this, _LimitExceededException.prototype);
   }
 };
-__name(_LimitExceededException, "LimitExceededException");
-var LimitExceededException = _LimitExceededException;
-var _TableInUseException = class _TableInUseException extends DynamoDBServiceException {
+var TableInUseException = class _TableInUseException extends DynamoDBServiceException {
+  static {
+    __name(this, "TableInUseException");
+  }
+  name = "TableInUseException";
+  $fault = "client";
   /**
    * @internal
    */
@@ -3837,14 +3854,15 @@ var _TableInUseException = class _TableInUseException extends DynamoDBServiceExc
       $fault: "client",
       ...opts
     });
-    this.name = "TableInUseException";
-    this.$fault = "client";
     Object.setPrototypeOf(this, _TableInUseException.prototype);
   }
 };
-__name(_TableInUseException, "TableInUseException");
-var TableInUseException = _TableInUseException;
-var _TableNotFoundException = class _TableNotFoundException extends DynamoDBServiceException {
+var TableNotFoundException = class _TableNotFoundException extends DynamoDBServiceException {
+  static {
+    __name(this, "TableNotFoundException");
+  }
+  name = "TableNotFoundException";
+  $fault = "client";
   /**
    * @internal
    */
@@ -3854,13 +3872,9 @@ var _TableNotFoundException = class _TableNotFoundException extends DynamoDBServ
       $fault: "client",
       ...opts
     });
-    this.name = "TableNotFoundException";
-    this.$fault = "client";
     Object.setPrototypeOf(this, _TableNotFoundException.prototype);
   }
 };
-__name(_TableNotFoundException, "TableNotFoundException");
-var TableNotFoundException = _TableNotFoundException;
 var GlobalTableStatus = {
   ACTIVE: "ACTIVE",
   CREATING: "CREATING",
@@ -3895,7 +3909,12 @@ var TableStatus = {
   INACCESSIBLE_ENCRYPTION_CREDENTIALS: "INACCESSIBLE_ENCRYPTION_CREDENTIALS",
   UPDATING: "UPDATING"
 };
-var _GlobalTableAlreadyExistsException = class _GlobalTableAlreadyExistsException extends DynamoDBServiceException {
+var GlobalTableAlreadyExistsException = class _GlobalTableAlreadyExistsException extends DynamoDBServiceException {
+  static {
+    __name(this, "GlobalTableAlreadyExistsException");
+  }
+  name = "GlobalTableAlreadyExistsException";
+  $fault = "client";
   /**
    * @internal
    */
@@ -3905,18 +3924,19 @@ var _GlobalTableAlreadyExistsException = class _GlobalTableAlreadyExistsExceptio
       $fault: "client",
       ...opts
     });
-    this.name = "GlobalTableAlreadyExistsException";
-    this.$fault = "client";
     Object.setPrototypeOf(this, _GlobalTableAlreadyExistsException.prototype);
   }
 };
-__name(_GlobalTableAlreadyExistsException, "GlobalTableAlreadyExistsException");
-var GlobalTableAlreadyExistsException = _GlobalTableAlreadyExistsException;
 var MultiRegionConsistency = {
   EVENTUAL: "EVENTUAL",
   STRONG: "STRONG"
 };
-var _ResourceInUseException = class _ResourceInUseException extends DynamoDBServiceException {
+var ResourceInUseException = class _ResourceInUseException extends DynamoDBServiceException {
+  static {
+    __name(this, "ResourceInUseException");
+  }
+  name = "ResourceInUseException";
+  $fault = "client";
   /**
    * @internal
    */
@@ -3926,13 +3946,9 @@ var _ResourceInUseException = class _ResourceInUseException extends DynamoDBServ
       $fault: "client",
       ...opts
     });
-    this.name = "ResourceInUseException";
-    this.$fault = "client";
     Object.setPrototypeOf(this, _ResourceInUseException.prototype);
   }
 };
-__name(_ResourceInUseException, "ResourceInUseException");
-var ResourceInUseException = _ResourceInUseException;
 var ReturnValue = {
   ALL_NEW: "ALL_NEW",
   ALL_OLD: "ALL_OLD",
@@ -3940,7 +3956,12 @@ var ReturnValue = {
   UPDATED_NEW: "UPDATED_NEW",
   UPDATED_OLD: "UPDATED_OLD"
 };
-var _ReplicatedWriteConflictException = class _ReplicatedWriteConflictException extends DynamoDBServiceException {
+var ReplicatedWriteConflictException = class _ReplicatedWriteConflictException extends DynamoDBServiceException {
+  static {
+    __name(this, "ReplicatedWriteConflictException");
+  }
+  name = "ReplicatedWriteConflictException";
+  $fault = "client";
   /**
    * @internal
    */
@@ -3950,14 +3971,15 @@ var _ReplicatedWriteConflictException = class _ReplicatedWriteConflictException 
       $fault: "client",
       ...opts
     });
-    this.name = "ReplicatedWriteConflictException";
-    this.$fault = "client";
     Object.setPrototypeOf(this, _ReplicatedWriteConflictException.prototype);
   }
 };
-__name(_ReplicatedWriteConflictException, "ReplicatedWriteConflictException");
-var ReplicatedWriteConflictException = _ReplicatedWriteConflictException;
-var _TransactionConflictException = class _TransactionConflictException extends DynamoDBServiceException {
+var TransactionConflictException = class _TransactionConflictException extends DynamoDBServiceException {
+  static {
+    __name(this, "TransactionConflictException");
+  }
+  name = "TransactionConflictException";
+  $fault = "client";
   /**
    * @internal
    */
@@ -3967,14 +3989,15 @@ var _TransactionConflictException = class _TransactionConflictException extends 
       $fault: "client",
       ...opts
     });
-    this.name = "TransactionConflictException";
-    this.$fault = "client";
     Object.setPrototypeOf(this, _TransactionConflictException.prototype);
   }
 };
-__name(_TransactionConflictException, "TransactionConflictException");
-var TransactionConflictException = _TransactionConflictException;
-var _PolicyNotFoundException = class _PolicyNotFoundException extends DynamoDBServiceException {
+var PolicyNotFoundException = class _PolicyNotFoundException extends DynamoDBServiceException {
+  static {
+    __name(this, "PolicyNotFoundException");
+  }
+  name = "PolicyNotFoundException";
+  $fault = "client";
   /**
    * @internal
    */
@@ -3984,13 +4007,9 @@ var _PolicyNotFoundException = class _PolicyNotFoundException extends DynamoDBSe
       $fault: "client",
       ...opts
     });
-    this.name = "PolicyNotFoundException";
-    this.$fault = "client";
     Object.setPrototypeOf(this, _PolicyNotFoundException.prototype);
   }
 };
-__name(_PolicyNotFoundException, "PolicyNotFoundException");
-var PolicyNotFoundException = _PolicyNotFoundException;
 var ExportFormat = {
   DYNAMODB_JSON: "DYNAMODB_JSON",
   ION: "ION"
@@ -4012,7 +4031,12 @@ var S3SseAlgorithm = {
   AES256: "AES256",
   KMS: "KMS"
 };
-var _ExportNotFoundException = class _ExportNotFoundException extends DynamoDBServiceException {
+var ExportNotFoundException = class _ExportNotFoundException extends DynamoDBServiceException {
+  static {
+    __name(this, "ExportNotFoundException");
+  }
+  name = "ExportNotFoundException";
+  $fault = "client";
   /**
    * @internal
    */
@@ -4022,14 +4046,15 @@ var _ExportNotFoundException = class _ExportNotFoundException extends DynamoDBSe
       $fault: "client",
       ...opts
     });
-    this.name = "ExportNotFoundException";
-    this.$fault = "client";
     Object.setPrototypeOf(this, _ExportNotFoundException.prototype);
   }
 };
-__name(_ExportNotFoundException, "ExportNotFoundException");
-var ExportNotFoundException = _ExportNotFoundException;
-var _GlobalTableNotFoundException = class _GlobalTableNotFoundException extends DynamoDBServiceException {
+var GlobalTableNotFoundException = class _GlobalTableNotFoundException extends DynamoDBServiceException {
+  static {
+    __name(this, "GlobalTableNotFoundException");
+  }
+  name = "GlobalTableNotFoundException";
+  $fault = "client";
   /**
    * @internal
    */
@@ -4039,13 +4064,9 @@ var _GlobalTableNotFoundException = class _GlobalTableNotFoundException extends 
       $fault: "client",
       ...opts
     });
-    this.name = "GlobalTableNotFoundException";
-    this.$fault = "client";
     Object.setPrototypeOf(this, _GlobalTableNotFoundException.prototype);
   }
 };
-__name(_GlobalTableNotFoundException, "GlobalTableNotFoundException");
-var GlobalTableNotFoundException = _GlobalTableNotFoundException;
 var ImportStatus = {
   CANCELLED: "CANCELLED",
   CANCELLING: "CANCELLING",
@@ -4063,7 +4084,12 @@ var InputFormat = {
   DYNAMODB_JSON: "DYNAMODB_JSON",
   ION: "ION"
 };
-var _ImportNotFoundException = class _ImportNotFoundException extends DynamoDBServiceException {
+var ImportNotFoundException = class _ImportNotFoundException extends DynamoDBServiceException {
+  static {
+    __name(this, "ImportNotFoundException");
+  }
+  name = "ImportNotFoundException";
+  $fault = "client";
   /**
    * @internal
    */
@@ -4073,13 +4099,9 @@ var _ImportNotFoundException = class _ImportNotFoundException extends DynamoDBSe
       $fault: "client",
       ...opts
     });
-    this.name = "ImportNotFoundException";
-    this.$fault = "client";
     Object.setPrototypeOf(this, _ImportNotFoundException.prototype);
   }
 };
-__name(_ImportNotFoundException, "ImportNotFoundException");
-var ImportNotFoundException = _ImportNotFoundException;
 var DestinationStatus = {
   ACTIVE: "ACTIVE",
   DISABLED: "DISABLED",
@@ -4088,7 +4110,12 @@ var DestinationStatus = {
   ENABLING: "ENABLING",
   UPDATING: "UPDATING"
 };
-var _DuplicateItemException = class _DuplicateItemException extends DynamoDBServiceException {
+var DuplicateItemException = class _DuplicateItemException extends DynamoDBServiceException {
+  static {
+    __name(this, "DuplicateItemException");
+  }
+  name = "DuplicateItemException";
+  $fault = "client";
   /**
    * @internal
    */
@@ -4098,14 +4125,16 @@ var _DuplicateItemException = class _DuplicateItemException extends DynamoDBServ
       $fault: "client",
       ...opts
     });
-    this.name = "DuplicateItemException";
-    this.$fault = "client";
     Object.setPrototypeOf(this, _DuplicateItemException.prototype);
   }
 };
-__name(_DuplicateItemException, "DuplicateItemException");
-var DuplicateItemException = _DuplicateItemException;
-var _IdempotentParameterMismatchException = class _IdempotentParameterMismatchException extends DynamoDBServiceException {
+var IdempotentParameterMismatchException = class _IdempotentParameterMismatchException extends DynamoDBServiceException {
+  static {
+    __name(this, "IdempotentParameterMismatchException");
+  }
+  name = "IdempotentParameterMismatchException";
+  $fault = "client";
+  Message;
   /**
    * @internal
    */
@@ -4115,15 +4144,17 @@ var _IdempotentParameterMismatchException = class _IdempotentParameterMismatchEx
       $fault: "client",
       ...opts
     });
-    this.name = "IdempotentParameterMismatchException";
-    this.$fault = "client";
     Object.setPrototypeOf(this, _IdempotentParameterMismatchException.prototype);
     this.Message = opts.Message;
   }
 };
-__name(_IdempotentParameterMismatchException, "IdempotentParameterMismatchException");
-var IdempotentParameterMismatchException = _IdempotentParameterMismatchException;
-var _TransactionInProgressException = class _TransactionInProgressException extends DynamoDBServiceException {
+var TransactionInProgressException = class _TransactionInProgressException extends DynamoDBServiceException {
+  static {
+    __name(this, "TransactionInProgressException");
+  }
+  name = "TransactionInProgressException";
+  $fault = "client";
+  Message;
   /**
    * @internal
    */
@@ -4133,15 +4164,16 @@ var _TransactionInProgressException = class _TransactionInProgressException exte
       $fault: "client",
       ...opts
     });
-    this.name = "TransactionInProgressException";
-    this.$fault = "client";
     Object.setPrototypeOf(this, _TransactionInProgressException.prototype);
     this.Message = opts.Message;
   }
 };
-__name(_TransactionInProgressException, "TransactionInProgressException");
-var TransactionInProgressException = _TransactionInProgressException;
-var _ExportConflictException = class _ExportConflictException extends DynamoDBServiceException {
+var ExportConflictException = class _ExportConflictException extends DynamoDBServiceException {
+  static {
+    __name(this, "ExportConflictException");
+  }
+  name = "ExportConflictException";
+  $fault = "client";
   /**
    * @internal
    */
@@ -4151,14 +4183,15 @@ var _ExportConflictException = class _ExportConflictException extends DynamoDBSe
       $fault: "client",
       ...opts
     });
-    this.name = "ExportConflictException";
-    this.$fault = "client";
     Object.setPrototypeOf(this, _ExportConflictException.prototype);
   }
 };
-__name(_ExportConflictException, "ExportConflictException");
-var ExportConflictException = _ExportConflictException;
-var _InvalidExportTimeException = class _InvalidExportTimeException extends DynamoDBServiceException {
+var InvalidExportTimeException = class _InvalidExportTimeException extends DynamoDBServiceException {
+  static {
+    __name(this, "InvalidExportTimeException");
+  }
+  name = "InvalidExportTimeException";
+  $fault = "client";
   /**
    * @internal
    */
@@ -4168,14 +4201,15 @@ var _InvalidExportTimeException = class _InvalidExportTimeException extends Dyna
       $fault: "client",
       ...opts
     });
-    this.name = "InvalidExportTimeException";
-    this.$fault = "client";
     Object.setPrototypeOf(this, _InvalidExportTimeException.prototype);
   }
 };
-__name(_InvalidExportTimeException, "InvalidExportTimeException");
-var InvalidExportTimeException = _InvalidExportTimeException;
-var _PointInTimeRecoveryUnavailableException = class _PointInTimeRecoveryUnavailableException extends DynamoDBServiceException {
+var PointInTimeRecoveryUnavailableException = class _PointInTimeRecoveryUnavailableException extends DynamoDBServiceException {
+  static {
+    __name(this, "PointInTimeRecoveryUnavailableException");
+  }
+  name = "PointInTimeRecoveryUnavailableException";
+  $fault = "client";
   /**
    * @internal
    */
@@ -4185,14 +4219,15 @@ var _PointInTimeRecoveryUnavailableException = class _PointInTimeRecoveryUnavail
       $fault: "client",
       ...opts
     });
-    this.name = "PointInTimeRecoveryUnavailableException";
-    this.$fault = "client";
     Object.setPrototypeOf(this, _PointInTimeRecoveryUnavailableException.prototype);
   }
 };
-__name(_PointInTimeRecoveryUnavailableException, "PointInTimeRecoveryUnavailableException");
-var PointInTimeRecoveryUnavailableException = _PointInTimeRecoveryUnavailableException;
-var _ImportConflictException = class _ImportConflictException extends DynamoDBServiceException {
+var ImportConflictException = class _ImportConflictException extends DynamoDBServiceException {
+  static {
+    __name(this, "ImportConflictException");
+  }
+  name = "ImportConflictException";
+  $fault = "client";
   /**
    * @internal
    */
@@ -4202,20 +4237,21 @@ var _ImportConflictException = class _ImportConflictException extends DynamoDBSe
       $fault: "client",
       ...opts
     });
-    this.name = "ImportConflictException";
-    this.$fault = "client";
     Object.setPrototypeOf(this, _ImportConflictException.prototype);
   }
 };
-__name(_ImportConflictException, "ImportConflictException");
-var ImportConflictException = _ImportConflictException;
 var Select = {
   ALL_ATTRIBUTES: "ALL_ATTRIBUTES",
   ALL_PROJECTED_ATTRIBUTES: "ALL_PROJECTED_ATTRIBUTES",
   COUNT: "COUNT",
   SPECIFIC_ATTRIBUTES: "SPECIFIC_ATTRIBUTES"
 };
-var _TableAlreadyExistsException = class _TableAlreadyExistsException extends DynamoDBServiceException {
+var TableAlreadyExistsException = class _TableAlreadyExistsException extends DynamoDBServiceException {
+  static {
+    __name(this, "TableAlreadyExistsException");
+  }
+  name = "TableAlreadyExistsException";
+  $fault = "client";
   /**
    * @internal
    */
@@ -4225,14 +4261,15 @@ var _TableAlreadyExistsException = class _TableAlreadyExistsException extends Dy
       $fault: "client",
       ...opts
     });
-    this.name = "TableAlreadyExistsException";
-    this.$fault = "client";
     Object.setPrototypeOf(this, _TableAlreadyExistsException.prototype);
   }
 };
-__name(_TableAlreadyExistsException, "TableAlreadyExistsException");
-var TableAlreadyExistsException = _TableAlreadyExistsException;
-var _InvalidRestoreTimeException = class _InvalidRestoreTimeException extends DynamoDBServiceException {
+var InvalidRestoreTimeException = class _InvalidRestoreTimeException extends DynamoDBServiceException {
+  static {
+    __name(this, "InvalidRestoreTimeException");
+  }
+  name = "InvalidRestoreTimeException";
+  $fault = "client";
   /**
    * @internal
    */
@@ -4242,14 +4279,15 @@ var _InvalidRestoreTimeException = class _InvalidRestoreTimeException extends Dy
       $fault: "client",
       ...opts
     });
-    this.name = "InvalidRestoreTimeException";
-    this.$fault = "client";
     Object.setPrototypeOf(this, _InvalidRestoreTimeException.prototype);
   }
 };
-__name(_InvalidRestoreTimeException, "InvalidRestoreTimeException");
-var InvalidRestoreTimeException = _InvalidRestoreTimeException;
-var _ReplicaAlreadyExistsException = class _ReplicaAlreadyExistsException extends DynamoDBServiceException {
+var ReplicaAlreadyExistsException = class _ReplicaAlreadyExistsException extends DynamoDBServiceException {
+  static {
+    __name(this, "ReplicaAlreadyExistsException");
+  }
+  name = "ReplicaAlreadyExistsException";
+  $fault = "client";
   /**
    * @internal
    */
@@ -4259,14 +4297,15 @@ var _ReplicaAlreadyExistsException = class _ReplicaAlreadyExistsException extend
       $fault: "client",
       ...opts
     });
-    this.name = "ReplicaAlreadyExistsException";
-    this.$fault = "client";
     Object.setPrototypeOf(this, _ReplicaAlreadyExistsException.prototype);
   }
 };
-__name(_ReplicaAlreadyExistsException, "ReplicaAlreadyExistsException");
-var ReplicaAlreadyExistsException = _ReplicaAlreadyExistsException;
-var _ReplicaNotFoundException = class _ReplicaNotFoundException extends DynamoDBServiceException {
+var ReplicaNotFoundException = class _ReplicaNotFoundException extends DynamoDBServiceException {
+  static {
+    __name(this, "ReplicaNotFoundException");
+  }
+  name = "ReplicaNotFoundException";
+  $fault = "client";
   /**
    * @internal
    */
@@ -4276,14 +4315,15 @@ var _ReplicaNotFoundException = class _ReplicaNotFoundException extends DynamoDB
       $fault: "client",
       ...opts
     });
-    this.name = "ReplicaNotFoundException";
-    this.$fault = "client";
     Object.setPrototypeOf(this, _ReplicaNotFoundException.prototype);
   }
 };
-__name(_ReplicaNotFoundException, "ReplicaNotFoundException");
-var ReplicaNotFoundException = _ReplicaNotFoundException;
-var _IndexNotFoundException = class _IndexNotFoundException extends DynamoDBServiceException {
+var IndexNotFoundException = class _IndexNotFoundException extends DynamoDBServiceException {
+  static {
+    __name(this, "IndexNotFoundException");
+  }
+  name = "IndexNotFoundException";
+  $fault = "client";
   /**
    * @internal
    */
@@ -4293,13 +4333,9 @@ var _IndexNotFoundException = class _IndexNotFoundException extends DynamoDBServ
       $fault: "client",
       ...opts
     });
-    this.name = "IndexNotFoundException";
-    this.$fault = "client";
     Object.setPrototypeOf(this, _IndexNotFoundException.prototype);
   }
 };
-__name(_IndexNotFoundException, "IndexNotFoundException");
-var IndexNotFoundException = _IndexNotFoundException;
 var AttributeValue;
 ((AttributeValue2) => {
   AttributeValue2.visit = /* @__PURE__ */ __name((value, visitor) => {
@@ -4326,7 +4362,17 @@ var AttributeValue;
     return visitor._(value.$unknown[0], value.$unknown[1]);
   }, "visit");
 })(AttributeValue || (AttributeValue = {}));
-var _ConditionalCheckFailedException = class _ConditionalCheckFailedException extends DynamoDBServiceException {
+var ConditionalCheckFailedException = class _ConditionalCheckFailedException extends DynamoDBServiceException {
+  static {
+    __name(this, "ConditionalCheckFailedException");
+  }
+  name = "ConditionalCheckFailedException";
+  $fault = "client";
+  /**
+   * <p>Item which caused the <code>ConditionalCheckFailedException</code>.</p>
+   * @public
+   */
+  Item;
   /**
    * @internal
    */
@@ -4336,15 +4382,22 @@ var _ConditionalCheckFailedException = class _ConditionalCheckFailedException ex
       $fault: "client",
       ...opts
     });
-    this.name = "ConditionalCheckFailedException";
-    this.$fault = "client";
     Object.setPrototypeOf(this, _ConditionalCheckFailedException.prototype);
     this.Item = opts.Item;
   }
 };
-__name(_ConditionalCheckFailedException, "ConditionalCheckFailedException");
-var ConditionalCheckFailedException = _ConditionalCheckFailedException;
-var _TransactionCanceledException = class _TransactionCanceledException extends DynamoDBServiceException {
+var TransactionCanceledException = class _TransactionCanceledException extends DynamoDBServiceException {
+  static {
+    __name(this, "TransactionCanceledException");
+  }
+  name = "TransactionCanceledException";
+  $fault = "client";
+  Message;
+  /**
+   * <p>A list of cancellation reasons.</p>
+   * @public
+   */
+  CancellationReasons;
   /**
    * @internal
    */
@@ -4354,15 +4407,11 @@ var _TransactionCanceledException = class _TransactionCanceledException extends 
       $fault: "client",
       ...opts
     });
-    this.name = "TransactionCanceledException";
-    this.$fault = "client";
     Object.setPrototypeOf(this, _TransactionCanceledException.prototype);
     this.Message = opts.Message;
     this.CancellationReasons = opts.CancellationReasons;
   }
 };
-__name(_TransactionCanceledException, "TransactionCanceledException");
-var TransactionCanceledException = _TransactionCanceledException;
 
 // src/protocols/Aws_json1_0.ts
 var se_BatchExecuteStatementCommand = /* @__PURE__ */ __name(async (input, context) => {
@@ -7051,7 +7100,8 @@ var de_PointInTimeRecoveryDescription = /* @__PURE__ */ __name((output, context)
   return (0, import_smithy_client.take)(output, {
     EarliestRestorableDateTime: (_) => (0, import_smithy_client.expectNonNull)((0, import_smithy_client.parseEpochTimestamp)((0, import_smithy_client.expectNumber)(_))),
     LatestRestorableDateTime: (_) => (0, import_smithy_client.expectNonNull)((0, import_smithy_client.parseEpochTimestamp)((0, import_smithy_client.expectNumber)(_))),
-    PointInTimeRecoveryStatus: import_smithy_client.expectString
+    PointInTimeRecoveryStatus: import_smithy_client.expectString,
+    RecoveryPeriodInDays: import_smithy_client.expectInt32
   });
 }, "de_PointInTimeRecoveryDescription");
 var de_ProvisionedThroughputDescription = /* @__PURE__ */ __name((output, context) => {
@@ -7385,15 +7435,16 @@ function sharedHeaders(operation) {
 __name(sharedHeaders, "sharedHeaders");
 
 // src/commands/DescribeEndpointsCommand.ts
-var _DescribeEndpointsCommand = class _DescribeEndpointsCommand extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
+var DescribeEndpointsCommand = class extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
   return [
     (0, import_middleware_serde.getSerdePlugin)(config, this.serialize, this.deserialize),
     (0, import_middleware_endpoint.getEndpointPlugin)(config, Command.getEndpointParameterInstructions())
   ];
 }).s("DynamoDB_20120810", "DescribeEndpoints", {}).n("DynamoDBClient", "DescribeEndpointsCommand").f(void 0, void 0).ser(se_DescribeEndpointsCommand).de(de_DescribeEndpointsCommand).build() {
+  static {
+    __name(this, "DescribeEndpointsCommand");
+  }
 };
-__name(_DescribeEndpointsCommand, "DescribeEndpointsCommand");
-var DescribeEndpointsCommand = _DescribeEndpointsCommand;
 
 // src/DynamoDBClient.ts
 var import_runtimeConfig = __nccwpck_require__(3919);
@@ -7462,7 +7513,14 @@ var resolveRuntimeExtensions = /* @__PURE__ */ __name((runtimeConfig, extensions
 }, "resolveRuntimeExtensions");
 
 // src/DynamoDBClient.ts
-var _DynamoDBClient = class _DynamoDBClient extends import_smithy_client.Client {
+var DynamoDBClient = class extends import_smithy_client.Client {
+  static {
+    __name(this, "DynamoDBClient");
+  }
+  /**
+   * The resolved configuration of DynamoDBClient class. This is resolved and normalized from the {@link DynamoDBClientConfig | constructor configuration interface}.
+   */
+  config;
   constructor(...[configuration]) {
     const _config_0 = (0, import_runtimeConfig.getRuntimeConfig)(configuration || {});
     const _config_1 = resolveClientEndpointParameters(_config_0);
@@ -7476,7 +7534,7 @@ var _DynamoDBClient = class _DynamoDBClient extends import_smithy_client.Client 
     const _config_9 = (0, import_middleware_endpoint_discovery.resolveEndpointDiscoveryConfig)(_config_8, {
       endpointDiscoveryCommandCtor: DescribeEndpointsCommand
     });
-    const _config_10 = resolveRuntimeExtensions(_config_9, (configuration == null ? void 0 : configuration.extensions) || []);
+    const _config_10 = resolveRuntimeExtensions(_config_9, configuration?.extensions || []);
     super(_config_10);
     this.config = _config_10;
     this.middlewareStack.use((0, import_middleware_user_agent.getUserAgentPlugin)(this.config));
@@ -7504,8 +7562,6 @@ var _DynamoDBClient = class _DynamoDBClient extends import_smithy_client.Client 
     super.destroy();
   }
 };
-__name(_DynamoDBClient, "DynamoDBClient");
-var DynamoDBClient = _DynamoDBClient;
 
 // src/DynamoDB.ts
 
@@ -7514,785 +7570,841 @@ var DynamoDBClient = _DynamoDBClient;
 
 
 
-var _BatchExecuteStatementCommand = class _BatchExecuteStatementCommand extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
+var BatchExecuteStatementCommand = class extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
   return [
     (0, import_middleware_serde.getSerdePlugin)(config, this.serialize, this.deserialize),
     (0, import_middleware_endpoint.getEndpointPlugin)(config, Command.getEndpointParameterInstructions())
   ];
 }).s("DynamoDB_20120810", "BatchExecuteStatement", {}).n("DynamoDBClient", "BatchExecuteStatementCommand").f(void 0, void 0).ser(se_BatchExecuteStatementCommand).de(de_BatchExecuteStatementCommand).build() {
+  static {
+    __name(this, "BatchExecuteStatementCommand");
+  }
 };
-__name(_BatchExecuteStatementCommand, "BatchExecuteStatementCommand");
-var BatchExecuteStatementCommand = _BatchExecuteStatementCommand;
 
 // src/commands/BatchGetItemCommand.ts
 
 
 
-var _BatchGetItemCommand = class _BatchGetItemCommand extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
+var BatchGetItemCommand = class extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
   return [
     (0, import_middleware_serde.getSerdePlugin)(config, this.serialize, this.deserialize),
     (0, import_middleware_endpoint.getEndpointPlugin)(config, Command.getEndpointParameterInstructions())
   ];
 }).s("DynamoDB_20120810", "BatchGetItem", {}).n("DynamoDBClient", "BatchGetItemCommand").f(void 0, void 0).ser(se_BatchGetItemCommand).de(de_BatchGetItemCommand).build() {
+  static {
+    __name(this, "BatchGetItemCommand");
+  }
 };
-__name(_BatchGetItemCommand, "BatchGetItemCommand");
-var BatchGetItemCommand = _BatchGetItemCommand;
 
 // src/commands/BatchWriteItemCommand.ts
 
 
 
-var _BatchWriteItemCommand = class _BatchWriteItemCommand extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
+var BatchWriteItemCommand = class extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
   return [
     (0, import_middleware_serde.getSerdePlugin)(config, this.serialize, this.deserialize),
     (0, import_middleware_endpoint.getEndpointPlugin)(config, Command.getEndpointParameterInstructions())
   ];
 }).s("DynamoDB_20120810", "BatchWriteItem", {}).n("DynamoDBClient", "BatchWriteItemCommand").f(void 0, void 0).ser(se_BatchWriteItemCommand).de(de_BatchWriteItemCommand).build() {
+  static {
+    __name(this, "BatchWriteItemCommand");
+  }
 };
-__name(_BatchWriteItemCommand, "BatchWriteItemCommand");
-var BatchWriteItemCommand = _BatchWriteItemCommand;
 
 // src/commands/CreateBackupCommand.ts
 
 
 
-var _CreateBackupCommand = class _CreateBackupCommand extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
+var CreateBackupCommand = class extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
   return [
     (0, import_middleware_serde.getSerdePlugin)(config, this.serialize, this.deserialize),
     (0, import_middleware_endpoint.getEndpointPlugin)(config, Command.getEndpointParameterInstructions())
   ];
 }).s("DynamoDB_20120810", "CreateBackup", {}).n("DynamoDBClient", "CreateBackupCommand").f(void 0, void 0).ser(se_CreateBackupCommand).de(de_CreateBackupCommand).build() {
+  static {
+    __name(this, "CreateBackupCommand");
+  }
 };
-__name(_CreateBackupCommand, "CreateBackupCommand");
-var CreateBackupCommand = _CreateBackupCommand;
 
 // src/commands/CreateGlobalTableCommand.ts
 
 
 
-var _CreateGlobalTableCommand = class _CreateGlobalTableCommand extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
+var CreateGlobalTableCommand = class extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
   return [
     (0, import_middleware_serde.getSerdePlugin)(config, this.serialize, this.deserialize),
     (0, import_middleware_endpoint.getEndpointPlugin)(config, Command.getEndpointParameterInstructions())
   ];
 }).s("DynamoDB_20120810", "CreateGlobalTable", {}).n("DynamoDBClient", "CreateGlobalTableCommand").f(void 0, void 0).ser(se_CreateGlobalTableCommand).de(de_CreateGlobalTableCommand).build() {
+  static {
+    __name(this, "CreateGlobalTableCommand");
+  }
 };
-__name(_CreateGlobalTableCommand, "CreateGlobalTableCommand");
-var CreateGlobalTableCommand = _CreateGlobalTableCommand;
 
 // src/commands/CreateTableCommand.ts
 
 
 
-var _CreateTableCommand = class _CreateTableCommand extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
+var CreateTableCommand = class extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
   return [
     (0, import_middleware_serde.getSerdePlugin)(config, this.serialize, this.deserialize),
     (0, import_middleware_endpoint.getEndpointPlugin)(config, Command.getEndpointParameterInstructions())
   ];
 }).s("DynamoDB_20120810", "CreateTable", {}).n("DynamoDBClient", "CreateTableCommand").f(void 0, void 0).ser(se_CreateTableCommand).de(de_CreateTableCommand).build() {
+  static {
+    __name(this, "CreateTableCommand");
+  }
 };
-__name(_CreateTableCommand, "CreateTableCommand");
-var CreateTableCommand = _CreateTableCommand;
 
 // src/commands/DeleteBackupCommand.ts
 
 
 
-var _DeleteBackupCommand = class _DeleteBackupCommand extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
+var DeleteBackupCommand = class extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
   return [
     (0, import_middleware_serde.getSerdePlugin)(config, this.serialize, this.deserialize),
     (0, import_middleware_endpoint.getEndpointPlugin)(config, Command.getEndpointParameterInstructions())
   ];
 }).s("DynamoDB_20120810", "DeleteBackup", {}).n("DynamoDBClient", "DeleteBackupCommand").f(void 0, void 0).ser(se_DeleteBackupCommand).de(de_DeleteBackupCommand).build() {
+  static {
+    __name(this, "DeleteBackupCommand");
+  }
 };
-__name(_DeleteBackupCommand, "DeleteBackupCommand");
-var DeleteBackupCommand = _DeleteBackupCommand;
 
 // src/commands/DeleteItemCommand.ts
 
 
 
-var _DeleteItemCommand = class _DeleteItemCommand extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
+var DeleteItemCommand = class extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
   return [
     (0, import_middleware_serde.getSerdePlugin)(config, this.serialize, this.deserialize),
     (0, import_middleware_endpoint.getEndpointPlugin)(config, Command.getEndpointParameterInstructions())
   ];
 }).s("DynamoDB_20120810", "DeleteItem", {}).n("DynamoDBClient", "DeleteItemCommand").f(void 0, void 0).ser(se_DeleteItemCommand).de(de_DeleteItemCommand).build() {
+  static {
+    __name(this, "DeleteItemCommand");
+  }
 };
-__name(_DeleteItemCommand, "DeleteItemCommand");
-var DeleteItemCommand = _DeleteItemCommand;
 
 // src/commands/DeleteResourcePolicyCommand.ts
 
 
 
-var _DeleteResourcePolicyCommand = class _DeleteResourcePolicyCommand extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
+var DeleteResourcePolicyCommand = class extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
   return [
     (0, import_middleware_serde.getSerdePlugin)(config, this.serialize, this.deserialize),
     (0, import_middleware_endpoint.getEndpointPlugin)(config, Command.getEndpointParameterInstructions())
   ];
 }).s("DynamoDB_20120810", "DeleteResourcePolicy", {}).n("DynamoDBClient", "DeleteResourcePolicyCommand").f(void 0, void 0).ser(se_DeleteResourcePolicyCommand).de(de_DeleteResourcePolicyCommand).build() {
+  static {
+    __name(this, "DeleteResourcePolicyCommand");
+  }
 };
-__name(_DeleteResourcePolicyCommand, "DeleteResourcePolicyCommand");
-var DeleteResourcePolicyCommand = _DeleteResourcePolicyCommand;
 
 // src/commands/DeleteTableCommand.ts
 
 
 
-var _DeleteTableCommand = class _DeleteTableCommand extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
+var DeleteTableCommand = class extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
   return [
     (0, import_middleware_serde.getSerdePlugin)(config, this.serialize, this.deserialize),
     (0, import_middleware_endpoint.getEndpointPlugin)(config, Command.getEndpointParameterInstructions())
   ];
 }).s("DynamoDB_20120810", "DeleteTable", {}).n("DynamoDBClient", "DeleteTableCommand").f(void 0, void 0).ser(se_DeleteTableCommand).de(de_DeleteTableCommand).build() {
+  static {
+    __name(this, "DeleteTableCommand");
+  }
 };
-__name(_DeleteTableCommand, "DeleteTableCommand");
-var DeleteTableCommand = _DeleteTableCommand;
 
 // src/commands/DescribeBackupCommand.ts
 
 
 
-var _DescribeBackupCommand = class _DescribeBackupCommand extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
+var DescribeBackupCommand = class extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
   return [
     (0, import_middleware_serde.getSerdePlugin)(config, this.serialize, this.deserialize),
     (0, import_middleware_endpoint.getEndpointPlugin)(config, Command.getEndpointParameterInstructions())
   ];
 }).s("DynamoDB_20120810", "DescribeBackup", {}).n("DynamoDBClient", "DescribeBackupCommand").f(void 0, void 0).ser(se_DescribeBackupCommand).de(de_DescribeBackupCommand).build() {
+  static {
+    __name(this, "DescribeBackupCommand");
+  }
 };
-__name(_DescribeBackupCommand, "DescribeBackupCommand");
-var DescribeBackupCommand = _DescribeBackupCommand;
 
 // src/commands/DescribeContinuousBackupsCommand.ts
 
 
 
-var _DescribeContinuousBackupsCommand = class _DescribeContinuousBackupsCommand extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
+var DescribeContinuousBackupsCommand = class extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
   return [
     (0, import_middleware_serde.getSerdePlugin)(config, this.serialize, this.deserialize),
     (0, import_middleware_endpoint.getEndpointPlugin)(config, Command.getEndpointParameterInstructions())
   ];
 }).s("DynamoDB_20120810", "DescribeContinuousBackups", {}).n("DynamoDBClient", "DescribeContinuousBackupsCommand").f(void 0, void 0).ser(se_DescribeContinuousBackupsCommand).de(de_DescribeContinuousBackupsCommand).build() {
+  static {
+    __name(this, "DescribeContinuousBackupsCommand");
+  }
 };
-__name(_DescribeContinuousBackupsCommand, "DescribeContinuousBackupsCommand");
-var DescribeContinuousBackupsCommand = _DescribeContinuousBackupsCommand;
 
 // src/commands/DescribeContributorInsightsCommand.ts
 
 
 
-var _DescribeContributorInsightsCommand = class _DescribeContributorInsightsCommand extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
+var DescribeContributorInsightsCommand = class extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
   return [
     (0, import_middleware_serde.getSerdePlugin)(config, this.serialize, this.deserialize),
     (0, import_middleware_endpoint.getEndpointPlugin)(config, Command.getEndpointParameterInstructions())
   ];
 }).s("DynamoDB_20120810", "DescribeContributorInsights", {}).n("DynamoDBClient", "DescribeContributorInsightsCommand").f(void 0, void 0).ser(se_DescribeContributorInsightsCommand).de(de_DescribeContributorInsightsCommand).build() {
+  static {
+    __name(this, "DescribeContributorInsightsCommand");
+  }
 };
-__name(_DescribeContributorInsightsCommand, "DescribeContributorInsightsCommand");
-var DescribeContributorInsightsCommand = _DescribeContributorInsightsCommand;
 
 // src/commands/DescribeExportCommand.ts
 
 
 
-var _DescribeExportCommand = class _DescribeExportCommand extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
+var DescribeExportCommand = class extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
   return [
     (0, import_middleware_serde.getSerdePlugin)(config, this.serialize, this.deserialize),
     (0, import_middleware_endpoint.getEndpointPlugin)(config, Command.getEndpointParameterInstructions())
   ];
 }).s("DynamoDB_20120810", "DescribeExport", {}).n("DynamoDBClient", "DescribeExportCommand").f(void 0, void 0).ser(se_DescribeExportCommand).de(de_DescribeExportCommand).build() {
+  static {
+    __name(this, "DescribeExportCommand");
+  }
 };
-__name(_DescribeExportCommand, "DescribeExportCommand");
-var DescribeExportCommand = _DescribeExportCommand;
 
 // src/commands/DescribeGlobalTableCommand.ts
 
 
 
-var _DescribeGlobalTableCommand = class _DescribeGlobalTableCommand extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
+var DescribeGlobalTableCommand = class extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
   return [
     (0, import_middleware_serde.getSerdePlugin)(config, this.serialize, this.deserialize),
     (0, import_middleware_endpoint.getEndpointPlugin)(config, Command.getEndpointParameterInstructions())
   ];
 }).s("DynamoDB_20120810", "DescribeGlobalTable", {}).n("DynamoDBClient", "DescribeGlobalTableCommand").f(void 0, void 0).ser(se_DescribeGlobalTableCommand).de(de_DescribeGlobalTableCommand).build() {
+  static {
+    __name(this, "DescribeGlobalTableCommand");
+  }
 };
-__name(_DescribeGlobalTableCommand, "DescribeGlobalTableCommand");
-var DescribeGlobalTableCommand = _DescribeGlobalTableCommand;
 
 // src/commands/DescribeGlobalTableSettingsCommand.ts
 
 
 
-var _DescribeGlobalTableSettingsCommand = class _DescribeGlobalTableSettingsCommand extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
+var DescribeGlobalTableSettingsCommand = class extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
   return [
     (0, import_middleware_serde.getSerdePlugin)(config, this.serialize, this.deserialize),
     (0, import_middleware_endpoint.getEndpointPlugin)(config, Command.getEndpointParameterInstructions())
   ];
 }).s("DynamoDB_20120810", "DescribeGlobalTableSettings", {}).n("DynamoDBClient", "DescribeGlobalTableSettingsCommand").f(void 0, void 0).ser(se_DescribeGlobalTableSettingsCommand).de(de_DescribeGlobalTableSettingsCommand).build() {
+  static {
+    __name(this, "DescribeGlobalTableSettingsCommand");
+  }
 };
-__name(_DescribeGlobalTableSettingsCommand, "DescribeGlobalTableSettingsCommand");
-var DescribeGlobalTableSettingsCommand = _DescribeGlobalTableSettingsCommand;
 
 // src/commands/DescribeImportCommand.ts
 
 
 
-var _DescribeImportCommand = class _DescribeImportCommand extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
+var DescribeImportCommand = class extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
   return [
     (0, import_middleware_serde.getSerdePlugin)(config, this.serialize, this.deserialize),
     (0, import_middleware_endpoint.getEndpointPlugin)(config, Command.getEndpointParameterInstructions())
   ];
 }).s("DynamoDB_20120810", "DescribeImport", {}).n("DynamoDBClient", "DescribeImportCommand").f(void 0, void 0).ser(se_DescribeImportCommand).de(de_DescribeImportCommand).build() {
+  static {
+    __name(this, "DescribeImportCommand");
+  }
 };
-__name(_DescribeImportCommand, "DescribeImportCommand");
-var DescribeImportCommand = _DescribeImportCommand;
 
 // src/commands/DescribeKinesisStreamingDestinationCommand.ts
 
 
 
-var _DescribeKinesisStreamingDestinationCommand = class _DescribeKinesisStreamingDestinationCommand extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
+var DescribeKinesisStreamingDestinationCommand = class extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
   return [
     (0, import_middleware_serde.getSerdePlugin)(config, this.serialize, this.deserialize),
     (0, import_middleware_endpoint.getEndpointPlugin)(config, Command.getEndpointParameterInstructions())
   ];
 }).s("DynamoDB_20120810", "DescribeKinesisStreamingDestination", {}).n("DynamoDBClient", "DescribeKinesisStreamingDestinationCommand").f(void 0, void 0).ser(se_DescribeKinesisStreamingDestinationCommand).de(de_DescribeKinesisStreamingDestinationCommand).build() {
+  static {
+    __name(this, "DescribeKinesisStreamingDestinationCommand");
+  }
 };
-__name(_DescribeKinesisStreamingDestinationCommand, "DescribeKinesisStreamingDestinationCommand");
-var DescribeKinesisStreamingDestinationCommand = _DescribeKinesisStreamingDestinationCommand;
 
 // src/commands/DescribeLimitsCommand.ts
 
 
 
-var _DescribeLimitsCommand = class _DescribeLimitsCommand extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
+var DescribeLimitsCommand = class extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
   return [
     (0, import_middleware_serde.getSerdePlugin)(config, this.serialize, this.deserialize),
     (0, import_middleware_endpoint.getEndpointPlugin)(config, Command.getEndpointParameterInstructions())
   ];
 }).s("DynamoDB_20120810", "DescribeLimits", {}).n("DynamoDBClient", "DescribeLimitsCommand").f(void 0, void 0).ser(se_DescribeLimitsCommand).de(de_DescribeLimitsCommand).build() {
+  static {
+    __name(this, "DescribeLimitsCommand");
+  }
 };
-__name(_DescribeLimitsCommand, "DescribeLimitsCommand");
-var DescribeLimitsCommand = _DescribeLimitsCommand;
 
 // src/commands/DescribeTableCommand.ts
 
 
 
-var _DescribeTableCommand = class _DescribeTableCommand extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
+var DescribeTableCommand = class extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
   return [
     (0, import_middleware_serde.getSerdePlugin)(config, this.serialize, this.deserialize),
     (0, import_middleware_endpoint.getEndpointPlugin)(config, Command.getEndpointParameterInstructions())
   ];
 }).s("DynamoDB_20120810", "DescribeTable", {}).n("DynamoDBClient", "DescribeTableCommand").f(void 0, void 0).ser(se_DescribeTableCommand).de(de_DescribeTableCommand).build() {
+  static {
+    __name(this, "DescribeTableCommand");
+  }
 };
-__name(_DescribeTableCommand, "DescribeTableCommand");
-var DescribeTableCommand = _DescribeTableCommand;
 
 // src/commands/DescribeTableReplicaAutoScalingCommand.ts
 
 
 
-var _DescribeTableReplicaAutoScalingCommand = class _DescribeTableReplicaAutoScalingCommand extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
+var DescribeTableReplicaAutoScalingCommand = class extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
   return [
     (0, import_middleware_serde.getSerdePlugin)(config, this.serialize, this.deserialize),
     (0, import_middleware_endpoint.getEndpointPlugin)(config, Command.getEndpointParameterInstructions())
   ];
 }).s("DynamoDB_20120810", "DescribeTableReplicaAutoScaling", {}).n("DynamoDBClient", "DescribeTableReplicaAutoScalingCommand").f(void 0, void 0).ser(se_DescribeTableReplicaAutoScalingCommand).de(de_DescribeTableReplicaAutoScalingCommand).build() {
+  static {
+    __name(this, "DescribeTableReplicaAutoScalingCommand");
+  }
 };
-__name(_DescribeTableReplicaAutoScalingCommand, "DescribeTableReplicaAutoScalingCommand");
-var DescribeTableReplicaAutoScalingCommand = _DescribeTableReplicaAutoScalingCommand;
 
 // src/commands/DescribeTimeToLiveCommand.ts
 
 
 
-var _DescribeTimeToLiveCommand = class _DescribeTimeToLiveCommand extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
+var DescribeTimeToLiveCommand = class extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
   return [
     (0, import_middleware_serde.getSerdePlugin)(config, this.serialize, this.deserialize),
     (0, import_middleware_endpoint.getEndpointPlugin)(config, Command.getEndpointParameterInstructions())
   ];
 }).s("DynamoDB_20120810", "DescribeTimeToLive", {}).n("DynamoDBClient", "DescribeTimeToLiveCommand").f(void 0, void 0).ser(se_DescribeTimeToLiveCommand).de(de_DescribeTimeToLiveCommand).build() {
+  static {
+    __name(this, "DescribeTimeToLiveCommand");
+  }
 };
-__name(_DescribeTimeToLiveCommand, "DescribeTimeToLiveCommand");
-var DescribeTimeToLiveCommand = _DescribeTimeToLiveCommand;
 
 // src/commands/DisableKinesisStreamingDestinationCommand.ts
 
 
 
-var _DisableKinesisStreamingDestinationCommand = class _DisableKinesisStreamingDestinationCommand extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
+var DisableKinesisStreamingDestinationCommand = class extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
   return [
     (0, import_middleware_serde.getSerdePlugin)(config, this.serialize, this.deserialize),
     (0, import_middleware_endpoint.getEndpointPlugin)(config, Command.getEndpointParameterInstructions())
   ];
 }).s("DynamoDB_20120810", "DisableKinesisStreamingDestination", {}).n("DynamoDBClient", "DisableKinesisStreamingDestinationCommand").f(void 0, void 0).ser(se_DisableKinesisStreamingDestinationCommand).de(de_DisableKinesisStreamingDestinationCommand).build() {
+  static {
+    __name(this, "DisableKinesisStreamingDestinationCommand");
+  }
 };
-__name(_DisableKinesisStreamingDestinationCommand, "DisableKinesisStreamingDestinationCommand");
-var DisableKinesisStreamingDestinationCommand = _DisableKinesisStreamingDestinationCommand;
 
 // src/commands/EnableKinesisStreamingDestinationCommand.ts
 
 
 
-var _EnableKinesisStreamingDestinationCommand = class _EnableKinesisStreamingDestinationCommand extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
+var EnableKinesisStreamingDestinationCommand = class extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
   return [
     (0, import_middleware_serde.getSerdePlugin)(config, this.serialize, this.deserialize),
     (0, import_middleware_endpoint.getEndpointPlugin)(config, Command.getEndpointParameterInstructions())
   ];
 }).s("DynamoDB_20120810", "EnableKinesisStreamingDestination", {}).n("DynamoDBClient", "EnableKinesisStreamingDestinationCommand").f(void 0, void 0).ser(se_EnableKinesisStreamingDestinationCommand).de(de_EnableKinesisStreamingDestinationCommand).build() {
+  static {
+    __name(this, "EnableKinesisStreamingDestinationCommand");
+  }
 };
-__name(_EnableKinesisStreamingDestinationCommand, "EnableKinesisStreamingDestinationCommand");
-var EnableKinesisStreamingDestinationCommand = _EnableKinesisStreamingDestinationCommand;
 
 // src/commands/ExecuteStatementCommand.ts
 
 
 
-var _ExecuteStatementCommand = class _ExecuteStatementCommand extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
+var ExecuteStatementCommand = class extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
   return [
     (0, import_middleware_serde.getSerdePlugin)(config, this.serialize, this.deserialize),
     (0, import_middleware_endpoint.getEndpointPlugin)(config, Command.getEndpointParameterInstructions())
   ];
 }).s("DynamoDB_20120810", "ExecuteStatement", {}).n("DynamoDBClient", "ExecuteStatementCommand").f(void 0, void 0).ser(se_ExecuteStatementCommand).de(de_ExecuteStatementCommand).build() {
+  static {
+    __name(this, "ExecuteStatementCommand");
+  }
 };
-__name(_ExecuteStatementCommand, "ExecuteStatementCommand");
-var ExecuteStatementCommand = _ExecuteStatementCommand;
 
 // src/commands/ExecuteTransactionCommand.ts
 
 
 
-var _ExecuteTransactionCommand = class _ExecuteTransactionCommand extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
+var ExecuteTransactionCommand = class extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
   return [
     (0, import_middleware_serde.getSerdePlugin)(config, this.serialize, this.deserialize),
     (0, import_middleware_endpoint.getEndpointPlugin)(config, Command.getEndpointParameterInstructions())
   ];
 }).s("DynamoDB_20120810", "ExecuteTransaction", {}).n("DynamoDBClient", "ExecuteTransactionCommand").f(void 0, void 0).ser(se_ExecuteTransactionCommand).de(de_ExecuteTransactionCommand).build() {
+  static {
+    __name(this, "ExecuteTransactionCommand");
+  }
 };
-__name(_ExecuteTransactionCommand, "ExecuteTransactionCommand");
-var ExecuteTransactionCommand = _ExecuteTransactionCommand;
 
 // src/commands/ExportTableToPointInTimeCommand.ts
 
 
 
-var _ExportTableToPointInTimeCommand = class _ExportTableToPointInTimeCommand extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
+var ExportTableToPointInTimeCommand = class extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
   return [
     (0, import_middleware_serde.getSerdePlugin)(config, this.serialize, this.deserialize),
     (0, import_middleware_endpoint.getEndpointPlugin)(config, Command.getEndpointParameterInstructions())
   ];
 }).s("DynamoDB_20120810", "ExportTableToPointInTime", {}).n("DynamoDBClient", "ExportTableToPointInTimeCommand").f(void 0, void 0).ser(se_ExportTableToPointInTimeCommand).de(de_ExportTableToPointInTimeCommand).build() {
+  static {
+    __name(this, "ExportTableToPointInTimeCommand");
+  }
 };
-__name(_ExportTableToPointInTimeCommand, "ExportTableToPointInTimeCommand");
-var ExportTableToPointInTimeCommand = _ExportTableToPointInTimeCommand;
 
 // src/commands/GetItemCommand.ts
 
 
 
-var _GetItemCommand = class _GetItemCommand extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
+var GetItemCommand = class extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
   return [
     (0, import_middleware_serde.getSerdePlugin)(config, this.serialize, this.deserialize),
     (0, import_middleware_endpoint.getEndpointPlugin)(config, Command.getEndpointParameterInstructions())
   ];
 }).s("DynamoDB_20120810", "GetItem", {}).n("DynamoDBClient", "GetItemCommand").f(void 0, void 0).ser(se_GetItemCommand).de(de_GetItemCommand).build() {
+  static {
+    __name(this, "GetItemCommand");
+  }
 };
-__name(_GetItemCommand, "GetItemCommand");
-var GetItemCommand = _GetItemCommand;
 
 // src/commands/GetResourcePolicyCommand.ts
 
 
 
-var _GetResourcePolicyCommand = class _GetResourcePolicyCommand extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
+var GetResourcePolicyCommand = class extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
   return [
     (0, import_middleware_serde.getSerdePlugin)(config, this.serialize, this.deserialize),
     (0, import_middleware_endpoint.getEndpointPlugin)(config, Command.getEndpointParameterInstructions())
   ];
 }).s("DynamoDB_20120810", "GetResourcePolicy", {}).n("DynamoDBClient", "GetResourcePolicyCommand").f(void 0, void 0).ser(se_GetResourcePolicyCommand).de(de_GetResourcePolicyCommand).build() {
+  static {
+    __name(this, "GetResourcePolicyCommand");
+  }
 };
-__name(_GetResourcePolicyCommand, "GetResourcePolicyCommand");
-var GetResourcePolicyCommand = _GetResourcePolicyCommand;
 
 // src/commands/ImportTableCommand.ts
 
 
 
-var _ImportTableCommand = class _ImportTableCommand extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
+var ImportTableCommand = class extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
   return [
     (0, import_middleware_serde.getSerdePlugin)(config, this.serialize, this.deserialize),
     (0, import_middleware_endpoint.getEndpointPlugin)(config, Command.getEndpointParameterInstructions())
   ];
 }).s("DynamoDB_20120810", "ImportTable", {}).n("DynamoDBClient", "ImportTableCommand").f(void 0, void 0).ser(se_ImportTableCommand).de(de_ImportTableCommand).build() {
+  static {
+    __name(this, "ImportTableCommand");
+  }
 };
-__name(_ImportTableCommand, "ImportTableCommand");
-var ImportTableCommand = _ImportTableCommand;
 
 // src/commands/ListBackupsCommand.ts
 
 
 
-var _ListBackupsCommand = class _ListBackupsCommand extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
+var ListBackupsCommand = class extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
   return [
     (0, import_middleware_serde.getSerdePlugin)(config, this.serialize, this.deserialize),
     (0, import_middleware_endpoint.getEndpointPlugin)(config, Command.getEndpointParameterInstructions())
   ];
 }).s("DynamoDB_20120810", "ListBackups", {}).n("DynamoDBClient", "ListBackupsCommand").f(void 0, void 0).ser(se_ListBackupsCommand).de(de_ListBackupsCommand).build() {
+  static {
+    __name(this, "ListBackupsCommand");
+  }
 };
-__name(_ListBackupsCommand, "ListBackupsCommand");
-var ListBackupsCommand = _ListBackupsCommand;
 
 // src/commands/ListContributorInsightsCommand.ts
 
 
 
-var _ListContributorInsightsCommand = class _ListContributorInsightsCommand extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
+var ListContributorInsightsCommand = class extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
   return [
     (0, import_middleware_serde.getSerdePlugin)(config, this.serialize, this.deserialize),
     (0, import_middleware_endpoint.getEndpointPlugin)(config, Command.getEndpointParameterInstructions())
   ];
 }).s("DynamoDB_20120810", "ListContributorInsights", {}).n("DynamoDBClient", "ListContributorInsightsCommand").f(void 0, void 0).ser(se_ListContributorInsightsCommand).de(de_ListContributorInsightsCommand).build() {
+  static {
+    __name(this, "ListContributorInsightsCommand");
+  }
 };
-__name(_ListContributorInsightsCommand, "ListContributorInsightsCommand");
-var ListContributorInsightsCommand = _ListContributorInsightsCommand;
 
 // src/commands/ListExportsCommand.ts
 
 
 
-var _ListExportsCommand = class _ListExportsCommand extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
+var ListExportsCommand = class extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
   return [
     (0, import_middleware_serde.getSerdePlugin)(config, this.serialize, this.deserialize),
     (0, import_middleware_endpoint.getEndpointPlugin)(config, Command.getEndpointParameterInstructions())
   ];
 }).s("DynamoDB_20120810", "ListExports", {}).n("DynamoDBClient", "ListExportsCommand").f(void 0, void 0).ser(se_ListExportsCommand).de(de_ListExportsCommand).build() {
+  static {
+    __name(this, "ListExportsCommand");
+  }
 };
-__name(_ListExportsCommand, "ListExportsCommand");
-var ListExportsCommand = _ListExportsCommand;
 
 // src/commands/ListGlobalTablesCommand.ts
 
 
 
-var _ListGlobalTablesCommand = class _ListGlobalTablesCommand extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
+var ListGlobalTablesCommand = class extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
   return [
     (0, import_middleware_serde.getSerdePlugin)(config, this.serialize, this.deserialize),
     (0, import_middleware_endpoint.getEndpointPlugin)(config, Command.getEndpointParameterInstructions())
   ];
 }).s("DynamoDB_20120810", "ListGlobalTables", {}).n("DynamoDBClient", "ListGlobalTablesCommand").f(void 0, void 0).ser(se_ListGlobalTablesCommand).de(de_ListGlobalTablesCommand).build() {
+  static {
+    __name(this, "ListGlobalTablesCommand");
+  }
 };
-__name(_ListGlobalTablesCommand, "ListGlobalTablesCommand");
-var ListGlobalTablesCommand = _ListGlobalTablesCommand;
 
 // src/commands/ListImportsCommand.ts
 
 
 
-var _ListImportsCommand = class _ListImportsCommand extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
+var ListImportsCommand = class extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
   return [
     (0, import_middleware_serde.getSerdePlugin)(config, this.serialize, this.deserialize),
     (0, import_middleware_endpoint.getEndpointPlugin)(config, Command.getEndpointParameterInstructions())
   ];
 }).s("DynamoDB_20120810", "ListImports", {}).n("DynamoDBClient", "ListImportsCommand").f(void 0, void 0).ser(se_ListImportsCommand).de(de_ListImportsCommand).build() {
+  static {
+    __name(this, "ListImportsCommand");
+  }
 };
-__name(_ListImportsCommand, "ListImportsCommand");
-var ListImportsCommand = _ListImportsCommand;
 
 // src/commands/ListTablesCommand.ts
 
 
 
-var _ListTablesCommand = class _ListTablesCommand extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
+var ListTablesCommand = class extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
   return [
     (0, import_middleware_serde.getSerdePlugin)(config, this.serialize, this.deserialize),
     (0, import_middleware_endpoint.getEndpointPlugin)(config, Command.getEndpointParameterInstructions())
   ];
 }).s("DynamoDB_20120810", "ListTables", {}).n("DynamoDBClient", "ListTablesCommand").f(void 0, void 0).ser(se_ListTablesCommand).de(de_ListTablesCommand).build() {
+  static {
+    __name(this, "ListTablesCommand");
+  }
 };
-__name(_ListTablesCommand, "ListTablesCommand");
-var ListTablesCommand = _ListTablesCommand;
 
 // src/commands/ListTagsOfResourceCommand.ts
 
 
 
-var _ListTagsOfResourceCommand = class _ListTagsOfResourceCommand extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
+var ListTagsOfResourceCommand = class extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
   return [
     (0, import_middleware_serde.getSerdePlugin)(config, this.serialize, this.deserialize),
     (0, import_middleware_endpoint.getEndpointPlugin)(config, Command.getEndpointParameterInstructions())
   ];
 }).s("DynamoDB_20120810", "ListTagsOfResource", {}).n("DynamoDBClient", "ListTagsOfResourceCommand").f(void 0, void 0).ser(se_ListTagsOfResourceCommand).de(de_ListTagsOfResourceCommand).build() {
+  static {
+    __name(this, "ListTagsOfResourceCommand");
+  }
 };
-__name(_ListTagsOfResourceCommand, "ListTagsOfResourceCommand");
-var ListTagsOfResourceCommand = _ListTagsOfResourceCommand;
 
 // src/commands/PutItemCommand.ts
 
 
 
-var _PutItemCommand = class _PutItemCommand extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
+var PutItemCommand = class extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
   return [
     (0, import_middleware_serde.getSerdePlugin)(config, this.serialize, this.deserialize),
     (0, import_middleware_endpoint.getEndpointPlugin)(config, Command.getEndpointParameterInstructions())
   ];
 }).s("DynamoDB_20120810", "PutItem", {}).n("DynamoDBClient", "PutItemCommand").f(void 0, void 0).ser(se_PutItemCommand).de(de_PutItemCommand).build() {
+  static {
+    __name(this, "PutItemCommand");
+  }
 };
-__name(_PutItemCommand, "PutItemCommand");
-var PutItemCommand = _PutItemCommand;
 
 // src/commands/PutResourcePolicyCommand.ts
 
 
 
-var _PutResourcePolicyCommand = class _PutResourcePolicyCommand extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
+var PutResourcePolicyCommand = class extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
   return [
     (0, import_middleware_serde.getSerdePlugin)(config, this.serialize, this.deserialize),
     (0, import_middleware_endpoint.getEndpointPlugin)(config, Command.getEndpointParameterInstructions())
   ];
 }).s("DynamoDB_20120810", "PutResourcePolicy", {}).n("DynamoDBClient", "PutResourcePolicyCommand").f(void 0, void 0).ser(se_PutResourcePolicyCommand).de(de_PutResourcePolicyCommand).build() {
+  static {
+    __name(this, "PutResourcePolicyCommand");
+  }
 };
-__name(_PutResourcePolicyCommand, "PutResourcePolicyCommand");
-var PutResourcePolicyCommand = _PutResourcePolicyCommand;
 
 // src/commands/QueryCommand.ts
 
 
 
-var _QueryCommand = class _QueryCommand extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
+var QueryCommand = class extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
   return [
     (0, import_middleware_serde.getSerdePlugin)(config, this.serialize, this.deserialize),
     (0, import_middleware_endpoint.getEndpointPlugin)(config, Command.getEndpointParameterInstructions())
   ];
 }).s("DynamoDB_20120810", "Query", {}).n("DynamoDBClient", "QueryCommand").f(void 0, void 0).ser(se_QueryCommand).de(de_QueryCommand).build() {
+  static {
+    __name(this, "QueryCommand");
+  }
 };
-__name(_QueryCommand, "QueryCommand");
-var QueryCommand = _QueryCommand;
 
 // src/commands/RestoreTableFromBackupCommand.ts
 
 
 
-var _RestoreTableFromBackupCommand = class _RestoreTableFromBackupCommand extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
+var RestoreTableFromBackupCommand = class extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
   return [
     (0, import_middleware_serde.getSerdePlugin)(config, this.serialize, this.deserialize),
     (0, import_middleware_endpoint.getEndpointPlugin)(config, Command.getEndpointParameterInstructions())
   ];
 }).s("DynamoDB_20120810", "RestoreTableFromBackup", {}).n("DynamoDBClient", "RestoreTableFromBackupCommand").f(void 0, void 0).ser(se_RestoreTableFromBackupCommand).de(de_RestoreTableFromBackupCommand).build() {
+  static {
+    __name(this, "RestoreTableFromBackupCommand");
+  }
 };
-__name(_RestoreTableFromBackupCommand, "RestoreTableFromBackupCommand");
-var RestoreTableFromBackupCommand = _RestoreTableFromBackupCommand;
 
 // src/commands/RestoreTableToPointInTimeCommand.ts
 
 
 
-var _RestoreTableToPointInTimeCommand = class _RestoreTableToPointInTimeCommand extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
+var RestoreTableToPointInTimeCommand = class extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
   return [
     (0, import_middleware_serde.getSerdePlugin)(config, this.serialize, this.deserialize),
     (0, import_middleware_endpoint.getEndpointPlugin)(config, Command.getEndpointParameterInstructions())
   ];
 }).s("DynamoDB_20120810", "RestoreTableToPointInTime", {}).n("DynamoDBClient", "RestoreTableToPointInTimeCommand").f(void 0, void 0).ser(se_RestoreTableToPointInTimeCommand).de(de_RestoreTableToPointInTimeCommand).build() {
+  static {
+    __name(this, "RestoreTableToPointInTimeCommand");
+  }
 };
-__name(_RestoreTableToPointInTimeCommand, "RestoreTableToPointInTimeCommand");
-var RestoreTableToPointInTimeCommand = _RestoreTableToPointInTimeCommand;
 
 // src/commands/ScanCommand.ts
 
 
 
-var _ScanCommand = class _ScanCommand extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
+var ScanCommand = class extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
   return [
     (0, import_middleware_serde.getSerdePlugin)(config, this.serialize, this.deserialize),
     (0, import_middleware_endpoint.getEndpointPlugin)(config, Command.getEndpointParameterInstructions())
   ];
 }).s("DynamoDB_20120810", "Scan", {}).n("DynamoDBClient", "ScanCommand").f(void 0, void 0).ser(se_ScanCommand).de(de_ScanCommand).build() {
+  static {
+    __name(this, "ScanCommand");
+  }
 };
-__name(_ScanCommand, "ScanCommand");
-var ScanCommand = _ScanCommand;
 
 // src/commands/TagResourceCommand.ts
 
 
 
-var _TagResourceCommand = class _TagResourceCommand extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
+var TagResourceCommand = class extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
   return [
     (0, import_middleware_serde.getSerdePlugin)(config, this.serialize, this.deserialize),
     (0, import_middleware_endpoint.getEndpointPlugin)(config, Command.getEndpointParameterInstructions())
   ];
 }).s("DynamoDB_20120810", "TagResource", {}).n("DynamoDBClient", "TagResourceCommand").f(void 0, void 0).ser(se_TagResourceCommand).de(de_TagResourceCommand).build() {
+  static {
+    __name(this, "TagResourceCommand");
+  }
 };
-__name(_TagResourceCommand, "TagResourceCommand");
-var TagResourceCommand = _TagResourceCommand;
 
 // src/commands/TransactGetItemsCommand.ts
 
 
 
-var _TransactGetItemsCommand = class _TransactGetItemsCommand extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
+var TransactGetItemsCommand = class extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
   return [
     (0, import_middleware_serde.getSerdePlugin)(config, this.serialize, this.deserialize),
     (0, import_middleware_endpoint.getEndpointPlugin)(config, Command.getEndpointParameterInstructions())
   ];
 }).s("DynamoDB_20120810", "TransactGetItems", {}).n("DynamoDBClient", "TransactGetItemsCommand").f(void 0, void 0).ser(se_TransactGetItemsCommand).de(de_TransactGetItemsCommand).build() {
+  static {
+    __name(this, "TransactGetItemsCommand");
+  }
 };
-__name(_TransactGetItemsCommand, "TransactGetItemsCommand");
-var TransactGetItemsCommand = _TransactGetItemsCommand;
 
 // src/commands/TransactWriteItemsCommand.ts
 
 
 
-var _TransactWriteItemsCommand = class _TransactWriteItemsCommand extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
+var TransactWriteItemsCommand = class extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
   return [
     (0, import_middleware_serde.getSerdePlugin)(config, this.serialize, this.deserialize),
     (0, import_middleware_endpoint.getEndpointPlugin)(config, Command.getEndpointParameterInstructions())
   ];
 }).s("DynamoDB_20120810", "TransactWriteItems", {}).n("DynamoDBClient", "TransactWriteItemsCommand").f(void 0, void 0).ser(se_TransactWriteItemsCommand).de(de_TransactWriteItemsCommand).build() {
+  static {
+    __name(this, "TransactWriteItemsCommand");
+  }
 };
-__name(_TransactWriteItemsCommand, "TransactWriteItemsCommand");
-var TransactWriteItemsCommand = _TransactWriteItemsCommand;
 
 // src/commands/UntagResourceCommand.ts
 
 
 
-var _UntagResourceCommand = class _UntagResourceCommand extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
+var UntagResourceCommand = class extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
   return [
     (0, import_middleware_serde.getSerdePlugin)(config, this.serialize, this.deserialize),
     (0, import_middleware_endpoint.getEndpointPlugin)(config, Command.getEndpointParameterInstructions())
   ];
 }).s("DynamoDB_20120810", "UntagResource", {}).n("DynamoDBClient", "UntagResourceCommand").f(void 0, void 0).ser(se_UntagResourceCommand).de(de_UntagResourceCommand).build() {
+  static {
+    __name(this, "UntagResourceCommand");
+  }
 };
-__name(_UntagResourceCommand, "UntagResourceCommand");
-var UntagResourceCommand = _UntagResourceCommand;
 
 // src/commands/UpdateContinuousBackupsCommand.ts
 
 
 
-var _UpdateContinuousBackupsCommand = class _UpdateContinuousBackupsCommand extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
+var UpdateContinuousBackupsCommand = class extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
   return [
     (0, import_middleware_serde.getSerdePlugin)(config, this.serialize, this.deserialize),
     (0, import_middleware_endpoint.getEndpointPlugin)(config, Command.getEndpointParameterInstructions())
   ];
 }).s("DynamoDB_20120810", "UpdateContinuousBackups", {}).n("DynamoDBClient", "UpdateContinuousBackupsCommand").f(void 0, void 0).ser(se_UpdateContinuousBackupsCommand).de(de_UpdateContinuousBackupsCommand).build() {
+  static {
+    __name(this, "UpdateContinuousBackupsCommand");
+  }
 };
-__name(_UpdateContinuousBackupsCommand, "UpdateContinuousBackupsCommand");
-var UpdateContinuousBackupsCommand = _UpdateContinuousBackupsCommand;
 
 // src/commands/UpdateContributorInsightsCommand.ts
 
 
 
-var _UpdateContributorInsightsCommand = class _UpdateContributorInsightsCommand extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
+var UpdateContributorInsightsCommand = class extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
   return [
     (0, import_middleware_serde.getSerdePlugin)(config, this.serialize, this.deserialize),
     (0, import_middleware_endpoint.getEndpointPlugin)(config, Command.getEndpointParameterInstructions())
   ];
 }).s("DynamoDB_20120810", "UpdateContributorInsights", {}).n("DynamoDBClient", "UpdateContributorInsightsCommand").f(void 0, void 0).ser(se_UpdateContributorInsightsCommand).de(de_UpdateContributorInsightsCommand).build() {
+  static {
+    __name(this, "UpdateContributorInsightsCommand");
+  }
 };
-__name(_UpdateContributorInsightsCommand, "UpdateContributorInsightsCommand");
-var UpdateContributorInsightsCommand = _UpdateContributorInsightsCommand;
 
 // src/commands/UpdateGlobalTableCommand.ts
 
 
 
-var _UpdateGlobalTableCommand = class _UpdateGlobalTableCommand extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
+var UpdateGlobalTableCommand = class extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
   return [
     (0, import_middleware_serde.getSerdePlugin)(config, this.serialize, this.deserialize),
     (0, import_middleware_endpoint.getEndpointPlugin)(config, Command.getEndpointParameterInstructions())
   ];
 }).s("DynamoDB_20120810", "UpdateGlobalTable", {}).n("DynamoDBClient", "UpdateGlobalTableCommand").f(void 0, void 0).ser(se_UpdateGlobalTableCommand).de(de_UpdateGlobalTableCommand).build() {
+  static {
+    __name(this, "UpdateGlobalTableCommand");
+  }
 };
-__name(_UpdateGlobalTableCommand, "UpdateGlobalTableCommand");
-var UpdateGlobalTableCommand = _UpdateGlobalTableCommand;
 
 // src/commands/UpdateGlobalTableSettingsCommand.ts
 
 
 
-var _UpdateGlobalTableSettingsCommand = class _UpdateGlobalTableSettingsCommand extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
+var UpdateGlobalTableSettingsCommand = class extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
   return [
     (0, import_middleware_serde.getSerdePlugin)(config, this.serialize, this.deserialize),
     (0, import_middleware_endpoint.getEndpointPlugin)(config, Command.getEndpointParameterInstructions())
   ];
 }).s("DynamoDB_20120810", "UpdateGlobalTableSettings", {}).n("DynamoDBClient", "UpdateGlobalTableSettingsCommand").f(void 0, void 0).ser(se_UpdateGlobalTableSettingsCommand).de(de_UpdateGlobalTableSettingsCommand).build() {
+  static {
+    __name(this, "UpdateGlobalTableSettingsCommand");
+  }
 };
-__name(_UpdateGlobalTableSettingsCommand, "UpdateGlobalTableSettingsCommand");
-var UpdateGlobalTableSettingsCommand = _UpdateGlobalTableSettingsCommand;
 
 // src/commands/UpdateItemCommand.ts
 
 
 
-var _UpdateItemCommand = class _UpdateItemCommand extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
+var UpdateItemCommand = class extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
   return [
     (0, import_middleware_serde.getSerdePlugin)(config, this.serialize, this.deserialize),
     (0, import_middleware_endpoint.getEndpointPlugin)(config, Command.getEndpointParameterInstructions())
   ];
 }).s("DynamoDB_20120810", "UpdateItem", {}).n("DynamoDBClient", "UpdateItemCommand").f(void 0, void 0).ser(se_UpdateItemCommand).de(de_UpdateItemCommand).build() {
+  static {
+    __name(this, "UpdateItemCommand");
+  }
 };
-__name(_UpdateItemCommand, "UpdateItemCommand");
-var UpdateItemCommand = _UpdateItemCommand;
 
 // src/commands/UpdateKinesisStreamingDestinationCommand.ts
 
 
 
-var _UpdateKinesisStreamingDestinationCommand = class _UpdateKinesisStreamingDestinationCommand extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
+var UpdateKinesisStreamingDestinationCommand = class extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
   return [
     (0, import_middleware_serde.getSerdePlugin)(config, this.serialize, this.deserialize),
     (0, import_middleware_endpoint.getEndpointPlugin)(config, Command.getEndpointParameterInstructions())
   ];
 }).s("DynamoDB_20120810", "UpdateKinesisStreamingDestination", {}).n("DynamoDBClient", "UpdateKinesisStreamingDestinationCommand").f(void 0, void 0).ser(se_UpdateKinesisStreamingDestinationCommand).de(de_UpdateKinesisStreamingDestinationCommand).build() {
+  static {
+    __name(this, "UpdateKinesisStreamingDestinationCommand");
+  }
 };
-__name(_UpdateKinesisStreamingDestinationCommand, "UpdateKinesisStreamingDestinationCommand");
-var UpdateKinesisStreamingDestinationCommand = _UpdateKinesisStreamingDestinationCommand;
 
 // src/commands/UpdateTableCommand.ts
 
 
 
-var _UpdateTableCommand = class _UpdateTableCommand extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
+var UpdateTableCommand = class extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
   return [
     (0, import_middleware_serde.getSerdePlugin)(config, this.serialize, this.deserialize),
     (0, import_middleware_endpoint.getEndpointPlugin)(config, Command.getEndpointParameterInstructions())
   ];
 }).s("DynamoDB_20120810", "UpdateTable", {}).n("DynamoDBClient", "UpdateTableCommand").f(void 0, void 0).ser(se_UpdateTableCommand).de(de_UpdateTableCommand).build() {
+  static {
+    __name(this, "UpdateTableCommand");
+  }
 };
-__name(_UpdateTableCommand, "UpdateTableCommand");
-var UpdateTableCommand = _UpdateTableCommand;
 
 // src/commands/UpdateTableReplicaAutoScalingCommand.ts
 
 
 
-var _UpdateTableReplicaAutoScalingCommand = class _UpdateTableReplicaAutoScalingCommand extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
+var UpdateTableReplicaAutoScalingCommand = class extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
   return [
     (0, import_middleware_serde.getSerdePlugin)(config, this.serialize, this.deserialize),
     (0, import_middleware_endpoint.getEndpointPlugin)(config, Command.getEndpointParameterInstructions())
   ];
 }).s("DynamoDB_20120810", "UpdateTableReplicaAutoScaling", {}).n("DynamoDBClient", "UpdateTableReplicaAutoScalingCommand").f(void 0, void 0).ser(se_UpdateTableReplicaAutoScalingCommand).de(de_UpdateTableReplicaAutoScalingCommand).build() {
+  static {
+    __name(this, "UpdateTableReplicaAutoScalingCommand");
+  }
 };
-__name(_UpdateTableReplicaAutoScalingCommand, "UpdateTableReplicaAutoScalingCommand");
-var UpdateTableReplicaAutoScalingCommand = _UpdateTableReplicaAutoScalingCommand;
 
 // src/commands/UpdateTimeToLiveCommand.ts
 
 
 
-var _UpdateTimeToLiveCommand = class _UpdateTimeToLiveCommand extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
+var UpdateTimeToLiveCommand = class extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
   return [
     (0, import_middleware_serde.getSerdePlugin)(config, this.serialize, this.deserialize),
     (0, import_middleware_endpoint.getEndpointPlugin)(config, Command.getEndpointParameterInstructions())
   ];
 }).s("DynamoDB_20120810", "UpdateTimeToLive", {}).n("DynamoDBClient", "UpdateTimeToLiveCommand").f(void 0, void 0).ser(se_UpdateTimeToLiveCommand).de(de_UpdateTimeToLiveCommand).build() {
+  static {
+    __name(this, "UpdateTimeToLiveCommand");
+  }
 };
-__name(_UpdateTimeToLiveCommand, "UpdateTimeToLiveCommand");
-var UpdateTimeToLiveCommand = _UpdateTimeToLiveCommand;
 
 // src/DynamoDB.ts
 var commands = {
@@ -8354,10 +8466,11 @@ var commands = {
   UpdateTableReplicaAutoScalingCommand,
   UpdateTimeToLiveCommand
 };
-var _DynamoDB = class _DynamoDB extends DynamoDBClient {
+var DynamoDB = class extends DynamoDBClient {
+  static {
+    __name(this, "DynamoDB");
+  }
 };
-__name(_DynamoDB, "DynamoDB");
-var DynamoDB = _DynamoDB;
 (0, import_smithy_client.createAggregatedClient)(commands, DynamoDB);
 
 // src/pagination/ListContributorInsightsPaginator.ts
@@ -8823,7 +8936,14 @@ var resolveRuntimeExtensions = /* @__PURE__ */ __name((runtimeConfig, extensions
 }, "resolveRuntimeExtensions");
 
 // src/SSOOIDCClient.ts
-var _SSOOIDCClient = class _SSOOIDCClient extends import_smithy_client.Client {
+var SSOOIDCClient = class extends import_smithy_client.Client {
+  static {
+    __name(this, "SSOOIDCClient");
+  }
+  /**
+   * The resolved configuration of SSOOIDCClient class. This is resolved and normalized from the {@link SSOOIDCClientConfig | constructor configuration interface}.
+   */
+  config;
   constructor(...[configuration]) {
     const _config_0 = (0, import_runtimeConfig.getRuntimeConfig)(configuration || {});
     const _config_1 = resolveClientEndpointParameters(_config_0);
@@ -8833,7 +8953,7 @@ var _SSOOIDCClient = class _SSOOIDCClient extends import_smithy_client.Client {
     const _config_5 = (0, import_middleware_host_header.resolveHostHeaderConfig)(_config_4);
     const _config_6 = (0, import_middleware_endpoint.resolveEndpointConfig)(_config_5);
     const _config_7 = (0, import_httpAuthSchemeProvider.resolveHttpAuthSchemeConfig)(_config_6);
-    const _config_8 = resolveRuntimeExtensions(_config_7, (configuration == null ? void 0 : configuration.extensions) || []);
+    const _config_8 = resolveRuntimeExtensions(_config_7, configuration?.extensions || []);
     super(_config_8);
     this.config = _config_8;
     this.middlewareStack.use((0, import_middleware_user_agent.getUserAgentPlugin)(this.config));
@@ -8861,8 +8981,6 @@ var _SSOOIDCClient = class _SSOOIDCClient extends import_smithy_client.Client {
     super.destroy();
   }
 };
-__name(_SSOOIDCClient, "SSOOIDCClient");
-var SSOOIDCClient = _SSOOIDCClient;
 
 // src/SSOOIDC.ts
 
@@ -8877,7 +8995,10 @@ var import_middleware_serde = __nccwpck_require__(1787);
 
 // src/models/SSOOIDCServiceException.ts
 
-var _SSOOIDCServiceException = class _SSOOIDCServiceException extends import_smithy_client.ServiceException {
+var SSOOIDCServiceException = class _SSOOIDCServiceException extends import_smithy_client.ServiceException {
+  static {
+    __name(this, "SSOOIDCServiceException");
+  }
   /**
    * @internal
    */
@@ -8886,11 +9007,26 @@ var _SSOOIDCServiceException = class _SSOOIDCServiceException extends import_smi
     Object.setPrototypeOf(this, _SSOOIDCServiceException.prototype);
   }
 };
-__name(_SSOOIDCServiceException, "SSOOIDCServiceException");
-var SSOOIDCServiceException = _SSOOIDCServiceException;
 
 // src/models/models_0.ts
-var _AccessDeniedException = class _AccessDeniedException extends SSOOIDCServiceException {
+var AccessDeniedException = class _AccessDeniedException extends SSOOIDCServiceException {
+  static {
+    __name(this, "AccessDeniedException");
+  }
+  name = "AccessDeniedException";
+  $fault = "client";
+  /**
+   * <p>Single error code.
+   *       For this exception the value will be <code>access_denied</code>.</p>
+   * @public
+   */
+  error;
+  /**
+   * <p>Human-readable text providing additional information, used to assist the
+   *       client developer in understanding the error that occurred.</p>
+   * @public
+   */
+  error_description;
   /**
    * @internal
    */
@@ -8900,16 +9036,29 @@ var _AccessDeniedException = class _AccessDeniedException extends SSOOIDCService
       $fault: "client",
       ...opts
     });
-    this.name = "AccessDeniedException";
-    this.$fault = "client";
     Object.setPrototypeOf(this, _AccessDeniedException.prototype);
     this.error = opts.error;
     this.error_description = opts.error_description;
   }
 };
-__name(_AccessDeniedException, "AccessDeniedException");
-var AccessDeniedException = _AccessDeniedException;
-var _AuthorizationPendingException = class _AuthorizationPendingException extends SSOOIDCServiceException {
+var AuthorizationPendingException = class _AuthorizationPendingException extends SSOOIDCServiceException {
+  static {
+    __name(this, "AuthorizationPendingException");
+  }
+  name = "AuthorizationPendingException";
+  $fault = "client";
+  /**
+   * <p>Single error code.
+   *       For this exception the value will be <code>authorization_pending</code>.</p>
+   * @public
+   */
+  error;
+  /**
+   * <p>Human-readable text providing additional information, used to assist the
+   *       client developer in understanding the error that occurred.</p>
+   * @public
+   */
+  error_description;
   /**
    * @internal
    */
@@ -8919,16 +9068,29 @@ var _AuthorizationPendingException = class _AuthorizationPendingException extend
       $fault: "client",
       ...opts
     });
-    this.name = "AuthorizationPendingException";
-    this.$fault = "client";
     Object.setPrototypeOf(this, _AuthorizationPendingException.prototype);
     this.error = opts.error;
     this.error_description = opts.error_description;
   }
 };
-__name(_AuthorizationPendingException, "AuthorizationPendingException");
-var AuthorizationPendingException = _AuthorizationPendingException;
-var _ExpiredTokenException = class _ExpiredTokenException extends SSOOIDCServiceException {
+var ExpiredTokenException = class _ExpiredTokenException extends SSOOIDCServiceException {
+  static {
+    __name(this, "ExpiredTokenException");
+  }
+  name = "ExpiredTokenException";
+  $fault = "client";
+  /**
+   * <p>Single error code.
+   *       For this exception the value will be <code>expired_token</code>.</p>
+   * @public
+   */
+  error;
+  /**
+   * <p>Human-readable text providing additional information, used to assist the
+   *       client developer in understanding the error that occurred.</p>
+   * @public
+   */
+  error_description;
   /**
    * @internal
    */
@@ -8938,16 +9100,29 @@ var _ExpiredTokenException = class _ExpiredTokenException extends SSOOIDCService
       $fault: "client",
       ...opts
     });
-    this.name = "ExpiredTokenException";
-    this.$fault = "client";
     Object.setPrototypeOf(this, _ExpiredTokenException.prototype);
     this.error = opts.error;
     this.error_description = opts.error_description;
   }
 };
-__name(_ExpiredTokenException, "ExpiredTokenException");
-var ExpiredTokenException = _ExpiredTokenException;
-var _InternalServerException = class _InternalServerException extends SSOOIDCServiceException {
+var InternalServerException = class _InternalServerException extends SSOOIDCServiceException {
+  static {
+    __name(this, "InternalServerException");
+  }
+  name = "InternalServerException";
+  $fault = "server";
+  /**
+   * <p>Single error code.
+   *       For this exception the value will be <code>server_error</code>.</p>
+   * @public
+   */
+  error;
+  /**
+   * <p>Human-readable text providing additional information, used to assist the
+   *       client developer in understanding the error that occurred.</p>
+   * @public
+   */
+  error_description;
   /**
    * @internal
    */
@@ -8957,16 +9132,29 @@ var _InternalServerException = class _InternalServerException extends SSOOIDCSer
       $fault: "server",
       ...opts
     });
-    this.name = "InternalServerException";
-    this.$fault = "server";
     Object.setPrototypeOf(this, _InternalServerException.prototype);
     this.error = opts.error;
     this.error_description = opts.error_description;
   }
 };
-__name(_InternalServerException, "InternalServerException");
-var InternalServerException = _InternalServerException;
-var _InvalidClientException = class _InvalidClientException extends SSOOIDCServiceException {
+var InvalidClientException = class _InvalidClientException extends SSOOIDCServiceException {
+  static {
+    __name(this, "InvalidClientException");
+  }
+  name = "InvalidClientException";
+  $fault = "client";
+  /**
+   * <p>Single error code.
+   *       For this exception the value will be <code>invalid_client</code>.</p>
+   * @public
+   */
+  error;
+  /**
+   * <p>Human-readable text providing additional information, used to assist the
+   *       client developer in understanding the error that occurred.</p>
+   * @public
+   */
+  error_description;
   /**
    * @internal
    */
@@ -8976,16 +9164,29 @@ var _InvalidClientException = class _InvalidClientException extends SSOOIDCServi
       $fault: "client",
       ...opts
     });
-    this.name = "InvalidClientException";
-    this.$fault = "client";
     Object.setPrototypeOf(this, _InvalidClientException.prototype);
     this.error = opts.error;
     this.error_description = opts.error_description;
   }
 };
-__name(_InvalidClientException, "InvalidClientException");
-var InvalidClientException = _InvalidClientException;
-var _InvalidGrantException = class _InvalidGrantException extends SSOOIDCServiceException {
+var InvalidGrantException = class _InvalidGrantException extends SSOOIDCServiceException {
+  static {
+    __name(this, "InvalidGrantException");
+  }
+  name = "InvalidGrantException";
+  $fault = "client";
+  /**
+   * <p>Single error code.
+   *       For this exception the value will be <code>invalid_grant</code>.</p>
+   * @public
+   */
+  error;
+  /**
+   * <p>Human-readable text providing additional information, used to assist the
+   *       client developer in understanding the error that occurred.</p>
+   * @public
+   */
+  error_description;
   /**
    * @internal
    */
@@ -8995,16 +9196,29 @@ var _InvalidGrantException = class _InvalidGrantException extends SSOOIDCService
       $fault: "client",
       ...opts
     });
-    this.name = "InvalidGrantException";
-    this.$fault = "client";
     Object.setPrototypeOf(this, _InvalidGrantException.prototype);
     this.error = opts.error;
     this.error_description = opts.error_description;
   }
 };
-__name(_InvalidGrantException, "InvalidGrantException");
-var InvalidGrantException = _InvalidGrantException;
-var _InvalidRequestException = class _InvalidRequestException extends SSOOIDCServiceException {
+var InvalidRequestException = class _InvalidRequestException extends SSOOIDCServiceException {
+  static {
+    __name(this, "InvalidRequestException");
+  }
+  name = "InvalidRequestException";
+  $fault = "client";
+  /**
+   * <p>Single error code.
+   *       For this exception the value will be <code>invalid_request</code>.</p>
+   * @public
+   */
+  error;
+  /**
+   * <p>Human-readable text providing additional information, used to assist the
+   *       client developer in understanding the error that occurred.</p>
+   * @public
+   */
+  error_description;
   /**
    * @internal
    */
@@ -9014,16 +9228,29 @@ var _InvalidRequestException = class _InvalidRequestException extends SSOOIDCSer
       $fault: "client",
       ...opts
     });
-    this.name = "InvalidRequestException";
-    this.$fault = "client";
     Object.setPrototypeOf(this, _InvalidRequestException.prototype);
     this.error = opts.error;
     this.error_description = opts.error_description;
   }
 };
-__name(_InvalidRequestException, "InvalidRequestException");
-var InvalidRequestException = _InvalidRequestException;
-var _InvalidScopeException = class _InvalidScopeException extends SSOOIDCServiceException {
+var InvalidScopeException = class _InvalidScopeException extends SSOOIDCServiceException {
+  static {
+    __name(this, "InvalidScopeException");
+  }
+  name = "InvalidScopeException";
+  $fault = "client";
+  /**
+   * <p>Single error code.
+   *       For this exception the value will be <code>invalid_scope</code>.</p>
+   * @public
+   */
+  error;
+  /**
+   * <p>Human-readable text providing additional information, used to assist the
+   *       client developer in understanding the error that occurred.</p>
+   * @public
+   */
+  error_description;
   /**
    * @internal
    */
@@ -9033,16 +9260,29 @@ var _InvalidScopeException = class _InvalidScopeException extends SSOOIDCService
       $fault: "client",
       ...opts
     });
-    this.name = "InvalidScopeException";
-    this.$fault = "client";
     Object.setPrototypeOf(this, _InvalidScopeException.prototype);
     this.error = opts.error;
     this.error_description = opts.error_description;
   }
 };
-__name(_InvalidScopeException, "InvalidScopeException");
-var InvalidScopeException = _InvalidScopeException;
-var _SlowDownException = class _SlowDownException extends SSOOIDCServiceException {
+var SlowDownException = class _SlowDownException extends SSOOIDCServiceException {
+  static {
+    __name(this, "SlowDownException");
+  }
+  name = "SlowDownException";
+  $fault = "client";
+  /**
+   * <p>Single error code.
+   *       For this exception the value will be <code>slow_down</code>.</p>
+   * @public
+   */
+  error;
+  /**
+   * <p>Human-readable text providing additional information, used to assist the
+   *       client developer in understanding the error that occurred.</p>
+   * @public
+   */
+  error_description;
   /**
    * @internal
    */
@@ -9052,16 +9292,29 @@ var _SlowDownException = class _SlowDownException extends SSOOIDCServiceExceptio
       $fault: "client",
       ...opts
     });
-    this.name = "SlowDownException";
-    this.$fault = "client";
     Object.setPrototypeOf(this, _SlowDownException.prototype);
     this.error = opts.error;
     this.error_description = opts.error_description;
   }
 };
-__name(_SlowDownException, "SlowDownException");
-var SlowDownException = _SlowDownException;
-var _UnauthorizedClientException = class _UnauthorizedClientException extends SSOOIDCServiceException {
+var UnauthorizedClientException = class _UnauthorizedClientException extends SSOOIDCServiceException {
+  static {
+    __name(this, "UnauthorizedClientException");
+  }
+  name = "UnauthorizedClientException";
+  $fault = "client";
+  /**
+   * <p>Single error code.
+   *       For this exception the value will be <code>unauthorized_client</code>.</p>
+   * @public
+   */
+  error;
+  /**
+   * <p>Human-readable text providing additional information, used to assist the
+   *       client developer in understanding the error that occurred.</p>
+   * @public
+   */
+  error_description;
   /**
    * @internal
    */
@@ -9071,16 +9324,29 @@ var _UnauthorizedClientException = class _UnauthorizedClientException extends SS
       $fault: "client",
       ...opts
     });
-    this.name = "UnauthorizedClientException";
-    this.$fault = "client";
     Object.setPrototypeOf(this, _UnauthorizedClientException.prototype);
     this.error = opts.error;
     this.error_description = opts.error_description;
   }
 };
-__name(_UnauthorizedClientException, "UnauthorizedClientException");
-var UnauthorizedClientException = _UnauthorizedClientException;
-var _UnsupportedGrantTypeException = class _UnsupportedGrantTypeException extends SSOOIDCServiceException {
+var UnsupportedGrantTypeException = class _UnsupportedGrantTypeException extends SSOOIDCServiceException {
+  static {
+    __name(this, "UnsupportedGrantTypeException");
+  }
+  name = "UnsupportedGrantTypeException";
+  $fault = "client";
+  /**
+   * <p>Single error code.
+   *       For this exception the value will be <code>unsupported_grant_type</code>.</p>
+   * @public
+   */
+  error;
+  /**
+   * <p>Human-readable text providing additional information, used to assist the
+   *       client developer in understanding the error that occurred.</p>
+   * @public
+   */
+  error_description;
   /**
    * @internal
    */
@@ -9090,16 +9356,39 @@ var _UnsupportedGrantTypeException = class _UnsupportedGrantTypeException extend
       $fault: "client",
       ...opts
     });
-    this.name = "UnsupportedGrantTypeException";
-    this.$fault = "client";
     Object.setPrototypeOf(this, _UnsupportedGrantTypeException.prototype);
     this.error = opts.error;
     this.error_description = opts.error_description;
   }
 };
-__name(_UnsupportedGrantTypeException, "UnsupportedGrantTypeException");
-var UnsupportedGrantTypeException = _UnsupportedGrantTypeException;
-var _InvalidRequestRegionException = class _InvalidRequestRegionException extends SSOOIDCServiceException {
+var InvalidRequestRegionException = class _InvalidRequestRegionException extends SSOOIDCServiceException {
+  static {
+    __name(this, "InvalidRequestRegionException");
+  }
+  name = "InvalidRequestRegionException";
+  $fault = "client";
+  /**
+   * <p>Single error code.
+   *       For this exception the value will be <code>invalid_request</code>.</p>
+   * @public
+   */
+  error;
+  /**
+   * <p>Human-readable text providing additional information, used to assist the
+   *       client developer in understanding the error that occurred.</p>
+   * @public
+   */
+  error_description;
+  /**
+   * <p>Indicates the IAM Identity Center endpoint which the requester may call with this token.</p>
+   * @public
+   */
+  endpoint;
+  /**
+   * <p>Indicates the region which the requester may call with this token.</p>
+   * @public
+   */
+  region;
   /**
    * @internal
    */
@@ -9109,8 +9398,6 @@ var _InvalidRequestRegionException = class _InvalidRequestRegionException extend
       $fault: "client",
       ...opts
     });
-    this.name = "InvalidRequestRegionException";
-    this.$fault = "client";
     Object.setPrototypeOf(this, _InvalidRequestRegionException.prototype);
     this.error = opts.error;
     this.error_description = opts.error_description;
@@ -9118,9 +9405,24 @@ var _InvalidRequestRegionException = class _InvalidRequestRegionException extend
     this.region = opts.region;
   }
 };
-__name(_InvalidRequestRegionException, "InvalidRequestRegionException");
-var InvalidRequestRegionException = _InvalidRequestRegionException;
-var _InvalidClientMetadataException = class _InvalidClientMetadataException extends SSOOIDCServiceException {
+var InvalidClientMetadataException = class _InvalidClientMetadataException extends SSOOIDCServiceException {
+  static {
+    __name(this, "InvalidClientMetadataException");
+  }
+  name = "InvalidClientMetadataException";
+  $fault = "client";
+  /**
+   * <p>Single error code.
+   *       For this exception the value will be <code>invalid_client_metadata</code>.</p>
+   * @public
+   */
+  error;
+  /**
+   * <p>Human-readable text providing additional information, used to assist the
+   *       client developer in understanding the error that occurred.</p>
+   * @public
+   */
+  error_description;
   /**
    * @internal
    */
@@ -9130,16 +9432,29 @@ var _InvalidClientMetadataException = class _InvalidClientMetadataException exte
       $fault: "client",
       ...opts
     });
-    this.name = "InvalidClientMetadataException";
-    this.$fault = "client";
     Object.setPrototypeOf(this, _InvalidClientMetadataException.prototype);
     this.error = opts.error;
     this.error_description = opts.error_description;
   }
 };
-__name(_InvalidClientMetadataException, "InvalidClientMetadataException");
-var InvalidClientMetadataException = _InvalidClientMetadataException;
-var _InvalidRedirectUriException = class _InvalidRedirectUriException extends SSOOIDCServiceException {
+var InvalidRedirectUriException = class _InvalidRedirectUriException extends SSOOIDCServiceException {
+  static {
+    __name(this, "InvalidRedirectUriException");
+  }
+  name = "InvalidRedirectUriException";
+  $fault = "client";
+  /**
+   * <p>Single error code.
+   *       For this exception the value will be <code>invalid_redirect_uri</code>.</p>
+   * @public
+   */
+  error;
+  /**
+   * <p>Human-readable text providing additional information, used to assist the
+   *       client developer in understanding the error that occurred.</p>
+   * @public
+   */
+  error_description;
   /**
    * @internal
    */
@@ -9149,15 +9464,11 @@ var _InvalidRedirectUriException = class _InvalidRedirectUriException extends SS
       $fault: "client",
       ...opts
     });
-    this.name = "InvalidRedirectUriException";
-    this.$fault = "client";
     Object.setPrototypeOf(this, _InvalidRedirectUriException.prototype);
     this.error = opts.error;
     this.error_description = opts.error_description;
   }
 };
-__name(_InvalidRedirectUriException, "InvalidRedirectUriException");
-var InvalidRedirectUriException = _InvalidRedirectUriException;
 var CreateTokenRequestFilterSensitiveLog = /* @__PURE__ */ __name((obj) => ({
   ...obj,
   ...obj.clientSecret && { clientSecret: import_smithy_client.SENSITIVE_STRING },
@@ -9627,57 +9938,61 @@ var deserializeMetadata = /* @__PURE__ */ __name((output) => ({
 var _ai = "aws_iam";
 
 // src/commands/CreateTokenCommand.ts
-var _CreateTokenCommand = class _CreateTokenCommand extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
+var CreateTokenCommand = class extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
   return [
     (0, import_middleware_serde.getSerdePlugin)(config, this.serialize, this.deserialize),
     (0, import_middleware_endpoint.getEndpointPlugin)(config, Command.getEndpointParameterInstructions())
   ];
 }).s("AWSSSOOIDCService", "CreateToken", {}).n("SSOOIDCClient", "CreateTokenCommand").f(CreateTokenRequestFilterSensitiveLog, CreateTokenResponseFilterSensitiveLog).ser(se_CreateTokenCommand).de(de_CreateTokenCommand).build() {
+  static {
+    __name(this, "CreateTokenCommand");
+  }
 };
-__name(_CreateTokenCommand, "CreateTokenCommand");
-var CreateTokenCommand = _CreateTokenCommand;
 
 // src/commands/CreateTokenWithIAMCommand.ts
 
 
 
-var _CreateTokenWithIAMCommand = class _CreateTokenWithIAMCommand extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
+var CreateTokenWithIAMCommand = class extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
   return [
     (0, import_middleware_serde.getSerdePlugin)(config, this.serialize, this.deserialize),
     (0, import_middleware_endpoint.getEndpointPlugin)(config, Command.getEndpointParameterInstructions())
   ];
 }).s("AWSSSOOIDCService", "CreateTokenWithIAM", {}).n("SSOOIDCClient", "CreateTokenWithIAMCommand").f(CreateTokenWithIAMRequestFilterSensitiveLog, CreateTokenWithIAMResponseFilterSensitiveLog).ser(se_CreateTokenWithIAMCommand).de(de_CreateTokenWithIAMCommand).build() {
+  static {
+    __name(this, "CreateTokenWithIAMCommand");
+  }
 };
-__name(_CreateTokenWithIAMCommand, "CreateTokenWithIAMCommand");
-var CreateTokenWithIAMCommand = _CreateTokenWithIAMCommand;
 
 // src/commands/RegisterClientCommand.ts
 
 
 
-var _RegisterClientCommand = class _RegisterClientCommand extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
+var RegisterClientCommand = class extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
   return [
     (0, import_middleware_serde.getSerdePlugin)(config, this.serialize, this.deserialize),
     (0, import_middleware_endpoint.getEndpointPlugin)(config, Command.getEndpointParameterInstructions())
   ];
 }).s("AWSSSOOIDCService", "RegisterClient", {}).n("SSOOIDCClient", "RegisterClientCommand").f(void 0, RegisterClientResponseFilterSensitiveLog).ser(se_RegisterClientCommand).de(de_RegisterClientCommand).build() {
+  static {
+    __name(this, "RegisterClientCommand");
+  }
 };
-__name(_RegisterClientCommand, "RegisterClientCommand");
-var RegisterClientCommand = _RegisterClientCommand;
 
 // src/commands/StartDeviceAuthorizationCommand.ts
 
 
 
-var _StartDeviceAuthorizationCommand = class _StartDeviceAuthorizationCommand extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
+var StartDeviceAuthorizationCommand = class extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
   return [
     (0, import_middleware_serde.getSerdePlugin)(config, this.serialize, this.deserialize),
     (0, import_middleware_endpoint.getEndpointPlugin)(config, Command.getEndpointParameterInstructions())
   ];
 }).s("AWSSSOOIDCService", "StartDeviceAuthorization", {}).n("SSOOIDCClient", "StartDeviceAuthorizationCommand").f(StartDeviceAuthorizationRequestFilterSensitiveLog, void 0).ser(se_StartDeviceAuthorizationCommand).de(de_StartDeviceAuthorizationCommand).build() {
+  static {
+    __name(this, "StartDeviceAuthorizationCommand");
+  }
 };
-__name(_StartDeviceAuthorizationCommand, "StartDeviceAuthorizationCommand");
-var StartDeviceAuthorizationCommand = _StartDeviceAuthorizationCommand;
 
 // src/SSOOIDC.ts
 var commands = {
@@ -9686,10 +10001,11 @@ var commands = {
   RegisterClientCommand,
   StartDeviceAuthorizationCommand
 };
-var _SSOOIDC = class _SSOOIDC extends SSOOIDCClient {
+var SSOOIDC = class extends SSOOIDCClient {
+  static {
+    __name(this, "SSOOIDC");
+  }
 };
-__name(_SSOOIDC, "SSOOIDC");
-var SSOOIDC = _SSOOIDC;
 (0, import_smithy_client.createAggregatedClient)(commands, SSOOIDC);
 // Annotate the CommonJS export names for ESM import in node:
 
@@ -10070,7 +10386,14 @@ var resolveRuntimeExtensions = /* @__PURE__ */ __name((runtimeConfig, extensions
 }, "resolveRuntimeExtensions");
 
 // src/SSOClient.ts
-var _SSOClient = class _SSOClient extends import_smithy_client.Client {
+var SSOClient = class extends import_smithy_client.Client {
+  static {
+    __name(this, "SSOClient");
+  }
+  /**
+   * The resolved configuration of SSOClient class. This is resolved and normalized from the {@link SSOClientConfig | constructor configuration interface}.
+   */
+  config;
   constructor(...[configuration]) {
     const _config_0 = (0, import_runtimeConfig.getRuntimeConfig)(configuration || {});
     const _config_1 = resolveClientEndpointParameters(_config_0);
@@ -10080,7 +10403,7 @@ var _SSOClient = class _SSOClient extends import_smithy_client.Client {
     const _config_5 = (0, import_middleware_host_header.resolveHostHeaderConfig)(_config_4);
     const _config_6 = (0, import_middleware_endpoint.resolveEndpointConfig)(_config_5);
     const _config_7 = (0, import_httpAuthSchemeProvider.resolveHttpAuthSchemeConfig)(_config_6);
-    const _config_8 = resolveRuntimeExtensions(_config_7, (configuration == null ? void 0 : configuration.extensions) || []);
+    const _config_8 = resolveRuntimeExtensions(_config_7, configuration?.extensions || []);
     super(_config_8);
     this.config = _config_8;
     this.middlewareStack.use((0, import_middleware_user_agent.getUserAgentPlugin)(this.config));
@@ -10108,8 +10431,6 @@ var _SSOClient = class _SSOClient extends import_smithy_client.Client {
     super.destroy();
   }
 };
-__name(_SSOClient, "SSOClient");
-var SSOClient = _SSOClient;
 
 // src/SSO.ts
 
@@ -10124,7 +10445,10 @@ var import_middleware_serde = __nccwpck_require__(1787);
 
 // src/models/SSOServiceException.ts
 
-var _SSOServiceException = class _SSOServiceException extends import_smithy_client.ServiceException {
+var SSOServiceException = class _SSOServiceException extends import_smithy_client.ServiceException {
+  static {
+    __name(this, "SSOServiceException");
+  }
   /**
    * @internal
    */
@@ -10133,11 +10457,14 @@ var _SSOServiceException = class _SSOServiceException extends import_smithy_clie
     Object.setPrototypeOf(this, _SSOServiceException.prototype);
   }
 };
-__name(_SSOServiceException, "SSOServiceException");
-var SSOServiceException = _SSOServiceException;
 
 // src/models/models_0.ts
-var _InvalidRequestException = class _InvalidRequestException extends SSOServiceException {
+var InvalidRequestException = class _InvalidRequestException extends SSOServiceException {
+  static {
+    __name(this, "InvalidRequestException");
+  }
+  name = "InvalidRequestException";
+  $fault = "client";
   /**
    * @internal
    */
@@ -10147,14 +10474,15 @@ var _InvalidRequestException = class _InvalidRequestException extends SSOService
       $fault: "client",
       ...opts
     });
-    this.name = "InvalidRequestException";
-    this.$fault = "client";
     Object.setPrototypeOf(this, _InvalidRequestException.prototype);
   }
 };
-__name(_InvalidRequestException, "InvalidRequestException");
-var InvalidRequestException = _InvalidRequestException;
-var _ResourceNotFoundException = class _ResourceNotFoundException extends SSOServiceException {
+var ResourceNotFoundException = class _ResourceNotFoundException extends SSOServiceException {
+  static {
+    __name(this, "ResourceNotFoundException");
+  }
+  name = "ResourceNotFoundException";
+  $fault = "client";
   /**
    * @internal
    */
@@ -10164,14 +10492,15 @@ var _ResourceNotFoundException = class _ResourceNotFoundException extends SSOSer
       $fault: "client",
       ...opts
     });
-    this.name = "ResourceNotFoundException";
-    this.$fault = "client";
     Object.setPrototypeOf(this, _ResourceNotFoundException.prototype);
   }
 };
-__name(_ResourceNotFoundException, "ResourceNotFoundException");
-var ResourceNotFoundException = _ResourceNotFoundException;
-var _TooManyRequestsException = class _TooManyRequestsException extends SSOServiceException {
+var TooManyRequestsException = class _TooManyRequestsException extends SSOServiceException {
+  static {
+    __name(this, "TooManyRequestsException");
+  }
+  name = "TooManyRequestsException";
+  $fault = "client";
   /**
    * @internal
    */
@@ -10181,14 +10510,15 @@ var _TooManyRequestsException = class _TooManyRequestsException extends SSOServi
       $fault: "client",
       ...opts
     });
-    this.name = "TooManyRequestsException";
-    this.$fault = "client";
     Object.setPrototypeOf(this, _TooManyRequestsException.prototype);
   }
 };
-__name(_TooManyRequestsException, "TooManyRequestsException");
-var TooManyRequestsException = _TooManyRequestsException;
-var _UnauthorizedException = class _UnauthorizedException extends SSOServiceException {
+var UnauthorizedException = class _UnauthorizedException extends SSOServiceException {
+  static {
+    __name(this, "UnauthorizedException");
+  }
+  name = "UnauthorizedException";
+  $fault = "client";
   /**
    * @internal
    */
@@ -10198,13 +10528,9 @@ var _UnauthorizedException = class _UnauthorizedException extends SSOServiceExce
       $fault: "client",
       ...opts
     });
-    this.name = "UnauthorizedException";
-    this.$fault = "client";
     Object.setPrototypeOf(this, _UnauthorizedException.prototype);
   }
 };
-__name(_UnauthorizedException, "UnauthorizedException");
-var UnauthorizedException = _UnauthorizedException;
 var GetRoleCredentialsRequestFilterSensitiveLog = /* @__PURE__ */ __name((obj) => ({
   ...obj,
   ...obj.accessToken && { accessToken: import_smithy_client.SENSITIVE_STRING }
@@ -10441,57 +10767,61 @@ var _rn = "role_name";
 var _xasbt = "x-amz-sso_bearer_token";
 
 // src/commands/GetRoleCredentialsCommand.ts
-var _GetRoleCredentialsCommand = class _GetRoleCredentialsCommand extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
+var GetRoleCredentialsCommand = class extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
   return [
     (0, import_middleware_serde.getSerdePlugin)(config, this.serialize, this.deserialize),
     (0, import_middleware_endpoint.getEndpointPlugin)(config, Command.getEndpointParameterInstructions())
   ];
 }).s("SWBPortalService", "GetRoleCredentials", {}).n("SSOClient", "GetRoleCredentialsCommand").f(GetRoleCredentialsRequestFilterSensitiveLog, GetRoleCredentialsResponseFilterSensitiveLog).ser(se_GetRoleCredentialsCommand).de(de_GetRoleCredentialsCommand).build() {
+  static {
+    __name(this, "GetRoleCredentialsCommand");
+  }
 };
-__name(_GetRoleCredentialsCommand, "GetRoleCredentialsCommand");
-var GetRoleCredentialsCommand = _GetRoleCredentialsCommand;
 
 // src/commands/ListAccountRolesCommand.ts
 
 
 
-var _ListAccountRolesCommand = class _ListAccountRolesCommand extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
+var ListAccountRolesCommand = class extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
   return [
     (0, import_middleware_serde.getSerdePlugin)(config, this.serialize, this.deserialize),
     (0, import_middleware_endpoint.getEndpointPlugin)(config, Command.getEndpointParameterInstructions())
   ];
 }).s("SWBPortalService", "ListAccountRoles", {}).n("SSOClient", "ListAccountRolesCommand").f(ListAccountRolesRequestFilterSensitiveLog, void 0).ser(se_ListAccountRolesCommand).de(de_ListAccountRolesCommand).build() {
+  static {
+    __name(this, "ListAccountRolesCommand");
+  }
 };
-__name(_ListAccountRolesCommand, "ListAccountRolesCommand");
-var ListAccountRolesCommand = _ListAccountRolesCommand;
 
 // src/commands/ListAccountsCommand.ts
 
 
 
-var _ListAccountsCommand = class _ListAccountsCommand extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
+var ListAccountsCommand = class extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
   return [
     (0, import_middleware_serde.getSerdePlugin)(config, this.serialize, this.deserialize),
     (0, import_middleware_endpoint.getEndpointPlugin)(config, Command.getEndpointParameterInstructions())
   ];
 }).s("SWBPortalService", "ListAccounts", {}).n("SSOClient", "ListAccountsCommand").f(ListAccountsRequestFilterSensitiveLog, void 0).ser(se_ListAccountsCommand).de(de_ListAccountsCommand).build() {
+  static {
+    __name(this, "ListAccountsCommand");
+  }
 };
-__name(_ListAccountsCommand, "ListAccountsCommand");
-var ListAccountsCommand = _ListAccountsCommand;
 
 // src/commands/LogoutCommand.ts
 
 
 
-var _LogoutCommand = class _LogoutCommand extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
+var LogoutCommand = class extends import_smithy_client.Command.classBuilder().ep(commonParams).m(function(Command, cs, config, o) {
   return [
     (0, import_middleware_serde.getSerdePlugin)(config, this.serialize, this.deserialize),
     (0, import_middleware_endpoint.getEndpointPlugin)(config, Command.getEndpointParameterInstructions())
   ];
 }).s("SWBPortalService", "Logout", {}).n("SSOClient", "LogoutCommand").f(LogoutRequestFilterSensitiveLog, void 0).ser(se_LogoutCommand).de(de_LogoutCommand).build() {
+  static {
+    __name(this, "LogoutCommand");
+  }
 };
-__name(_LogoutCommand, "LogoutCommand");
-var LogoutCommand = _LogoutCommand;
 
 // src/SSO.ts
 var commands = {
@@ -10500,10 +10830,11 @@ var commands = {
   ListAccountsCommand,
   LogoutCommand
 };
-var _SSO = class _SSO extends SSOClient {
+var SSO = class extends SSOClient {
+  static {
+    __name(this, "SSO");
+  }
 };
-__name(_SSO, "SSO");
-var SSO = _SSO;
 (0, import_smithy_client.createAggregatedClient)(commands, SSO);
 
 // src/pagination/ListAccountRolesPaginator.ts
@@ -10650,6 +10981,7 @@ const EndpointParameters_1 = __nccwpck_require__(3932);
 const runtimeConfig_1 = __nccwpck_require__(7117);
 const runtimeExtensions_1 = __nccwpck_require__(5297);
 class STSClient extends smithy_client_1.Client {
+    config;
     constructor(...[configuration]) {
         const _config_0 = (0, runtimeConfig_1.getRuntimeConfig)(configuration || {});
         const _config_1 = (0, EndpointParameters_1.resolveClientEndpointParameters)(_config_0);
@@ -10958,7 +11290,10 @@ var import_EndpointParameters = __nccwpck_require__(3932);
 
 // src/models/STSServiceException.ts
 var import_smithy_client = __nccwpck_require__(8015);
-var _STSServiceException = class _STSServiceException extends import_smithy_client.ServiceException {
+var STSServiceException = class _STSServiceException extends import_smithy_client.ServiceException {
+  static {
+    __name(this, "STSServiceException");
+  }
   /**
    * @internal
    */
@@ -10967,11 +11302,14 @@ var _STSServiceException = class _STSServiceException extends import_smithy_clie
     Object.setPrototypeOf(this, _STSServiceException.prototype);
   }
 };
-__name(_STSServiceException, "STSServiceException");
-var STSServiceException = _STSServiceException;
 
 // src/models/models_0.ts
-var _ExpiredTokenException = class _ExpiredTokenException extends STSServiceException {
+var ExpiredTokenException = class _ExpiredTokenException extends STSServiceException {
+  static {
+    __name(this, "ExpiredTokenException");
+  }
+  name = "ExpiredTokenException";
+  $fault = "client";
   /**
    * @internal
    */
@@ -10981,14 +11319,15 @@ var _ExpiredTokenException = class _ExpiredTokenException extends STSServiceExce
       $fault: "client",
       ...opts
     });
-    this.name = "ExpiredTokenException";
-    this.$fault = "client";
     Object.setPrototypeOf(this, _ExpiredTokenException.prototype);
   }
 };
-__name(_ExpiredTokenException, "ExpiredTokenException");
-var ExpiredTokenException = _ExpiredTokenException;
-var _MalformedPolicyDocumentException = class _MalformedPolicyDocumentException extends STSServiceException {
+var MalformedPolicyDocumentException = class _MalformedPolicyDocumentException extends STSServiceException {
+  static {
+    __name(this, "MalformedPolicyDocumentException");
+  }
+  name = "MalformedPolicyDocumentException";
+  $fault = "client";
   /**
    * @internal
    */
@@ -10998,14 +11337,15 @@ var _MalformedPolicyDocumentException = class _MalformedPolicyDocumentException 
       $fault: "client",
       ...opts
     });
-    this.name = "MalformedPolicyDocumentException";
-    this.$fault = "client";
     Object.setPrototypeOf(this, _MalformedPolicyDocumentException.prototype);
   }
 };
-__name(_MalformedPolicyDocumentException, "MalformedPolicyDocumentException");
-var MalformedPolicyDocumentException = _MalformedPolicyDocumentException;
-var _PackedPolicyTooLargeException = class _PackedPolicyTooLargeException extends STSServiceException {
+var PackedPolicyTooLargeException = class _PackedPolicyTooLargeException extends STSServiceException {
+  static {
+    __name(this, "PackedPolicyTooLargeException");
+  }
+  name = "PackedPolicyTooLargeException";
+  $fault = "client";
   /**
    * @internal
    */
@@ -11015,14 +11355,15 @@ var _PackedPolicyTooLargeException = class _PackedPolicyTooLargeException extend
       $fault: "client",
       ...opts
     });
-    this.name = "PackedPolicyTooLargeException";
-    this.$fault = "client";
     Object.setPrototypeOf(this, _PackedPolicyTooLargeException.prototype);
   }
 };
-__name(_PackedPolicyTooLargeException, "PackedPolicyTooLargeException");
-var PackedPolicyTooLargeException = _PackedPolicyTooLargeException;
-var _RegionDisabledException = class _RegionDisabledException extends STSServiceException {
+var RegionDisabledException = class _RegionDisabledException extends STSServiceException {
+  static {
+    __name(this, "RegionDisabledException");
+  }
+  name = "RegionDisabledException";
+  $fault = "client";
   /**
    * @internal
    */
@@ -11032,14 +11373,15 @@ var _RegionDisabledException = class _RegionDisabledException extends STSService
       $fault: "client",
       ...opts
     });
-    this.name = "RegionDisabledException";
-    this.$fault = "client";
     Object.setPrototypeOf(this, _RegionDisabledException.prototype);
   }
 };
-__name(_RegionDisabledException, "RegionDisabledException");
-var RegionDisabledException = _RegionDisabledException;
-var _IDPRejectedClaimException = class _IDPRejectedClaimException extends STSServiceException {
+var IDPRejectedClaimException = class _IDPRejectedClaimException extends STSServiceException {
+  static {
+    __name(this, "IDPRejectedClaimException");
+  }
+  name = "IDPRejectedClaimException";
+  $fault = "client";
   /**
    * @internal
    */
@@ -11049,14 +11391,15 @@ var _IDPRejectedClaimException = class _IDPRejectedClaimException extends STSSer
       $fault: "client",
       ...opts
     });
-    this.name = "IDPRejectedClaimException";
-    this.$fault = "client";
     Object.setPrototypeOf(this, _IDPRejectedClaimException.prototype);
   }
 };
-__name(_IDPRejectedClaimException, "IDPRejectedClaimException");
-var IDPRejectedClaimException = _IDPRejectedClaimException;
-var _InvalidIdentityTokenException = class _InvalidIdentityTokenException extends STSServiceException {
+var InvalidIdentityTokenException = class _InvalidIdentityTokenException extends STSServiceException {
+  static {
+    __name(this, "InvalidIdentityTokenException");
+  }
+  name = "InvalidIdentityTokenException";
+  $fault = "client";
   /**
    * @internal
    */
@@ -11066,14 +11409,15 @@ var _InvalidIdentityTokenException = class _InvalidIdentityTokenException extend
       $fault: "client",
       ...opts
     });
-    this.name = "InvalidIdentityTokenException";
-    this.$fault = "client";
     Object.setPrototypeOf(this, _InvalidIdentityTokenException.prototype);
   }
 };
-__name(_InvalidIdentityTokenException, "InvalidIdentityTokenException");
-var InvalidIdentityTokenException = _InvalidIdentityTokenException;
-var _IDPCommunicationErrorException = class _IDPCommunicationErrorException extends STSServiceException {
+var IDPCommunicationErrorException = class _IDPCommunicationErrorException extends STSServiceException {
+  static {
+    __name(this, "IDPCommunicationErrorException");
+  }
+  name = "IDPCommunicationErrorException";
+  $fault = "client";
   /**
    * @internal
    */
@@ -11083,14 +11427,15 @@ var _IDPCommunicationErrorException = class _IDPCommunicationErrorException exte
       $fault: "client",
       ...opts
     });
-    this.name = "IDPCommunicationErrorException";
-    this.$fault = "client";
     Object.setPrototypeOf(this, _IDPCommunicationErrorException.prototype);
   }
 };
-__name(_IDPCommunicationErrorException, "IDPCommunicationErrorException");
-var IDPCommunicationErrorException = _IDPCommunicationErrorException;
-var _InvalidAuthorizationMessageException = class _InvalidAuthorizationMessageException extends STSServiceException {
+var InvalidAuthorizationMessageException = class _InvalidAuthorizationMessageException extends STSServiceException {
+  static {
+    __name(this, "InvalidAuthorizationMessageException");
+  }
+  name = "InvalidAuthorizationMessageException";
+  $fault = "client";
   /**
    * @internal
    */
@@ -11100,13 +11445,9 @@ var _InvalidAuthorizationMessageException = class _InvalidAuthorizationMessageEx
       $fault: "client",
       ...opts
     });
-    this.name = "InvalidAuthorizationMessageException";
-    this.$fault = "client";
     Object.setPrototypeOf(this, _InvalidAuthorizationMessageException.prototype);
   }
 };
-__name(_InvalidAuthorizationMessageException, "InvalidAuthorizationMessageException");
-var InvalidAuthorizationMessageException = _InvalidAuthorizationMessageException;
 var CredentialsFilterSensitiveLog = /* @__PURE__ */ __name((obj) => ({
   ...obj,
   ...obj.SecretAccessKey && { SecretAccessKey: import_smithy_client.SENSITIVE_STRING }
@@ -11468,7 +11809,6 @@ var de_RegionDisabledExceptionRes = /* @__PURE__ */ __name(async (parsedOutput, 
   return (0, import_smithy_client.decorateServiceException)(exception, body);
 }, "de_RegionDisabledExceptionRes");
 var se_AssumeRoleRequest = /* @__PURE__ */ __name((input, context) => {
-  var _a2, _b, _c, _d;
   const entries = {};
   if (input[_RA] != null) {
     entries[_RA] = input[_RA];
@@ -11478,7 +11818,7 @@ var se_AssumeRoleRequest = /* @__PURE__ */ __name((input, context) => {
   }
   if (input[_PA] != null) {
     const memberEntries = se_policyDescriptorListType(input[_PA], context);
-    if (((_a2 = input[_PA]) == null ? void 0 : _a2.length) === 0) {
+    if (input[_PA]?.length === 0) {
       entries.PolicyArns = [];
     }
     Object.entries(memberEntries).forEach(([key, value]) => {
@@ -11494,7 +11834,7 @@ var se_AssumeRoleRequest = /* @__PURE__ */ __name((input, context) => {
   }
   if (input[_T] != null) {
     const memberEntries = se_tagListType(input[_T], context);
-    if (((_b = input[_T]) == null ? void 0 : _b.length) === 0) {
+    if (input[_T]?.length === 0) {
       entries.Tags = [];
     }
     Object.entries(memberEntries).forEach(([key, value]) => {
@@ -11504,7 +11844,7 @@ var se_AssumeRoleRequest = /* @__PURE__ */ __name((input, context) => {
   }
   if (input[_TTK] != null) {
     const memberEntries = se_tagKeyListType(input[_TTK], context);
-    if (((_c = input[_TTK]) == null ? void 0 : _c.length) === 0) {
+    if (input[_TTK]?.length === 0) {
       entries.TransitiveTagKeys = [];
     }
     Object.entries(memberEntries).forEach(([key, value]) => {
@@ -11526,7 +11866,7 @@ var se_AssumeRoleRequest = /* @__PURE__ */ __name((input, context) => {
   }
   if (input[_PC] != null) {
     const memberEntries = se_ProvidedContextsListType(input[_PC], context);
-    if (((_d = input[_PC]) == null ? void 0 : _d.length) === 0) {
+    if (input[_PC]?.length === 0) {
       entries.ProvidedContexts = [];
     }
     Object.entries(memberEntries).forEach(([key, value]) => {
@@ -11537,7 +11877,6 @@ var se_AssumeRoleRequest = /* @__PURE__ */ __name((input, context) => {
   return entries;
 }, "se_AssumeRoleRequest");
 var se_AssumeRoleWithSAMLRequest = /* @__PURE__ */ __name((input, context) => {
-  var _a2;
   const entries = {};
   if (input[_RA] != null) {
     entries[_RA] = input[_RA];
@@ -11550,7 +11889,7 @@ var se_AssumeRoleWithSAMLRequest = /* @__PURE__ */ __name((input, context) => {
   }
   if (input[_PA] != null) {
     const memberEntries = se_policyDescriptorListType(input[_PA], context);
-    if (((_a2 = input[_PA]) == null ? void 0 : _a2.length) === 0) {
+    if (input[_PA]?.length === 0) {
       entries.PolicyArns = [];
     }
     Object.entries(memberEntries).forEach(([key, value]) => {
@@ -11567,7 +11906,6 @@ var se_AssumeRoleWithSAMLRequest = /* @__PURE__ */ __name((input, context) => {
   return entries;
 }, "se_AssumeRoleWithSAMLRequest");
 var se_AssumeRoleWithWebIdentityRequest = /* @__PURE__ */ __name((input, context) => {
-  var _a2;
   const entries = {};
   if (input[_RA] != null) {
     entries[_RA] = input[_RA];
@@ -11583,7 +11921,7 @@ var se_AssumeRoleWithWebIdentityRequest = /* @__PURE__ */ __name((input, context
   }
   if (input[_PA] != null) {
     const memberEntries = se_policyDescriptorListType(input[_PA], context);
-    if (((_a2 = input[_PA]) == null ? void 0 : _a2.length) === 0) {
+    if (input[_PA]?.length === 0) {
       entries.PolicyArns = [];
     }
     Object.entries(memberEntries).forEach(([key, value]) => {
@@ -11635,7 +11973,6 @@ var se_GetCallerIdentityRequest = /* @__PURE__ */ __name((input, context) => {
   return entries;
 }, "se_GetCallerIdentityRequest");
 var se_GetFederationTokenRequest = /* @__PURE__ */ __name((input, context) => {
-  var _a2, _b;
   const entries = {};
   if (input[_N] != null) {
     entries[_N] = input[_N];
@@ -11645,7 +11982,7 @@ var se_GetFederationTokenRequest = /* @__PURE__ */ __name((input, context) => {
   }
   if (input[_PA] != null) {
     const memberEntries = se_policyDescriptorListType(input[_PA], context);
-    if (((_a2 = input[_PA]) == null ? void 0 : _a2.length) === 0) {
+    if (input[_PA]?.length === 0) {
       entries.PolicyArns = [];
     }
     Object.entries(memberEntries).forEach(([key, value]) => {
@@ -11658,7 +11995,7 @@ var se_GetFederationTokenRequest = /* @__PURE__ */ __name((input, context) => {
   }
   if (input[_T] != null) {
     const memberEntries = se_tagListType(input[_T], context);
-    if (((_b = input[_T]) == null ? void 0 : _b.length) === 0) {
+    if (input[_T]?.length === 0) {
       entries.Tags = [];
     }
     Object.entries(memberEntries).forEach(([key, value]) => {
@@ -12075,8 +12412,7 @@ var _a = "arn";
 var _m = "message";
 var buildFormUrlencodedString = /* @__PURE__ */ __name((formEntries) => Object.entries(formEntries).map(([key, value]) => (0, import_smithy_client.extendedEncodeURIComponent)(key) + "=" + (0, import_smithy_client.extendedEncodeURIComponent)(value)).join("&"), "buildFormUrlencodedString");
 var loadQueryErrorCode = /* @__PURE__ */ __name((output, data) => {
-  var _a2;
-  if (((_a2 = data.Error) == null ? void 0 : _a2.Code) !== void 0) {
+  if (data.Error?.Code !== void 0) {
     return data.Error.Code;
   }
   if (output.statusCode == 404) {
@@ -12085,135 +12421,144 @@ var loadQueryErrorCode = /* @__PURE__ */ __name((output, data) => {
 }, "loadQueryErrorCode");
 
 // src/commands/AssumeRoleCommand.ts
-var _AssumeRoleCommand = class _AssumeRoleCommand extends import_smithy_client.Command.classBuilder().ep(import_EndpointParameters.commonParams).m(function(Command, cs, config, o) {
+var AssumeRoleCommand = class extends import_smithy_client.Command.classBuilder().ep(import_EndpointParameters.commonParams).m(function(Command, cs, config, o) {
   return [
     (0, import_middleware_serde.getSerdePlugin)(config, this.serialize, this.deserialize),
     (0, import_middleware_endpoint.getEndpointPlugin)(config, Command.getEndpointParameterInstructions())
   ];
 }).s("AWSSecurityTokenServiceV20110615", "AssumeRole", {}).n("STSClient", "AssumeRoleCommand").f(void 0, AssumeRoleResponseFilterSensitiveLog).ser(se_AssumeRoleCommand).de(de_AssumeRoleCommand).build() {
+  static {
+    __name(this, "AssumeRoleCommand");
+  }
 };
-__name(_AssumeRoleCommand, "AssumeRoleCommand");
-var AssumeRoleCommand = _AssumeRoleCommand;
 
 // src/commands/AssumeRoleWithSAMLCommand.ts
 
 
 
 var import_EndpointParameters2 = __nccwpck_require__(3932);
-var _AssumeRoleWithSAMLCommand = class _AssumeRoleWithSAMLCommand extends import_smithy_client.Command.classBuilder().ep(import_EndpointParameters2.commonParams).m(function(Command, cs, config, o) {
+var AssumeRoleWithSAMLCommand = class extends import_smithy_client.Command.classBuilder().ep(import_EndpointParameters2.commonParams).m(function(Command, cs, config, o) {
   return [
     (0, import_middleware_serde.getSerdePlugin)(config, this.serialize, this.deserialize),
     (0, import_middleware_endpoint.getEndpointPlugin)(config, Command.getEndpointParameterInstructions())
   ];
 }).s("AWSSecurityTokenServiceV20110615", "AssumeRoleWithSAML", {}).n("STSClient", "AssumeRoleWithSAMLCommand").f(AssumeRoleWithSAMLRequestFilterSensitiveLog, AssumeRoleWithSAMLResponseFilterSensitiveLog).ser(se_AssumeRoleWithSAMLCommand).de(de_AssumeRoleWithSAMLCommand).build() {
+  static {
+    __name(this, "AssumeRoleWithSAMLCommand");
+  }
 };
-__name(_AssumeRoleWithSAMLCommand, "AssumeRoleWithSAMLCommand");
-var AssumeRoleWithSAMLCommand = _AssumeRoleWithSAMLCommand;
 
 // src/commands/AssumeRoleWithWebIdentityCommand.ts
 
 
 
 var import_EndpointParameters3 = __nccwpck_require__(3932);
-var _AssumeRoleWithWebIdentityCommand = class _AssumeRoleWithWebIdentityCommand extends import_smithy_client.Command.classBuilder().ep(import_EndpointParameters3.commonParams).m(function(Command, cs, config, o) {
+var AssumeRoleWithWebIdentityCommand = class extends import_smithy_client.Command.classBuilder().ep(import_EndpointParameters3.commonParams).m(function(Command, cs, config, o) {
   return [
     (0, import_middleware_serde.getSerdePlugin)(config, this.serialize, this.deserialize),
     (0, import_middleware_endpoint.getEndpointPlugin)(config, Command.getEndpointParameterInstructions())
   ];
 }).s("AWSSecurityTokenServiceV20110615", "AssumeRoleWithWebIdentity", {}).n("STSClient", "AssumeRoleWithWebIdentityCommand").f(AssumeRoleWithWebIdentityRequestFilterSensitiveLog, AssumeRoleWithWebIdentityResponseFilterSensitiveLog).ser(se_AssumeRoleWithWebIdentityCommand).de(de_AssumeRoleWithWebIdentityCommand).build() {
+  static {
+    __name(this, "AssumeRoleWithWebIdentityCommand");
+  }
 };
-__name(_AssumeRoleWithWebIdentityCommand, "AssumeRoleWithWebIdentityCommand");
-var AssumeRoleWithWebIdentityCommand = _AssumeRoleWithWebIdentityCommand;
 
 // src/commands/AssumeRootCommand.ts
 
 
 
 var import_EndpointParameters4 = __nccwpck_require__(3932);
-var _AssumeRootCommand = class _AssumeRootCommand extends import_smithy_client.Command.classBuilder().ep(import_EndpointParameters4.commonParams).m(function(Command, cs, config, o) {
+var AssumeRootCommand = class extends import_smithy_client.Command.classBuilder().ep(import_EndpointParameters4.commonParams).m(function(Command, cs, config, o) {
   return [
     (0, import_middleware_serde.getSerdePlugin)(config, this.serialize, this.deserialize),
     (0, import_middleware_endpoint.getEndpointPlugin)(config, Command.getEndpointParameterInstructions())
   ];
 }).s("AWSSecurityTokenServiceV20110615", "AssumeRoot", {}).n("STSClient", "AssumeRootCommand").f(void 0, AssumeRootResponseFilterSensitiveLog).ser(se_AssumeRootCommand).de(de_AssumeRootCommand).build() {
+  static {
+    __name(this, "AssumeRootCommand");
+  }
 };
-__name(_AssumeRootCommand, "AssumeRootCommand");
-var AssumeRootCommand = _AssumeRootCommand;
 
 // src/commands/DecodeAuthorizationMessageCommand.ts
 
 
 
 var import_EndpointParameters5 = __nccwpck_require__(3932);
-var _DecodeAuthorizationMessageCommand = class _DecodeAuthorizationMessageCommand extends import_smithy_client.Command.classBuilder().ep(import_EndpointParameters5.commonParams).m(function(Command, cs, config, o) {
+var DecodeAuthorizationMessageCommand = class extends import_smithy_client.Command.classBuilder().ep(import_EndpointParameters5.commonParams).m(function(Command, cs, config, o) {
   return [
     (0, import_middleware_serde.getSerdePlugin)(config, this.serialize, this.deserialize),
     (0, import_middleware_endpoint.getEndpointPlugin)(config, Command.getEndpointParameterInstructions())
   ];
 }).s("AWSSecurityTokenServiceV20110615", "DecodeAuthorizationMessage", {}).n("STSClient", "DecodeAuthorizationMessageCommand").f(void 0, void 0).ser(se_DecodeAuthorizationMessageCommand).de(de_DecodeAuthorizationMessageCommand).build() {
+  static {
+    __name(this, "DecodeAuthorizationMessageCommand");
+  }
 };
-__name(_DecodeAuthorizationMessageCommand, "DecodeAuthorizationMessageCommand");
-var DecodeAuthorizationMessageCommand = _DecodeAuthorizationMessageCommand;
 
 // src/commands/GetAccessKeyInfoCommand.ts
 
 
 
 var import_EndpointParameters6 = __nccwpck_require__(3932);
-var _GetAccessKeyInfoCommand = class _GetAccessKeyInfoCommand extends import_smithy_client.Command.classBuilder().ep(import_EndpointParameters6.commonParams).m(function(Command, cs, config, o) {
+var GetAccessKeyInfoCommand = class extends import_smithy_client.Command.classBuilder().ep(import_EndpointParameters6.commonParams).m(function(Command, cs, config, o) {
   return [
     (0, import_middleware_serde.getSerdePlugin)(config, this.serialize, this.deserialize),
     (0, import_middleware_endpoint.getEndpointPlugin)(config, Command.getEndpointParameterInstructions())
   ];
 }).s("AWSSecurityTokenServiceV20110615", "GetAccessKeyInfo", {}).n("STSClient", "GetAccessKeyInfoCommand").f(void 0, void 0).ser(se_GetAccessKeyInfoCommand).de(de_GetAccessKeyInfoCommand).build() {
+  static {
+    __name(this, "GetAccessKeyInfoCommand");
+  }
 };
-__name(_GetAccessKeyInfoCommand, "GetAccessKeyInfoCommand");
-var GetAccessKeyInfoCommand = _GetAccessKeyInfoCommand;
 
 // src/commands/GetCallerIdentityCommand.ts
 
 
 
 var import_EndpointParameters7 = __nccwpck_require__(3932);
-var _GetCallerIdentityCommand = class _GetCallerIdentityCommand extends import_smithy_client.Command.classBuilder().ep(import_EndpointParameters7.commonParams).m(function(Command, cs, config, o) {
+var GetCallerIdentityCommand = class extends import_smithy_client.Command.classBuilder().ep(import_EndpointParameters7.commonParams).m(function(Command, cs, config, o) {
   return [
     (0, import_middleware_serde.getSerdePlugin)(config, this.serialize, this.deserialize),
     (0, import_middleware_endpoint.getEndpointPlugin)(config, Command.getEndpointParameterInstructions())
   ];
 }).s("AWSSecurityTokenServiceV20110615", "GetCallerIdentity", {}).n("STSClient", "GetCallerIdentityCommand").f(void 0, void 0).ser(se_GetCallerIdentityCommand).de(de_GetCallerIdentityCommand).build() {
+  static {
+    __name(this, "GetCallerIdentityCommand");
+  }
 };
-__name(_GetCallerIdentityCommand, "GetCallerIdentityCommand");
-var GetCallerIdentityCommand = _GetCallerIdentityCommand;
 
 // src/commands/GetFederationTokenCommand.ts
 
 
 
 var import_EndpointParameters8 = __nccwpck_require__(3932);
-var _GetFederationTokenCommand = class _GetFederationTokenCommand extends import_smithy_client.Command.classBuilder().ep(import_EndpointParameters8.commonParams).m(function(Command, cs, config, o) {
+var GetFederationTokenCommand = class extends import_smithy_client.Command.classBuilder().ep(import_EndpointParameters8.commonParams).m(function(Command, cs, config, o) {
   return [
     (0, import_middleware_serde.getSerdePlugin)(config, this.serialize, this.deserialize),
     (0, import_middleware_endpoint.getEndpointPlugin)(config, Command.getEndpointParameterInstructions())
   ];
 }).s("AWSSecurityTokenServiceV20110615", "GetFederationToken", {}).n("STSClient", "GetFederationTokenCommand").f(void 0, GetFederationTokenResponseFilterSensitiveLog).ser(se_GetFederationTokenCommand).de(de_GetFederationTokenCommand).build() {
+  static {
+    __name(this, "GetFederationTokenCommand");
+  }
 };
-__name(_GetFederationTokenCommand, "GetFederationTokenCommand");
-var GetFederationTokenCommand = _GetFederationTokenCommand;
 
 // src/commands/GetSessionTokenCommand.ts
 
 
 
 var import_EndpointParameters9 = __nccwpck_require__(3932);
-var _GetSessionTokenCommand = class _GetSessionTokenCommand extends import_smithy_client.Command.classBuilder().ep(import_EndpointParameters9.commonParams).m(function(Command, cs, config, o) {
+var GetSessionTokenCommand = class extends import_smithy_client.Command.classBuilder().ep(import_EndpointParameters9.commonParams).m(function(Command, cs, config, o) {
   return [
     (0, import_middleware_serde.getSerdePlugin)(config, this.serialize, this.deserialize),
     (0, import_middleware_endpoint.getEndpointPlugin)(config, Command.getEndpointParameterInstructions())
   ];
 }).s("AWSSecurityTokenServiceV20110615", "GetSessionToken", {}).n("STSClient", "GetSessionTokenCommand").f(void 0, GetSessionTokenResponseFilterSensitiveLog).ser(se_GetSessionTokenCommand).de(de_GetSessionTokenCommand).build() {
+  static {
+    __name(this, "GetSessionTokenCommand");
+  }
 };
-__name(_GetSessionTokenCommand, "GetSessionTokenCommand");
-var GetSessionTokenCommand = _GetSessionTokenCommand;
 
 // src/STS.ts
 var import_STSClient = __nccwpck_require__(8440);
@@ -12228,10 +12573,11 @@ var commands = {
   GetFederationTokenCommand,
   GetSessionTokenCommand
 };
-var _STS = class _STS extends import_STSClient.STSClient {
+var STS = class extends import_STSClient.STSClient {
+  static {
+    __name(this, "STS");
+  }
 };
-__name(_STS, "STS");
-var STS = _STS;
 (0, import_smithy_client.createAggregatedClient)(commands, STS);
 
 // src/index.ts
@@ -12241,7 +12587,7 @@ var import_EndpointParameters10 = __nccwpck_require__(3932);
 var import_client = __nccwpck_require__(9300);
 var ASSUME_ROLE_DEFAULT_REGION = "us-east-1";
 var getAccountIdFromAssumedRoleUser = /* @__PURE__ */ __name((assumedRoleUser) => {
-  if (typeof (assumedRoleUser == null ? void 0 : assumedRoleUser.Arn) === "string") {
+  if (typeof assumedRoleUser?.Arn === "string") {
     const arnComponents = assumedRoleUser.Arn.split(":");
     if (arnComponents.length > 4 && arnComponents[4] !== "") {
       return arnComponents[4];
@@ -12250,11 +12596,9 @@ var getAccountIdFromAssumedRoleUser = /* @__PURE__ */ __name((assumedRoleUser) =
   return void 0;
 }, "getAccountIdFromAssumedRoleUser");
 var resolveRegion = /* @__PURE__ */ __name(async (_region, _parentRegion, credentialProviderLogger) => {
-  var _a2;
   const region = typeof _region === "function" ? await _region() : _region;
   const parentRegion = typeof _parentRegion === "function" ? await _parentRegion() : _parentRegion;
-  (_a2 = credentialProviderLogger == null ? void 0 : credentialProviderLogger.debug) == null ? void 0 : _a2.call(
-    credentialProviderLogger,
+  credentialProviderLogger?.debug?.(
     "@aws-sdk/client-sts::resolveRegion",
     "accepting first of:",
     `${region} (provider)`,
@@ -12267,18 +12611,17 @@ var getDefaultRoleAssumer = /* @__PURE__ */ __name((stsOptions, stsClientCtor) =
   let stsClient;
   let closureSourceCreds;
   return async (sourceCreds, params) => {
-    var _a2, _b, _c;
     closureSourceCreds = sourceCreds;
     if (!stsClient) {
       const {
-        logger = (_a2 = stsOptions == null ? void 0 : stsOptions.parentClientConfig) == null ? void 0 : _a2.logger,
+        logger = stsOptions?.parentClientConfig?.logger,
         region,
-        requestHandler = (_b = stsOptions == null ? void 0 : stsOptions.parentClientConfig) == null ? void 0 : _b.requestHandler,
+        requestHandler = stsOptions?.parentClientConfig?.requestHandler,
         credentialProviderLogger
       } = stsOptions;
       const resolvedRegion = await resolveRegion(
         region,
-        (_c = stsOptions == null ? void 0 : stsOptions.parentClientConfig) == null ? void 0 : _c.region,
+        stsOptions?.parentClientConfig?.region,
         credentialProviderLogger
       );
       const isCompatibleRequestHandler = !isH2(requestHandler);
@@ -12311,17 +12654,16 @@ var getDefaultRoleAssumer = /* @__PURE__ */ __name((stsOptions, stsClientCtor) =
 var getDefaultRoleAssumerWithWebIdentity = /* @__PURE__ */ __name((stsOptions, stsClientCtor) => {
   let stsClient;
   return async (params) => {
-    var _a2, _b, _c;
     if (!stsClient) {
       const {
-        logger = (_a2 = stsOptions == null ? void 0 : stsOptions.parentClientConfig) == null ? void 0 : _a2.logger,
+        logger = stsOptions?.parentClientConfig?.logger,
         region,
-        requestHandler = (_b = stsOptions == null ? void 0 : stsOptions.parentClientConfig) == null ? void 0 : _b.requestHandler,
+        requestHandler = stsOptions?.parentClientConfig?.requestHandler,
         credentialProviderLogger
       } = stsOptions;
       const resolvedRegion = await resolveRegion(
         region,
-        (_c = stsOptions == null ? void 0 : stsOptions.parentClientConfig) == null ? void 0 : _c.region,
+        stsOptions?.parentClientConfig?.region,
         credentialProviderLogger
       );
       const isCompatibleRequestHandler = !isH2(requestHandler);
@@ -12353,25 +12695,26 @@ var getDefaultRoleAssumerWithWebIdentity = /* @__PURE__ */ __name((stsOptions, s
   };
 }, "getDefaultRoleAssumerWithWebIdentity");
 var isH2 = /* @__PURE__ */ __name((requestHandler) => {
-  var _a2;
-  return ((_a2 = requestHandler == null ? void 0 : requestHandler.metadata) == null ? void 0 : _a2.handlerProtocol) === "h2";
+  return requestHandler?.metadata?.handlerProtocol === "h2";
 }, "isH2");
 
 // src/defaultRoleAssumers.ts
 var import_STSClient2 = __nccwpck_require__(8440);
 var getCustomizableStsClientCtor = /* @__PURE__ */ __name((baseCtor, customizations) => {
-  var _a2;
   if (!customizations)
     return baseCtor;
   else
-    return _a2 = class extends baseCtor {
+    return class CustomizableSTSClient extends baseCtor {
+      static {
+        __name(this, "CustomizableSTSClient");
+      }
       constructor(config) {
         super(config);
         for (const customization of customizations) {
           this.middlewareStack.use(customization);
         }
       }
-    }, __name(_a2, "CustomizableSTSClient"), _a2;
+    };
 }, "getCustomizableStsClientCtor");
 var getDefaultRoleAssumer2 = /* @__PURE__ */ __name((stsOptions = {}, stsPlugins) => getDefaultRoleAssumer(stsOptions, getCustomizableStsClientCtor(import_STSClient2.STSClient, stsPlugins)), "getDefaultRoleAssumer");
 var getDefaultRoleAssumerWithWebIdentity2 = /* @__PURE__ */ __name((stsOptions = {}, stsPlugins) => getDefaultRoleAssumerWithWebIdentity(stsOptions, getCustomizableStsClientCtor(import_STSClient2.STSClient, stsPlugins)), "getDefaultRoleAssumerWithWebIdentity");
@@ -12778,10 +13121,7 @@ var import_protocol_http2 = __nccwpck_require__(9752);
 
 // src/submodules/httpAuthSchemes/utils/getDateHeader.ts
 var import_protocol_http = __nccwpck_require__(9752);
-var getDateHeader = /* @__PURE__ */ __name((response) => {
-  var _a, _b;
-  return import_protocol_http.HttpResponse.isInstance(response) ? ((_a = response.headers) == null ? void 0 : _a.date) ?? ((_b = response.headers) == null ? void 0 : _b.Date) : void 0;
-}, "getDateHeader");
+var getDateHeader = /* @__PURE__ */ __name((response) => import_protocol_http.HttpResponse.isInstance(response) ? response.headers?.date ?? response.headers?.Date : void 0, "getDateHeader");
 
 // src/submodules/httpAuthSchemes/utils/getSkewCorrectedDate.ts
 var getSkewCorrectedDate = /* @__PURE__ */ __name((systemClockOffset) => new Date(Date.now() + systemClockOffset), "getSkewCorrectedDate");
@@ -12806,21 +13146,20 @@ var throwSigningPropertyError = /* @__PURE__ */ __name((name, property) => {
   return property;
 }, "throwSigningPropertyError");
 var validateSigningProperties = /* @__PURE__ */ __name(async (signingProperties) => {
-  var _a, _b, _c;
   const context = throwSigningPropertyError(
     "context",
     signingProperties.context
   );
   const config = throwSigningPropertyError("config", signingProperties.config);
-  const authScheme = (_c = (_b = (_a = context.endpointV2) == null ? void 0 : _a.properties) == null ? void 0 : _b.authSchemes) == null ? void 0 : _c[0];
+  const authScheme = context.endpointV2?.properties?.authSchemes?.[0];
   const signerFunction = throwSigningPropertyError(
     "signer",
     config.signer
   );
   const signer = await signerFunction(authScheme);
-  const signingRegion = signingProperties == null ? void 0 : signingProperties.signingRegion;
-  const signingRegionSet = signingProperties == null ? void 0 : signingProperties.signingRegionSet;
-  const signingName = signingProperties == null ? void 0 : signingProperties.signingName;
+  const signingRegion = signingProperties?.signingRegion;
+  const signingRegionSet = signingProperties?.signingRegionSet;
+  const signingName = signingProperties?.signingName;
   return {
     config,
     signer,
@@ -12829,9 +13168,11 @@ var validateSigningProperties = /* @__PURE__ */ __name(async (signingProperties)
     signingName
   };
 }, "validateSigningProperties");
-var _AwsSdkSigV4Signer = class _AwsSdkSigV4Signer {
+var AwsSdkSigV4Signer = class {
+  static {
+    __name(this, "AwsSdkSigV4Signer");
+  }
   async sign(httpRequest, identity, signingProperties) {
-    var _a;
     if (!import_protocol_http2.HttpRequest.isInstance(httpRequest)) {
       throw new Error("The request is not an instance of `HttpRequest` and cannot be signed");
     }
@@ -12839,11 +13180,11 @@ var _AwsSdkSigV4Signer = class _AwsSdkSigV4Signer {
     const { config, signer } = validatedProps;
     let { signingRegion, signingName } = validatedProps;
     const handlerExecutionContext = signingProperties.context;
-    if (((_a = handlerExecutionContext == null ? void 0 : handlerExecutionContext.authSchemes) == null ? void 0 : _a.length) ?? 0 > 1) {
+    if (handlerExecutionContext?.authSchemes?.length ?? 0 > 1) {
       const [first, second] = handlerExecutionContext.authSchemes;
-      if ((first == null ? void 0 : first.name) === "sigv4a" && (second == null ? void 0 : second.name) === "sigv4") {
-        signingRegion = (second == null ? void 0 : second.signingRegion) ?? signingRegion;
-        signingName = (second == null ? void 0 : second.signingName) ?? signingName;
+      if (first?.name === "sigv4a" && second?.name === "sigv4") {
+        signingRegion = second?.signingRegion ?? signingRegion;
+        signingName = second?.signingName ?? signingName;
       }
     }
     const signedRequest = await signer.sign(httpRequest, {
@@ -12876,22 +13217,22 @@ var _AwsSdkSigV4Signer = class _AwsSdkSigV4Signer {
     }
   }
 };
-__name(_AwsSdkSigV4Signer, "AwsSdkSigV4Signer");
-var AwsSdkSigV4Signer = _AwsSdkSigV4Signer;
 var AWSSDKSigV4Signer = AwsSdkSigV4Signer;
 
 // src/submodules/httpAuthSchemes/aws_sdk/AwsSdkSigV4ASigner.ts
 var import_protocol_http3 = __nccwpck_require__(9752);
-var _AwsSdkSigV4ASigner = class _AwsSdkSigV4ASigner extends AwsSdkSigV4Signer {
+var AwsSdkSigV4ASigner = class extends AwsSdkSigV4Signer {
+  static {
+    __name(this, "AwsSdkSigV4ASigner");
+  }
   async sign(httpRequest, identity, signingProperties) {
-    var _a;
     if (!import_protocol_http3.HttpRequest.isInstance(httpRequest)) {
       throw new Error("The request is not an instance of `HttpRequest` and cannot be signed");
     }
     const { config, signer, signingRegion, signingRegionSet, signingName } = await validateSigningProperties(
       signingProperties
     );
-    const configResolvedSigningRegionSet = await ((_a = config.sigv4aSigningRegionSet) == null ? void 0 : _a.call(config));
+    const configResolvedSigningRegionSet = await config.sigv4aSigningRegionSet?.();
     const multiRegionOverride = (configResolvedSigningRegionSet ?? signingRegionSet ?? [signingRegion]).join(",");
     const signedRequest = await signer.sign(httpRequest, {
       signingDate: getSkewCorrectedDate(config.systemClockOffset),
@@ -12901,8 +13242,6 @@ var _AwsSdkSigV4ASigner = class _AwsSdkSigV4ASigner extends AwsSdkSigV4Signer {
     return signedRequest;
   }
 };
-__name(_AwsSdkSigV4ASigner, "AwsSdkSigV4ASigner");
-var AwsSdkSigV4ASigner = _AwsSdkSigV4ASigner;
 
 // src/submodules/httpAuthSchemes/aws_sdk/resolveAwsSdkSigV4AConfig.ts
 var import_core = __nccwpck_require__(5086);
@@ -13155,7 +13494,7 @@ var parseJsonBody = /* @__PURE__ */ __name((streamBody, context) => collectBodyS
     try {
       return JSON.parse(encoded);
     } catch (e) {
-      if ((e == null ? void 0 : e.name) === "SyntaxError") {
+      if (e?.name === "SyntaxError") {
         Object.defineProperty(e, "$responseBodyText", {
           value: encoded
         });
@@ -13246,11 +13585,10 @@ var parseXmlErrorBody = /* @__PURE__ */ __name(async (errorBody, context) => {
   return value;
 }, "parseXmlErrorBody");
 var loadRestXmlErrorCode = /* @__PURE__ */ __name((output, data) => {
-  var _a;
-  if (((_a = data == null ? void 0 : data.Error) == null ? void 0 : _a.Code) !== void 0) {
+  if (data?.Error?.Code !== void 0) {
     return data.Error.Code;
   }
-  if ((data == null ? void 0 : data.Code) !== void 0) {
+  if (data?.Code !== void 0) {
     return data.Code;
   }
   if (output.statusCode == 404) {
@@ -13310,8 +13648,7 @@ var ENV_EXPIRATION = "AWS_CREDENTIAL_EXPIRATION";
 var ENV_CREDENTIAL_SCOPE = "AWS_CREDENTIAL_SCOPE";
 var ENV_ACCOUNT_ID = "AWS_ACCOUNT_ID";
 var fromEnv = /* @__PURE__ */ __name((init) => async () => {
-  var _a;
-  (_a = init == null ? void 0 : init.logger) == null ? void 0 : _a.debug("@aws-sdk/credential-provider-env - fromEnv");
+  init?.logger?.debug("@aws-sdk/credential-provider-env - fromEnv");
   const accessKeyId = process.env[ENV_KEY];
   const secretAccessKey = process.env[ENV_SECRET];
   const sessionToken = process.env[ENV_SESSION];
@@ -13330,7 +13667,7 @@ var fromEnv = /* @__PURE__ */ __name((init) => async () => {
     (0, import_client.setCredentialFeature)(credentials, "CREDENTIALS_ENV_VARS", "g");
     return credentials;
   }
-  throw new import_property_provider.CredentialsProviderError("Unable to find environment variable credentials.", { logger: init == null ? void 0 : init.logger });
+  throw new import_property_provider.CredentialsProviderError("Unable to find environment variable credentials.", { logger: init?.logger });
 }, "fromEnv");
 // Annotate the CommonJS export names for ESM import in node:
 
@@ -13630,16 +13967,16 @@ var resolveCredentialSource = /* @__PURE__ */ __name((credentialSource, profileN
     EcsContainer: async (options) => {
       const { fromHttp } = await Promise.resolve().then(() => __toESM(__nccwpck_require__(9641)));
       const { fromContainerMetadata } = await Promise.resolve().then(() => __toESM(__nccwpck_require__(1778)));
-      logger == null ? void 0 : logger.debug("@aws-sdk/credential-provider-ini - credential_source is EcsContainer");
+      logger?.debug("@aws-sdk/credential-provider-ini - credential_source is EcsContainer");
       return async () => (0, import_property_provider.chain)(fromHttp(options ?? {}), fromContainerMetadata(options))().then(setNamedProvider);
     },
     Ec2InstanceMetadata: async (options) => {
-      logger == null ? void 0 : logger.debug("@aws-sdk/credential-provider-ini - credential_source is Ec2InstanceMetadata");
+      logger?.debug("@aws-sdk/credential-provider-ini - credential_source is Ec2InstanceMetadata");
       const { fromInstanceMetadata } = await Promise.resolve().then(() => __toESM(__nccwpck_require__(1778)));
       return async () => fromInstanceMetadata(options)().then(setNamedProvider);
     },
     Environment: async (options) => {
-      logger == null ? void 0 : logger.debug("@aws-sdk/credential-provider-ini - credential_source is Environment");
+      logger?.debug("@aws-sdk/credential-provider-ini - credential_source is Environment");
       const { fromEnv } = await Promise.resolve().then(() => __toESM(__nccwpck_require__(8162)));
       return async () => fromEnv(options)().then(setNamedProvider);
     }
@@ -13660,24 +13997,21 @@ var isAssumeRoleProfile = /* @__PURE__ */ __name((arg, { profile = "default", lo
   return Boolean(arg) && typeof arg === "object" && typeof arg.role_arn === "string" && ["undefined", "string"].indexOf(typeof arg.role_session_name) > -1 && ["undefined", "string"].indexOf(typeof arg.external_id) > -1 && ["undefined", "string"].indexOf(typeof arg.mfa_serial) > -1 && (isAssumeRoleWithSourceProfile(arg, { profile, logger }) || isCredentialSourceProfile(arg, { profile, logger }));
 }, "isAssumeRoleProfile");
 var isAssumeRoleWithSourceProfile = /* @__PURE__ */ __name((arg, { profile, logger }) => {
-  var _a;
   const withSourceProfile = typeof arg.source_profile === "string" && typeof arg.credential_source === "undefined";
   if (withSourceProfile) {
-    (_a = logger == null ? void 0 : logger.debug) == null ? void 0 : _a.call(logger, `    ${profile} isAssumeRoleWithSourceProfile source_profile=${arg.source_profile}`);
+    logger?.debug?.(`    ${profile} isAssumeRoleWithSourceProfile source_profile=${arg.source_profile}`);
   }
   return withSourceProfile;
 }, "isAssumeRoleWithSourceProfile");
 var isCredentialSourceProfile = /* @__PURE__ */ __name((arg, { profile, logger }) => {
-  var _a;
   const withProviderProfile = typeof arg.credential_source === "string" && typeof arg.source_profile === "undefined";
   if (withProviderProfile) {
-    (_a = logger == null ? void 0 : logger.debug) == null ? void 0 : _a.call(logger, `    ${profile} isCredentialSourceProfile credential_source=${arg.credential_source}`);
+    logger?.debug?.(`    ${profile} isCredentialSourceProfile credential_source=${arg.credential_source}`);
   }
   return withProviderProfile;
 }, "isCredentialSourceProfile");
 var resolveAssumeRoleCredentials = /* @__PURE__ */ __name(async (profileName, profiles, options, visitedProfiles = {}) => {
-  var _a, _b, _c;
-  (_a = options.logger) == null ? void 0 : _a.debug("@aws-sdk/credential-provider-ini - resolveAssumeRoleCredentials (STS)");
+  options.logger?.debug("@aws-sdk/credential-provider-ini - resolveAssumeRoleCredentials (STS)");
   const profileData = profiles[profileName];
   const { source_profile, region } = profileData;
   if (!options.roleAssumer) {
@@ -13687,8 +14021,8 @@ var resolveAssumeRoleCredentials = /* @__PURE__ */ __name(async (profileName, pr
         ...options.clientConfig,
         credentialProviderLogger: options.logger,
         parentClientConfig: {
-          ...options == null ? void 0 : options.parentClientConfig,
-          region: region ?? ((_b = options == null ? void 0 : options.parentClientConfig) == null ? void 0 : _b.region)
+          ...options?.parentClientConfig,
+          region: region ?? options?.parentClientConfig?.region
         }
       },
       options.clientPlugins
@@ -13700,7 +14034,7 @@ var resolveAssumeRoleCredentials = /* @__PURE__ */ __name(async (profileName, pr
       { logger: options.logger }
     );
   }
-  (_c = options.logger) == null ? void 0 : _c.debug(
+  options.logger?.debug(
     `@aws-sdk/credential-provider-ini - finding credential resolver using ${source_profile ? `source_profile=[${source_profile}]` : `profile=[${profileName}]`}`
   );
   const sourceCredsProvider = source_profile ? resolveProfileData(
@@ -13776,8 +14110,7 @@ var isSsoProfile = /* @__PURE__ */ __name((arg) => arg && (typeof arg.sso_start_
 
 var isStaticCredsProfile = /* @__PURE__ */ __name((arg) => Boolean(arg) && typeof arg === "object" && typeof arg.aws_access_key_id === "string" && typeof arg.aws_secret_access_key === "string" && ["undefined", "string"].indexOf(typeof arg.aws_session_token) > -1 && ["undefined", "string"].indexOf(typeof arg.aws_account_id) > -1, "isStaticCredsProfile");
 var resolveStaticCredentials = /* @__PURE__ */ __name(async (profile, options) => {
-  var _a;
-  (_a = options == null ? void 0 : options.logger) == null ? void 0 : _a.debug("@aws-sdk/credential-provider-ini - resolveStaticCredentials");
+  options?.logger?.debug("@aws-sdk/credential-provider-ini - resolveStaticCredentials");
   const credentials = {
     accessKeyId: profile.aws_access_key_id,
     secretAccessKey: profile.aws_secret_access_key,
@@ -13831,7 +14164,6 @@ var resolveProfileData = /* @__PURE__ */ __name(async (profileName, profiles, op
 
 // src/fromIni.ts
 var fromIni = /* @__PURE__ */ __name((_init = {}) => async ({ callerClientConfig } = {}) => {
-  var _a;
   const init = {
     ..._init,
     parentClientConfig: {
@@ -13839,11 +14171,11 @@ var fromIni = /* @__PURE__ */ __name((_init = {}) => async ({ callerClientConfig
       ..._init.parentClientConfig
     }
   };
-  (_a = init.logger) == null ? void 0 : _a.debug("@aws-sdk/credential-provider-ini - fromIni");
+  init.logger?.debug("@aws-sdk/credential-provider-ini - fromIni");
   const profiles = await (0, import_shared_ini_file_loader.parseKnownFiles)(init);
   return resolveProfileData(
     (0, import_shared_ini_file_loader.getProfileName)({
-      profile: _init.profile ?? (callerClientConfig == null ? void 0 : callerClientConfig.profile)
+      profile: _init.profile ?? callerClientConfig?.profile
     }),
     profiles,
     init
@@ -13909,10 +14241,9 @@ var import_shared_ini_file_loader = __nccwpck_require__(504);
 var import_property_provider = __nccwpck_require__(2074);
 var ENV_IMDS_DISABLED = "AWS_EC2_METADATA_DISABLED";
 var remoteProvider = /* @__PURE__ */ __name(async (init) => {
-  var _a, _b;
   const { ENV_CMDS_FULL_URI, ENV_CMDS_RELATIVE_URI, fromContainerMetadata, fromInstanceMetadata } = await Promise.resolve().then(() => __toESM(__nccwpck_require__(1778)));
   if (process.env[ENV_CMDS_RELATIVE_URI] || process.env[ENV_CMDS_FULL_URI]) {
-    (_a = init.logger) == null ? void 0 : _a.debug("@aws-sdk/credential-provider-node - remoteProvider::fromHttp/fromContainerMetadata");
+    init.logger?.debug("@aws-sdk/credential-provider-node - remoteProvider::fromHttp/fromContainerMetadata");
     const { fromHttp } = await Promise.resolve().then(() => __toESM(__nccwpck_require__(9641)));
     return (0, import_property_provider.chain)(fromHttp(init), fromContainerMetadata(init));
   }
@@ -13921,7 +14252,7 @@ var remoteProvider = /* @__PURE__ */ __name(async (init) => {
       throw new import_property_provider.CredentialsProviderError("EC2 Instance Metadata Service access disabled", { logger: init.logger });
     };
   }
-  (_b = init.logger) == null ? void 0 : _b.debug("@aws-sdk/credential-provider-node - remoteProvider::fromInstanceMetadata");
+  init.logger?.debug("@aws-sdk/credential-provider-node - remoteProvider::fromInstanceMetadata");
   return fromInstanceMetadata(init);
 }, "remoteProvider");
 
@@ -13930,13 +14261,12 @@ var multipleCredentialSourceWarningEmitted = false;
 var defaultProvider = /* @__PURE__ */ __name((init = {}) => (0, import_property_provider.memoize)(
   (0, import_property_provider.chain)(
     async () => {
-      var _a, _b, _c, _d;
       const profile = init.profile ?? process.env[import_shared_ini_file_loader.ENV_PROFILE];
       if (profile) {
         const envStaticCredentialsAreSet = process.env[import_credential_provider_env.ENV_KEY] && process.env[import_credential_provider_env.ENV_SECRET];
         if (envStaticCredentialsAreSet) {
           if (!multipleCredentialSourceWarningEmitted) {
-            const warnFn = ((_a = init.logger) == null ? void 0 : _a.warn) && ((_c = (_b = init.logger) == null ? void 0 : _b.constructor) == null ? void 0 : _c.name) !== "NoOpLogger" ? init.logger.warn : console.warn;
+            const warnFn = init.logger?.warn && init.logger?.constructor?.name !== "NoOpLogger" ? init.logger.warn : console.warn;
             warnFn(
               `@aws-sdk/credential-provider-node - defaultProvider::fromEnv WARNING:
     Multiple credential sources detected: 
@@ -13956,12 +14286,11 @@ var defaultProvider = /* @__PURE__ */ __name((init = {}) => (0, import_property_
           tryNextLink: true
         });
       }
-      (_d = init.logger) == null ? void 0 : _d.debug("@aws-sdk/credential-provider-node - defaultProvider::fromEnv");
+      init.logger?.debug("@aws-sdk/credential-provider-node - defaultProvider::fromEnv");
       return (0, import_credential_provider_env.fromEnv)(init)();
     },
     async () => {
-      var _a;
-      (_a = init.logger) == null ? void 0 : _a.debug("@aws-sdk/credential-provider-node - defaultProvider::fromSSO");
+      init.logger?.debug("@aws-sdk/credential-provider-node - defaultProvider::fromSSO");
       const { ssoStartUrl, ssoAccountId, ssoRegion, ssoRoleName, ssoSession } = init;
       if (!ssoStartUrl && !ssoAccountId && !ssoRegion && !ssoRoleName && !ssoSession) {
         throw new import_property_provider.CredentialsProviderError(
@@ -13973,26 +14302,22 @@ var defaultProvider = /* @__PURE__ */ __name((init = {}) => (0, import_property_
       return fromSSO(init)();
     },
     async () => {
-      var _a;
-      (_a = init.logger) == null ? void 0 : _a.debug("@aws-sdk/credential-provider-node - defaultProvider::fromIni");
+      init.logger?.debug("@aws-sdk/credential-provider-node - defaultProvider::fromIni");
       const { fromIni } = await Promise.resolve().then(() => __toESM(__nccwpck_require__(1241)));
       return fromIni(init)();
     },
     async () => {
-      var _a;
-      (_a = init.logger) == null ? void 0 : _a.debug("@aws-sdk/credential-provider-node - defaultProvider::fromProcess");
+      init.logger?.debug("@aws-sdk/credential-provider-node - defaultProvider::fromProcess");
       const { fromProcess } = await Promise.resolve().then(() => __toESM(__nccwpck_require__(2884)));
       return fromProcess(init)();
     },
     async () => {
-      var _a;
-      (_a = init.logger) == null ? void 0 : _a.debug("@aws-sdk/credential-provider-node - defaultProvider::fromTokenFile");
+      init.logger?.debug("@aws-sdk/credential-provider-node - defaultProvider::fromTokenFile");
       const { fromTokenFile } = await Promise.resolve().then(() => __toESM(__nccwpck_require__(8112)));
       return fromTokenFile(init)();
     },
     async () => {
-      var _a;
-      (_a = init.logger) == null ? void 0 : _a.debug("@aws-sdk/credential-provider-node - defaultProvider::remoteProvider");
+      init.logger?.debug("@aws-sdk/credential-provider-node - defaultProvider::remoteProvider");
       return (await remoteProvider(init))();
     },
     async () => {
@@ -14005,8 +14330,8 @@ var defaultProvider = /* @__PURE__ */ __name((init = {}) => (0, import_property_
   credentialsTreatedAsExpired,
   credentialsWillNeedRefresh
 ), "defaultProvider");
-var credentialsWillNeedRefresh = /* @__PURE__ */ __name((credentials) => (credentials == null ? void 0 : credentials.expiration) !== void 0, "credentialsWillNeedRefresh");
-var credentialsTreatedAsExpired = /* @__PURE__ */ __name((credentials) => (credentials == null ? void 0 : credentials.expiration) !== void 0 && credentials.expiration.getTime() - Date.now() < 3e5, "credentialsTreatedAsExpired");
+var credentialsWillNeedRefresh = /* @__PURE__ */ __name((credentials) => credentials?.expiration !== void 0, "credentialsWillNeedRefresh");
+var credentialsTreatedAsExpired = /* @__PURE__ */ __name((credentials) => credentials?.expiration !== void 0 && credentials.expiration.getTime() - Date.now() < 3e5, "credentialsTreatedAsExpired");
 // Annotate the CommonJS export names for ESM import in node:
 
 0 && (0);
@@ -14057,7 +14382,6 @@ var import_util = __nccwpck_require__(9023);
 // src/getValidatedProcessCredentials.ts
 var import_client = __nccwpck_require__(9300);
 var getValidatedProcessCredentials = /* @__PURE__ */ __name((profileName, data, profiles) => {
-  var _a;
   if (data.Version !== 1) {
     throw Error(`Profile ${profileName} credential_process did not return Version 1.`);
   }
@@ -14072,7 +14396,7 @@ var getValidatedProcessCredentials = /* @__PURE__ */ __name((profileName, data, 
     }
   }
   let accountId = data.AccountId;
-  if (!accountId && ((_a = profiles == null ? void 0 : profiles[profileName]) == null ? void 0 : _a.aws_account_id)) {
+  if (!accountId && profiles?.[profileName]?.aws_account_id) {
     accountId = profiles[profileName].aws_account_id;
   }
   const credentials = {
@@ -14118,12 +14442,11 @@ var resolveProcessCredentials = /* @__PURE__ */ __name(async (profileName, profi
 
 // src/fromProcess.ts
 var fromProcess = /* @__PURE__ */ __name((init = {}) => async ({ callerClientConfig } = {}) => {
-  var _a;
-  (_a = init.logger) == null ? void 0 : _a.debug("@aws-sdk/credential-provider-process - fromProcess");
+  init.logger?.debug("@aws-sdk/credential-provider-process - fromProcess");
   const profiles = await (0, import_shared_ini_file_loader.parseKnownFiles)(init);
   return resolveProcessCredentials(
     (0, import_shared_ini_file_loader.getProfileName)({
-      profile: init.profile ?? (callerClientConfig == null ? void 0 : callerClientConfig.profile)
+      profile: init.profile ?? callerClientConfig?.profile
     }),
     profiles,
     init.logger
@@ -14247,8 +14570,8 @@ var resolveSSOCredentials = /* @__PURE__ */ __name(async ({
   const { SSOClient: SSOClient2, GetRoleCredentialsCommand: GetRoleCredentialsCommand2 } = await Promise.resolve().then(() => (init_loadSso(), loadSso_exports));
   const sso = ssoClient || new SSOClient2(
     Object.assign({}, clientConfig ?? {}, {
-      logger: (clientConfig == null ? void 0 : clientConfig.logger) ?? (parentClientConfig == null ? void 0 : parentClientConfig.logger),
-      region: (clientConfig == null ? void 0 : clientConfig.region) ?? ssoRegion
+      logger: clientConfig?.logger ?? parentClientConfig?.logger,
+      region: clientConfig?.region ?? ssoRegion
     })
   );
   let ssoResp;
@@ -14309,12 +14632,11 @@ Reference: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sso.ht
 
 // src/fromSSO.ts
 var fromSSO = /* @__PURE__ */ __name((init = {}) => async ({ callerClientConfig } = {}) => {
-  var _a;
-  (_a = init.logger) == null ? void 0 : _a.debug("@aws-sdk/credential-provider-sso - fromSSO");
+  init.logger?.debug("@aws-sdk/credential-provider-sso - fromSSO");
   const { ssoStartUrl, ssoAccountId, ssoRegion, ssoRoleName, ssoSession } = init;
   const { ssoClient } = init;
   const profileName = (0, import_shared_ini_file_loader.getProfileName)({
-    profile: init.profile ?? (callerClientConfig == null ? void 0 : callerClientConfig.profile)
+    profile: init.profile ?? callerClientConfig?.profile
   });
   if (!ssoStartUrl && !ssoAccountId && !ssoRegion && !ssoRoleName && !ssoSession) {
     const profiles = await (0, import_shared_ini_file_loader.parseKnownFiles)(init);
@@ -14327,7 +14649,7 @@ var fromSSO = /* @__PURE__ */ __name((init = {}) => async ({ callerClientConfig 
         logger: init.logger
       });
     }
-    if (profile == null ? void 0 : profile.sso_session) {
+    if (profile?.sso_session) {
       const ssoSessions = await (0, import_shared_ini_file_loader.loadSsoSessionData)(init);
       const session = ssoSessions[profile.sso_session];
       const conflictMsg = ` configurations in profile ${profileName} and sso-session ${profile.sso_session}`;
@@ -14564,7 +14886,11 @@ module.exports = __toCommonJS(src_exports);
 
 // src/EndpointCache.ts
 var import_lru_cache = __toESM(__nccwpck_require__(5858));
-var _EndpointCache = class _EndpointCache {
+var EndpointCache = class {
+  static {
+    __name(this, "EndpointCache");
+  }
+  cache;
   constructor(capacity) {
     this.cache = new import_lru_cache.default(capacity);
   }
@@ -14655,8 +14981,6 @@ var _EndpointCache = class _EndpointCache {
     this.cache.clear();
   }
 };
-__name(_EndpointCache, "EndpointCache");
-var EndpointCache = _EndpointCache;
 // Annotate the CommonJS export names for ESM import in node:
 
 0 && (0);
@@ -14808,7 +15132,16 @@ var unmarshallOutput = /* @__PURE__ */ __name((obj, keyNodes, options) => {
 }, "unmarshallOutput");
 
 // src/baseCommand/DynamoDBDocumentClientCommand.ts
-var _DynamoDBDocumentClientCommand = class _DynamoDBDocumentClientCommand extends import_smithy_client.Command {
+var DynamoDBDocumentClientCommand = class _DynamoDBDocumentClientCommand extends import_smithy_client.Command {
+  static {
+    __name(this, "DynamoDBDocumentClientCommand");
+  }
+  static defaultLogFilterOverrides = {
+    overrideInputFilterSensitiveLog(...args) {
+    },
+    overrideOutputFilterSensitiveLog(...args) {
+    }
+  };
   addMarshallingMiddleware(configuration) {
     const { marshallOptions: marshallOptions3 = {}, unmarshallOptions: unmarshallOptions3 = {} } = configuration.translateConfig || {};
     marshallOptions3.convertTopLevelContainer = marshallOptions3.convertTopLevelContainer ?? true;
@@ -14820,8 +15153,7 @@ var _DynamoDBDocumentClientCommand = class _DynamoDBDocumentClientCommand extend
         context.dynamoDbDocumentClientOptions = context.dynamoDbDocumentClientOptions || _DynamoDBDocumentClientCommand.defaultLogFilterOverrides;
         const input = args.input;
         context.dynamoDbDocumentClientOptions.overrideInputFilterSensitiveLog = () => {
-          var _a;
-          return (_a = context.inputFilterSensitiveLog) == null ? void 0 : _a.call(context, input);
+          return context.inputFilterSensitiveLog?.(input);
         };
         return next(args);
       },
@@ -14838,8 +15170,7 @@ var _DynamoDBDocumentClientCommand = class _DynamoDBDocumentClientCommand extend
         const output = deserialized.output;
         context.dynamoDbDocumentClientOptions = context.dynamoDbDocumentClientOptions || _DynamoDBDocumentClientCommand.defaultLogFilterOverrides;
         context.dynamoDbDocumentClientOptions.overrideOutputFilterSensitiveLog = () => {
-          var _a;
-          return (_a = context.outputFilterSensitiveLog) == null ? void 0 : _a.call(context, output);
+          return context.outputFilterSensitiveLog?.(output);
         };
         deserialized.output = unmarshallOutput(deserialized.output, this.outputKeyNodes, unmarshallOptions3);
         return deserialized;
@@ -14853,43 +15184,40 @@ var _DynamoDBDocumentClientCommand = class _DynamoDBDocumentClientCommand extend
     );
   }
 };
-__name(_DynamoDBDocumentClientCommand, "DynamoDBDocumentClientCommand");
-_DynamoDBDocumentClientCommand.defaultLogFilterOverrides = {
-  overrideInputFilterSensitiveLog(...args) {
-  },
-  overrideOutputFilterSensitiveLog(...args) {
-  }
-};
-var DynamoDBDocumentClientCommand = _DynamoDBDocumentClientCommand;
 
 // src/commands/BatchExecuteStatementCommand.ts
-var _BatchExecuteStatementCommand = class _BatchExecuteStatementCommand extends DynamoDBDocumentClientCommand {
+var BatchExecuteStatementCommand = class extends DynamoDBDocumentClientCommand {
   constructor(input) {
     super();
     this.input = input;
-    this.inputKeyNodes = {
-      Statements: {
-        "*": {
-          Parameters: ALL_MEMBERS
-          // set/list of AttributeValue
-        }
-      }
-    };
-    this.outputKeyNodes = {
-      Responses: {
-        "*": {
-          Error: {
-            Item: ALL_VALUES
-            // map with AttributeValue
-          },
-          Item: ALL_VALUES
-          // map with AttributeValue
-        }
-      }
-    };
     this.clientCommand = new import_client_dynamodb.BatchExecuteStatementCommand(this.input);
     this.middlewareStack = this.clientCommand.middlewareStack;
   }
+  static {
+    __name(this, "BatchExecuteStatementCommand");
+  }
+  inputKeyNodes = {
+    Statements: {
+      "*": {
+        Parameters: ALL_MEMBERS
+        // set/list of AttributeValue
+      }
+    }
+  };
+  outputKeyNodes = {
+    Responses: {
+      "*": {
+        Error: {
+          Item: ALL_VALUES
+          // map with AttributeValue
+        },
+        Item: ALL_VALUES
+        // map with AttributeValue
+      }
+    }
+  };
+  clientCommand;
+  middlewareStack;
   /**
    * @internal
    */
@@ -14900,45 +15228,48 @@ var _BatchExecuteStatementCommand = class _BatchExecuteStatementCommand extends 
     return async () => handler(this.clientCommand);
   }
 };
-__name(_BatchExecuteStatementCommand, "BatchExecuteStatementCommand");
-var BatchExecuteStatementCommand = _BatchExecuteStatementCommand;
 
 // src/commands/BatchGetCommand.ts
 
 
-var _BatchGetCommand = class _BatchGetCommand extends DynamoDBDocumentClientCommand {
+var BatchGetCommand = class extends DynamoDBDocumentClientCommand {
   constructor(input) {
     super();
     this.input = input;
-    this.inputKeyNodes = {
-      RequestItems: {
-        "*": {
-          Keys: {
-            "*": ALL_VALUES
-            // map with AttributeValue
-          }
-        }
-      }
-    };
-    this.outputKeyNodes = {
-      Responses: {
-        "*": {
-          "*": ALL_VALUES
-          // map with AttributeValue
-        }
-      },
-      UnprocessedKeys: {
-        "*": {
-          Keys: {
-            "*": ALL_VALUES
-            // map with AttributeValue
-          }
-        }
-      }
-    };
     this.clientCommand = new import_client_dynamodb.BatchGetItemCommand(this.input);
     this.middlewareStack = this.clientCommand.middlewareStack;
   }
+  static {
+    __name(this, "BatchGetCommand");
+  }
+  inputKeyNodes = {
+    RequestItems: {
+      "*": {
+        Keys: {
+          "*": ALL_VALUES
+          // map with AttributeValue
+        }
+      }
+    }
+  };
+  outputKeyNodes = {
+    Responses: {
+      "*": {
+        "*": ALL_VALUES
+        // map with AttributeValue
+      }
+    },
+    UnprocessedKeys: {
+      "*": {
+        Keys: {
+          "*": ALL_VALUES
+          // map with AttributeValue
+        }
+      }
+    }
+  };
+  clientCommand;
+  middlewareStack;
   /**
    * @internal
    */
@@ -14949,385 +15280,62 @@ var _BatchGetCommand = class _BatchGetCommand extends DynamoDBDocumentClientComm
     return async () => handler(this.clientCommand);
   }
 };
-__name(_BatchGetCommand, "BatchGetCommand");
-var BatchGetCommand = _BatchGetCommand;
 
 // src/commands/BatchWriteCommand.ts
 
 
-var _BatchWriteCommand = class _BatchWriteCommand extends DynamoDBDocumentClientCommand {
+var BatchWriteCommand = class extends DynamoDBDocumentClientCommand {
   constructor(input) {
     super();
     this.input = input;
-    this.inputKeyNodes = {
-      RequestItems: {
-        "*": {
-          "*": {
-            PutRequest: {
-              Item: ALL_VALUES
-              // map with AttributeValue
-            },
-            DeleteRequest: {
-              Key: ALL_VALUES
-              // map with AttributeValue
-            }
-          }
-        }
-      }
-    };
-    this.outputKeyNodes = {
-      UnprocessedItems: {
-        "*": {
-          "*": {
-            PutRequest: {
-              Item: ALL_VALUES
-              // map with AttributeValue
-            },
-            DeleteRequest: {
-              Key: ALL_VALUES
-              // map with AttributeValue
-            }
-          }
-        }
-      },
-      ItemCollectionMetrics: {
-        "*": {
-          "*": {
-            ItemCollectionKey: ALL_VALUES
-            // map with AttributeValue
-          }
-        }
-      }
-    };
     this.clientCommand = new import_client_dynamodb.BatchWriteItemCommand(this.input);
     this.middlewareStack = this.clientCommand.middlewareStack;
   }
-  /**
-   * @internal
-   */
-  resolveMiddleware(clientStack, configuration, options) {
-    this.addMarshallingMiddleware(configuration);
-    const stack = clientStack.concat(this.middlewareStack);
-    const handler = this.clientCommand.resolveMiddleware(stack, configuration, options);
-    return async () => handler(this.clientCommand);
+  static {
+    __name(this, "BatchWriteCommand");
   }
-};
-__name(_BatchWriteCommand, "BatchWriteCommand");
-var BatchWriteCommand = _BatchWriteCommand;
-
-// src/commands/DeleteCommand.ts
-
-
-var _DeleteCommand = class _DeleteCommand extends DynamoDBDocumentClientCommand {
-  constructor(input) {
-    super();
-    this.input = input;
-    this.inputKeyNodes = {
-      Key: ALL_VALUES,
-      // map with AttributeValue
-      Expected: {
+  inputKeyNodes = {
+    RequestItems: {
+      "*": {
         "*": {
-          Value: SELF,
-          AttributeValueList: ALL_MEMBERS
-          // set/list of AttributeValue
-        }
-      },
-      ExpressionAttributeValues: ALL_VALUES
-      // map with AttributeValue
-    };
-    this.outputKeyNodes = {
-      Attributes: ALL_VALUES,
-      // map with AttributeValue
-      ItemCollectionMetrics: {
-        ItemCollectionKey: ALL_VALUES
-        // map with AttributeValue
-      }
-    };
-    this.clientCommand = new import_client_dynamodb.DeleteItemCommand(this.input);
-    this.middlewareStack = this.clientCommand.middlewareStack;
-  }
-  /**
-   * @internal
-   */
-  resolveMiddleware(clientStack, configuration, options) {
-    this.addMarshallingMiddleware(configuration);
-    const stack = clientStack.concat(this.middlewareStack);
-    const handler = this.clientCommand.resolveMiddleware(stack, configuration, options);
-    return async () => handler(this.clientCommand);
-  }
-};
-__name(_DeleteCommand, "DeleteCommand");
-var DeleteCommand = _DeleteCommand;
-
-// src/commands/ExecuteStatementCommand.ts
-
-
-var _ExecuteStatementCommand = class _ExecuteStatementCommand extends DynamoDBDocumentClientCommand {
-  constructor(input) {
-    super();
-    this.input = input;
-    this.inputKeyNodes = {
-      Parameters: ALL_MEMBERS
-      // set/list of AttributeValue
-    };
-    this.outputKeyNodes = {
-      Items: {
-        "*": ALL_VALUES
-        // map with AttributeValue
-      },
-      LastEvaluatedKey: ALL_VALUES
-      // map with AttributeValue
-    };
-    this.clientCommand = new import_client_dynamodb.ExecuteStatementCommand(this.input);
-    this.middlewareStack = this.clientCommand.middlewareStack;
-  }
-  /**
-   * @internal
-   */
-  resolveMiddleware(clientStack, configuration, options) {
-    this.addMarshallingMiddleware(configuration);
-    const stack = clientStack.concat(this.middlewareStack);
-    const handler = this.clientCommand.resolveMiddleware(stack, configuration, options);
-    return async () => handler(this.clientCommand);
-  }
-};
-__name(_ExecuteStatementCommand, "ExecuteStatementCommand");
-var ExecuteStatementCommand = _ExecuteStatementCommand;
-
-// src/commands/ExecuteTransactionCommand.ts
-
-
-var _ExecuteTransactionCommand = class _ExecuteTransactionCommand extends DynamoDBDocumentClientCommand {
-  constructor(input) {
-    super();
-    this.input = input;
-    this.inputKeyNodes = {
-      TransactStatements: {
-        "*": {
-          Parameters: ALL_MEMBERS
-          // set/list of AttributeValue
-        }
-      }
-    };
-    this.outputKeyNodes = {
-      Responses: {
-        "*": {
-          Item: ALL_VALUES
-          // map with AttributeValue
-        }
-      }
-    };
-    this.clientCommand = new import_client_dynamodb.ExecuteTransactionCommand(this.input);
-    this.middlewareStack = this.clientCommand.middlewareStack;
-  }
-  /**
-   * @internal
-   */
-  resolveMiddleware(clientStack, configuration, options) {
-    this.addMarshallingMiddleware(configuration);
-    const stack = clientStack.concat(this.middlewareStack);
-    const handler = this.clientCommand.resolveMiddleware(stack, configuration, options);
-    return async () => handler(this.clientCommand);
-  }
-};
-__name(_ExecuteTransactionCommand, "ExecuteTransactionCommand");
-var ExecuteTransactionCommand = _ExecuteTransactionCommand;
-
-// src/commands/GetCommand.ts
-
-
-var _GetCommand = class _GetCommand extends DynamoDBDocumentClientCommand {
-  constructor(input) {
-    super();
-    this.input = input;
-    this.inputKeyNodes = {
-      Key: ALL_VALUES
-      // map with AttributeValue
-    };
-    this.outputKeyNodes = {
-      Item: ALL_VALUES
-      // map with AttributeValue
-    };
-    this.clientCommand = new import_client_dynamodb.GetItemCommand(this.input);
-    this.middlewareStack = this.clientCommand.middlewareStack;
-  }
-  /**
-   * @internal
-   */
-  resolveMiddleware(clientStack, configuration, options) {
-    this.addMarshallingMiddleware(configuration);
-    const stack = clientStack.concat(this.middlewareStack);
-    const handler = this.clientCommand.resolveMiddleware(stack, configuration, options);
-    return async () => handler(this.clientCommand);
-  }
-};
-__name(_GetCommand, "GetCommand");
-var GetCommand = _GetCommand;
-
-// src/commands/PutCommand.ts
-
-
-var _PutCommand = class _PutCommand extends DynamoDBDocumentClientCommand {
-  constructor(input) {
-    super();
-    this.input = input;
-    this.inputKeyNodes = {
-      Item: ALL_VALUES,
-      // map with AttributeValue
-      Expected: {
-        "*": {
-          Value: SELF,
-          AttributeValueList: ALL_MEMBERS
-          // set/list of AttributeValue
-        }
-      },
-      ExpressionAttributeValues: ALL_VALUES
-      // map with AttributeValue
-    };
-    this.outputKeyNodes = {
-      Attributes: ALL_VALUES,
-      // map with AttributeValue
-      ItemCollectionMetrics: {
-        ItemCollectionKey: ALL_VALUES
-        // map with AttributeValue
-      }
-    };
-    this.clientCommand = new import_client_dynamodb.PutItemCommand(this.input);
-    this.middlewareStack = this.clientCommand.middlewareStack;
-  }
-  /**
-   * @internal
-   */
-  resolveMiddleware(clientStack, configuration, options) {
-    this.addMarshallingMiddleware(configuration);
-    const stack = clientStack.concat(this.middlewareStack);
-    const handler = this.clientCommand.resolveMiddleware(stack, configuration, options);
-    return async () => handler(this.clientCommand);
-  }
-};
-__name(_PutCommand, "PutCommand");
-var PutCommand = _PutCommand;
-
-// src/commands/QueryCommand.ts
-
-
-var _QueryCommand = class _QueryCommand extends DynamoDBDocumentClientCommand {
-  constructor(input) {
-    super();
-    this.input = input;
-    this.inputKeyNodes = {
-      KeyConditions: {
-        "*": {
-          AttributeValueList: ALL_MEMBERS
-          // set/list of AttributeValue
-        }
-      },
-      QueryFilter: {
-        "*": {
-          AttributeValueList: ALL_MEMBERS
-          // set/list of AttributeValue
-        }
-      },
-      ExclusiveStartKey: ALL_VALUES,
-      // map with AttributeValue
-      ExpressionAttributeValues: ALL_VALUES
-      // map with AttributeValue
-    };
-    this.outputKeyNodes = {
-      Items: {
-        "*": ALL_VALUES
-        // map with AttributeValue
-      },
-      LastEvaluatedKey: ALL_VALUES
-      // map with AttributeValue
-    };
-    this.clientCommand = new import_client_dynamodb.QueryCommand(this.input);
-    this.middlewareStack = this.clientCommand.middlewareStack;
-  }
-  /**
-   * @internal
-   */
-  resolveMiddleware(clientStack, configuration, options) {
-    this.addMarshallingMiddleware(configuration);
-    const stack = clientStack.concat(this.middlewareStack);
-    const handler = this.clientCommand.resolveMiddleware(stack, configuration, options);
-    return async () => handler(this.clientCommand);
-  }
-};
-__name(_QueryCommand, "QueryCommand");
-var QueryCommand = _QueryCommand;
-
-// src/commands/ScanCommand.ts
-
-
-var _ScanCommand = class _ScanCommand extends DynamoDBDocumentClientCommand {
-  constructor(input) {
-    super();
-    this.input = input;
-    this.inputKeyNodes = {
-      ScanFilter: {
-        "*": {
-          AttributeValueList: ALL_MEMBERS
-          // set/list of AttributeValue
-        }
-      },
-      ExclusiveStartKey: ALL_VALUES,
-      // map with AttributeValue
-      ExpressionAttributeValues: ALL_VALUES
-      // map with AttributeValue
-    };
-    this.outputKeyNodes = {
-      Items: {
-        "*": ALL_VALUES
-        // map with AttributeValue
-      },
-      LastEvaluatedKey: ALL_VALUES
-      // map with AttributeValue
-    };
-    this.clientCommand = new import_client_dynamodb.ScanCommand(this.input);
-    this.middlewareStack = this.clientCommand.middlewareStack;
-  }
-  /**
-   * @internal
-   */
-  resolveMiddleware(clientStack, configuration, options) {
-    this.addMarshallingMiddleware(configuration);
-    const stack = clientStack.concat(this.middlewareStack);
-    const handler = this.clientCommand.resolveMiddleware(stack, configuration, options);
-    return async () => handler(this.clientCommand);
-  }
-};
-__name(_ScanCommand, "ScanCommand");
-var ScanCommand = _ScanCommand;
-
-// src/commands/TransactGetCommand.ts
-
-
-var _TransactGetCommand = class _TransactGetCommand extends DynamoDBDocumentClientCommand {
-  constructor(input) {
-    super();
-    this.input = input;
-    this.inputKeyNodes = {
-      TransactItems: {
-        "*": {
-          Get: {
+          PutRequest: {
+            Item: ALL_VALUES
+            // map with AttributeValue
+          },
+          DeleteRequest: {
             Key: ALL_VALUES
             // map with AttributeValue
           }
         }
       }
-    };
-    this.outputKeyNodes = {
-      Responses: {
+    }
+  };
+  outputKeyNodes = {
+    UnprocessedItems: {
+      "*": {
         "*": {
-          Item: ALL_VALUES
+          PutRequest: {
+            Item: ALL_VALUES
+            // map with AttributeValue
+          },
+          DeleteRequest: {
+            Key: ALL_VALUES
+            // map with AttributeValue
+          }
+        }
+      }
+    },
+    ItemCollectionMetrics: {
+      "*": {
+        "*": {
+          ItemCollectionKey: ALL_VALUES
           // map with AttributeValue
         }
       }
-    };
-    this.clientCommand = new import_client_dynamodb.TransactGetItemsCommand(this.input);
-    this.middlewareStack = this.clientCommand.middlewareStack;
-  }
+    }
+  };
+  clientCommand;
+  middlewareStack;
   /**
    * @internal
    */
@@ -15338,59 +15346,412 @@ var _TransactGetCommand = class _TransactGetCommand extends DynamoDBDocumentClie
     return async () => handler(this.clientCommand);
   }
 };
-__name(_TransactGetCommand, "TransactGetCommand");
-var TransactGetCommand = _TransactGetCommand;
+
+// src/commands/DeleteCommand.ts
+
+
+var DeleteCommand = class extends DynamoDBDocumentClientCommand {
+  constructor(input) {
+    super();
+    this.input = input;
+    this.clientCommand = new import_client_dynamodb.DeleteItemCommand(this.input);
+    this.middlewareStack = this.clientCommand.middlewareStack;
+  }
+  static {
+    __name(this, "DeleteCommand");
+  }
+  inputKeyNodes = {
+    Key: ALL_VALUES,
+    // map with AttributeValue
+    Expected: {
+      "*": {
+        Value: SELF,
+        AttributeValueList: ALL_MEMBERS
+        // set/list of AttributeValue
+      }
+    },
+    ExpressionAttributeValues: ALL_VALUES
+    // map with AttributeValue
+  };
+  outputKeyNodes = {
+    Attributes: ALL_VALUES,
+    // map with AttributeValue
+    ItemCollectionMetrics: {
+      ItemCollectionKey: ALL_VALUES
+      // map with AttributeValue
+    }
+  };
+  clientCommand;
+  middlewareStack;
+  /**
+   * @internal
+   */
+  resolveMiddleware(clientStack, configuration, options) {
+    this.addMarshallingMiddleware(configuration);
+    const stack = clientStack.concat(this.middlewareStack);
+    const handler = this.clientCommand.resolveMiddleware(stack, configuration, options);
+    return async () => handler(this.clientCommand);
+  }
+};
+
+// src/commands/ExecuteStatementCommand.ts
+
+
+var ExecuteStatementCommand = class extends DynamoDBDocumentClientCommand {
+  constructor(input) {
+    super();
+    this.input = input;
+    this.clientCommand = new import_client_dynamodb.ExecuteStatementCommand(this.input);
+    this.middlewareStack = this.clientCommand.middlewareStack;
+  }
+  static {
+    __name(this, "ExecuteStatementCommand");
+  }
+  inputKeyNodes = {
+    Parameters: ALL_MEMBERS
+    // set/list of AttributeValue
+  };
+  outputKeyNodes = {
+    Items: {
+      "*": ALL_VALUES
+      // map with AttributeValue
+    },
+    LastEvaluatedKey: ALL_VALUES
+    // map with AttributeValue
+  };
+  clientCommand;
+  middlewareStack;
+  /**
+   * @internal
+   */
+  resolveMiddleware(clientStack, configuration, options) {
+    this.addMarshallingMiddleware(configuration);
+    const stack = clientStack.concat(this.middlewareStack);
+    const handler = this.clientCommand.resolveMiddleware(stack, configuration, options);
+    return async () => handler(this.clientCommand);
+  }
+};
+
+// src/commands/ExecuteTransactionCommand.ts
+
+
+var ExecuteTransactionCommand = class extends DynamoDBDocumentClientCommand {
+  constructor(input) {
+    super();
+    this.input = input;
+    this.clientCommand = new import_client_dynamodb.ExecuteTransactionCommand(this.input);
+    this.middlewareStack = this.clientCommand.middlewareStack;
+  }
+  static {
+    __name(this, "ExecuteTransactionCommand");
+  }
+  inputKeyNodes = {
+    TransactStatements: {
+      "*": {
+        Parameters: ALL_MEMBERS
+        // set/list of AttributeValue
+      }
+    }
+  };
+  outputKeyNodes = {
+    Responses: {
+      "*": {
+        Item: ALL_VALUES
+        // map with AttributeValue
+      }
+    }
+  };
+  clientCommand;
+  middlewareStack;
+  /**
+   * @internal
+   */
+  resolveMiddleware(clientStack, configuration, options) {
+    this.addMarshallingMiddleware(configuration);
+    const stack = clientStack.concat(this.middlewareStack);
+    const handler = this.clientCommand.resolveMiddleware(stack, configuration, options);
+    return async () => handler(this.clientCommand);
+  }
+};
+
+// src/commands/GetCommand.ts
+
+
+var GetCommand = class extends DynamoDBDocumentClientCommand {
+  constructor(input) {
+    super();
+    this.input = input;
+    this.clientCommand = new import_client_dynamodb.GetItemCommand(this.input);
+    this.middlewareStack = this.clientCommand.middlewareStack;
+  }
+  static {
+    __name(this, "GetCommand");
+  }
+  inputKeyNodes = {
+    Key: ALL_VALUES
+    // map with AttributeValue
+  };
+  outputKeyNodes = {
+    Item: ALL_VALUES
+    // map with AttributeValue
+  };
+  clientCommand;
+  middlewareStack;
+  /**
+   * @internal
+   */
+  resolveMiddleware(clientStack, configuration, options) {
+    this.addMarshallingMiddleware(configuration);
+    const stack = clientStack.concat(this.middlewareStack);
+    const handler = this.clientCommand.resolveMiddleware(stack, configuration, options);
+    return async () => handler(this.clientCommand);
+  }
+};
+
+// src/commands/PutCommand.ts
+
+
+var PutCommand = class extends DynamoDBDocumentClientCommand {
+  constructor(input) {
+    super();
+    this.input = input;
+    this.clientCommand = new import_client_dynamodb.PutItemCommand(this.input);
+    this.middlewareStack = this.clientCommand.middlewareStack;
+  }
+  static {
+    __name(this, "PutCommand");
+  }
+  inputKeyNodes = {
+    Item: ALL_VALUES,
+    // map with AttributeValue
+    Expected: {
+      "*": {
+        Value: SELF,
+        AttributeValueList: ALL_MEMBERS
+        // set/list of AttributeValue
+      }
+    },
+    ExpressionAttributeValues: ALL_VALUES
+    // map with AttributeValue
+  };
+  outputKeyNodes = {
+    Attributes: ALL_VALUES,
+    // map with AttributeValue
+    ItemCollectionMetrics: {
+      ItemCollectionKey: ALL_VALUES
+      // map with AttributeValue
+    }
+  };
+  clientCommand;
+  middlewareStack;
+  /**
+   * @internal
+   */
+  resolveMiddleware(clientStack, configuration, options) {
+    this.addMarshallingMiddleware(configuration);
+    const stack = clientStack.concat(this.middlewareStack);
+    const handler = this.clientCommand.resolveMiddleware(stack, configuration, options);
+    return async () => handler(this.clientCommand);
+  }
+};
+
+// src/commands/QueryCommand.ts
+
+
+var QueryCommand = class extends DynamoDBDocumentClientCommand {
+  constructor(input) {
+    super();
+    this.input = input;
+    this.clientCommand = new import_client_dynamodb.QueryCommand(this.input);
+    this.middlewareStack = this.clientCommand.middlewareStack;
+  }
+  static {
+    __name(this, "QueryCommand");
+  }
+  inputKeyNodes = {
+    KeyConditions: {
+      "*": {
+        AttributeValueList: ALL_MEMBERS
+        // set/list of AttributeValue
+      }
+    },
+    QueryFilter: {
+      "*": {
+        AttributeValueList: ALL_MEMBERS
+        // set/list of AttributeValue
+      }
+    },
+    ExclusiveStartKey: ALL_VALUES,
+    // map with AttributeValue
+    ExpressionAttributeValues: ALL_VALUES
+    // map with AttributeValue
+  };
+  outputKeyNodes = {
+    Items: {
+      "*": ALL_VALUES
+      // map with AttributeValue
+    },
+    LastEvaluatedKey: ALL_VALUES
+    // map with AttributeValue
+  };
+  clientCommand;
+  middlewareStack;
+  /**
+   * @internal
+   */
+  resolveMiddleware(clientStack, configuration, options) {
+    this.addMarshallingMiddleware(configuration);
+    const stack = clientStack.concat(this.middlewareStack);
+    const handler = this.clientCommand.resolveMiddleware(stack, configuration, options);
+    return async () => handler(this.clientCommand);
+  }
+};
+
+// src/commands/ScanCommand.ts
+
+
+var ScanCommand = class extends DynamoDBDocumentClientCommand {
+  constructor(input) {
+    super();
+    this.input = input;
+    this.clientCommand = new import_client_dynamodb.ScanCommand(this.input);
+    this.middlewareStack = this.clientCommand.middlewareStack;
+  }
+  static {
+    __name(this, "ScanCommand");
+  }
+  inputKeyNodes = {
+    ScanFilter: {
+      "*": {
+        AttributeValueList: ALL_MEMBERS
+        // set/list of AttributeValue
+      }
+    },
+    ExclusiveStartKey: ALL_VALUES,
+    // map with AttributeValue
+    ExpressionAttributeValues: ALL_VALUES
+    // map with AttributeValue
+  };
+  outputKeyNodes = {
+    Items: {
+      "*": ALL_VALUES
+      // map with AttributeValue
+    },
+    LastEvaluatedKey: ALL_VALUES
+    // map with AttributeValue
+  };
+  clientCommand;
+  middlewareStack;
+  /**
+   * @internal
+   */
+  resolveMiddleware(clientStack, configuration, options) {
+    this.addMarshallingMiddleware(configuration);
+    const stack = clientStack.concat(this.middlewareStack);
+    const handler = this.clientCommand.resolveMiddleware(stack, configuration, options);
+    return async () => handler(this.clientCommand);
+  }
+};
+
+// src/commands/TransactGetCommand.ts
+
+
+var TransactGetCommand = class extends DynamoDBDocumentClientCommand {
+  constructor(input) {
+    super();
+    this.input = input;
+    this.clientCommand = new import_client_dynamodb.TransactGetItemsCommand(this.input);
+    this.middlewareStack = this.clientCommand.middlewareStack;
+  }
+  static {
+    __name(this, "TransactGetCommand");
+  }
+  inputKeyNodes = {
+    TransactItems: {
+      "*": {
+        Get: {
+          Key: ALL_VALUES
+          // map with AttributeValue
+        }
+      }
+    }
+  };
+  outputKeyNodes = {
+    Responses: {
+      "*": {
+        Item: ALL_VALUES
+        // map with AttributeValue
+      }
+    }
+  };
+  clientCommand;
+  middlewareStack;
+  /**
+   * @internal
+   */
+  resolveMiddleware(clientStack, configuration, options) {
+    this.addMarshallingMiddleware(configuration);
+    const stack = clientStack.concat(this.middlewareStack);
+    const handler = this.clientCommand.resolveMiddleware(stack, configuration, options);
+    return async () => handler(this.clientCommand);
+  }
+};
 
 // src/commands/TransactWriteCommand.ts
 
 
-var _TransactWriteCommand = class _TransactWriteCommand extends DynamoDBDocumentClientCommand {
+var TransactWriteCommand = class extends DynamoDBDocumentClientCommand {
   constructor(input) {
     super();
     this.input = input;
-    this.inputKeyNodes = {
-      TransactItems: {
-        "*": {
-          ConditionCheck: {
-            Key: ALL_VALUES,
-            // map with AttributeValue
-            ExpressionAttributeValues: ALL_VALUES
-            // map with AttributeValue
-          },
-          Put: {
-            Item: ALL_VALUES,
-            // map with AttributeValue
-            ExpressionAttributeValues: ALL_VALUES
-            // map with AttributeValue
-          },
-          Delete: {
-            Key: ALL_VALUES,
-            // map with AttributeValue
-            ExpressionAttributeValues: ALL_VALUES
-            // map with AttributeValue
-          },
-          Update: {
-            Key: ALL_VALUES,
-            // map with AttributeValue
-            ExpressionAttributeValues: ALL_VALUES
-            // map with AttributeValue
-          }
-        }
-      }
-    };
-    this.outputKeyNodes = {
-      ItemCollectionMetrics: {
-        "*": {
-          "*": {
-            ItemCollectionKey: ALL_VALUES
-            // map with AttributeValue
-          }
-        }
-      }
-    };
     this.clientCommand = new import_client_dynamodb.TransactWriteItemsCommand(this.input);
     this.middlewareStack = this.clientCommand.middlewareStack;
   }
+  static {
+    __name(this, "TransactWriteCommand");
+  }
+  inputKeyNodes = {
+    TransactItems: {
+      "*": {
+        ConditionCheck: {
+          Key: ALL_VALUES,
+          // map with AttributeValue
+          ExpressionAttributeValues: ALL_VALUES
+          // map with AttributeValue
+        },
+        Put: {
+          Item: ALL_VALUES,
+          // map with AttributeValue
+          ExpressionAttributeValues: ALL_VALUES
+          // map with AttributeValue
+        },
+        Delete: {
+          Key: ALL_VALUES,
+          // map with AttributeValue
+          ExpressionAttributeValues: ALL_VALUES
+          // map with AttributeValue
+        },
+        Update: {
+          Key: ALL_VALUES,
+          // map with AttributeValue
+          ExpressionAttributeValues: ALL_VALUES
+          // map with AttributeValue
+        }
+      }
+    }
+  };
+  outputKeyNodes = {
+    ItemCollectionMetrics: {
+      "*": {
+        "*": {
+          ItemCollectionKey: ALL_VALUES
+          // map with AttributeValue
+        }
+      }
+    }
+  };
+  clientCommand;
+  middlewareStack;
   /**
    * @internal
    */
@@ -15401,45 +15762,48 @@ var _TransactWriteCommand = class _TransactWriteCommand extends DynamoDBDocument
     return async () => handler(this.clientCommand);
   }
 };
-__name(_TransactWriteCommand, "TransactWriteCommand");
-var TransactWriteCommand = _TransactWriteCommand;
 
 // src/commands/UpdateCommand.ts
 
 
-var _UpdateCommand = class _UpdateCommand extends DynamoDBDocumentClientCommand {
+var UpdateCommand = class extends DynamoDBDocumentClientCommand {
   constructor(input) {
     super();
     this.input = input;
-    this.inputKeyNodes = {
-      Key: ALL_VALUES,
-      // map with AttributeValue
-      AttributeUpdates: {
-        "*": {
-          Value: SELF
-        }
-      },
-      Expected: {
-        "*": {
-          Value: SELF,
-          AttributeValueList: ALL_MEMBERS
-          // set/list of AttributeValue
-        }
-      },
-      ExpressionAttributeValues: ALL_VALUES
-      // map with AttributeValue
-    };
-    this.outputKeyNodes = {
-      Attributes: ALL_VALUES,
-      // map with AttributeValue
-      ItemCollectionMetrics: {
-        ItemCollectionKey: ALL_VALUES
-        // map with AttributeValue
-      }
-    };
     this.clientCommand = new import_client_dynamodb.UpdateItemCommand(this.input);
     this.middlewareStack = this.clientCommand.middlewareStack;
   }
+  static {
+    __name(this, "UpdateCommand");
+  }
+  inputKeyNodes = {
+    Key: ALL_VALUES,
+    // map with AttributeValue
+    AttributeUpdates: {
+      "*": {
+        Value: SELF
+      }
+    },
+    Expected: {
+      "*": {
+        Value: SELF,
+        AttributeValueList: ALL_MEMBERS
+        // set/list of AttributeValue
+      }
+    },
+    ExpressionAttributeValues: ALL_VALUES
+    // map with AttributeValue
+  };
+  outputKeyNodes = {
+    Attributes: ALL_VALUES,
+    // map with AttributeValue
+    ItemCollectionMetrics: {
+      ItemCollectionKey: ALL_VALUES
+      // map with AttributeValue
+    }
+  };
+  clientCommand;
+  middlewareStack;
   /**
    * @internal
    */
@@ -15450,19 +15814,20 @@ var _UpdateCommand = class _UpdateCommand extends DynamoDBDocumentClientCommand 
     return async () => handler(this.clientCommand);
   }
 };
-__name(_UpdateCommand, "UpdateCommand");
-var UpdateCommand = _UpdateCommand;
 
 // src/DynamoDBDocumentClient.ts
 
-var _DynamoDBDocumentClient = class _DynamoDBDocumentClient extends import_smithy_client.Client {
+var DynamoDBDocumentClient = class _DynamoDBDocumentClient extends import_smithy_client.Client {
+  static {
+    __name(this, "DynamoDBDocumentClient");
+  }
+  config;
   constructor(client, translateConfig) {
-    var _a;
     super(client.config);
     this.config = client.config;
     this.config.translateConfig = translateConfig;
     this.middlewareStack = client.middlewareStack;
-    if ((_a = this.config) == null ? void 0 : _a.cacheMiddleware) {
+    if (this.config?.cacheMiddleware) {
       throw new Error(
         "@aws-sdk/lib-dynamodb - cacheMiddleware=true is not compatible with the DynamoDBDocumentClient. This option must be set to false."
       );
@@ -15474,11 +15839,12 @@ var _DynamoDBDocumentClient = class _DynamoDBDocumentClient extends import_smith
   destroy() {
   }
 };
-__name(_DynamoDBDocumentClient, "DynamoDBDocumentClient");
-var DynamoDBDocumentClient = _DynamoDBDocumentClient;
 
 // src/DynamoDBDocument.ts
-var _DynamoDBDocument = class _DynamoDBDocument extends DynamoDBDocumentClient {
+var DynamoDBDocument = class _DynamoDBDocument extends DynamoDBDocumentClient {
+  static {
+    __name(this, "DynamoDBDocument");
+  }
   static from(client, translateConfig) {
     return new _DynamoDBDocument(client, translateConfig);
   }
@@ -15652,8 +16018,6 @@ var _DynamoDBDocument = class _DynamoDBDocument extends DynamoDBDocumentClient {
     }
   }
 };
-__name(_DynamoDBDocument, "DynamoDBDocument");
-var DynamoDBDocument = _DynamoDBDocument;
 
 // src/pagination/Interfaces.ts
 var import_types = __nccwpck_require__(4566);
@@ -16018,7 +16382,6 @@ module.exports = __toCommonJS(src_exports);
 
 // src/loggerMiddleware.ts
 var loggerMiddleware = /* @__PURE__ */ __name(() => (next, context) => async (args) => {
-  var _a, _b;
   try {
     const response = await next(args);
     const { clientName, commandName, logger, dynamoDbDocumentClientOptions = {} } = context;
@@ -16026,7 +16389,7 @@ var loggerMiddleware = /* @__PURE__ */ __name(() => (next, context) => async (ar
     const inputFilterSensitiveLog = overrideInputFilterSensitiveLog ?? context.inputFilterSensitiveLog;
     const outputFilterSensitiveLog = overrideOutputFilterSensitiveLog ?? context.outputFilterSensitiveLog;
     const { $metadata, ...outputWithoutMetadata } = response.output;
-    (_a = logger == null ? void 0 : logger.info) == null ? void 0 : _a.call(logger, {
+    logger?.info?.({
       clientName,
       commandName,
       input: inputFilterSensitiveLog(args.input),
@@ -16038,7 +16401,7 @@ var loggerMiddleware = /* @__PURE__ */ __name(() => (next, context) => async (ar
     const { clientName, commandName, logger, dynamoDbDocumentClientOptions = {} } = context;
     const { overrideInputFilterSensitiveLog } = dynamoDbDocumentClientOptions;
     const inputFilterSensitiveLog = overrideInputFilterSensitiveLog ?? context.inputFilterSensitiveLog;
-    (_b = logger == null ? void 0 : logger.error) == null ? void 0 : _b.call(logger, {
+    logger?.error?.({
       clientName,
       commandName,
       input: inputFilterSensitiveLog(args.input),
@@ -16190,14 +16553,13 @@ function resolveUserAgentConfig(input) {
     ...input,
     customUserAgent: typeof input.customUserAgent === "string" ? [[input.customUserAgent]] : input.customUserAgent,
     userAgentAppId: async () => {
-      var _a, _b;
       const appId = await normalizedAppIdProvider();
       if (!isValidUserAgentAppId(appId)) {
-        const logger = ((_b = (_a = input.logger) == null ? void 0 : _a.constructor) == null ? void 0 : _b.name) === "NoOpLogger" || !input.logger ? console : input.logger;
+        const logger = input.logger?.constructor?.name === "NoOpLogger" || !input.logger ? console : input.logger;
         if (typeof appId !== "string") {
-          logger == null ? void 0 : logger.warn("userAgentAppId must be a string or undefined.");
+          logger?.warn("userAgentAppId must be a string or undefined.");
         } else if (appId.length > 50) {
-          logger == null ? void 0 : logger.warn("The provided userAgentAppId exceeds the maximum length of 50 characters.");
+          logger?.warn("The provided userAgentAppId exceeds the maximum length of 50 characters.");
         }
       }
       return appId;
@@ -16214,15 +16576,14 @@ var import_protocol_http = __nccwpck_require__(9752);
 var import_core2 = __nccwpck_require__(9116);
 var ACCOUNT_ID_ENDPOINT_REGEX = /\d{12}\.ddb/;
 async function checkFeatures(context, config, args) {
-  var _a, _b, _c, _d, _e, _f, _g;
   const request = args.request;
-  if (((_a = request == null ? void 0 : request.headers) == null ? void 0 : _a["smithy-protocol"]) === "rpc-v2-cbor") {
+  if (request?.headers?.["smithy-protocol"] === "rpc-v2-cbor") {
     (0, import_core2.setFeature)(context, "PROTOCOL_RPC_V2_CBOR", "M");
   }
   if (typeof config.retryStrategy === "function") {
     const retryStrategy = await config.retryStrategy();
     if (typeof retryStrategy.acquireInitialRetryToken === "function") {
-      if ((_c = (_b = retryStrategy.constructor) == null ? void 0 : _b.name) == null ? void 0 : _c.includes("Adaptive")) {
+      if (retryStrategy.constructor?.name?.includes("Adaptive")) {
         (0, import_core2.setFeature)(context, "RETRY_MODE_ADAPTIVE", "F");
       } else {
         (0, import_core2.setFeature)(context, "RETRY_MODE_STANDARD", "E");
@@ -16233,10 +16594,10 @@ async function checkFeatures(context, config, args) {
   }
   if (typeof config.accountIdEndpointMode === "function") {
     const endpointV2 = context.endpointV2;
-    if (String((_d = endpointV2 == null ? void 0 : endpointV2.url) == null ? void 0 : _d.hostname).match(ACCOUNT_ID_ENDPOINT_REGEX)) {
+    if (String(endpointV2?.url?.hostname).match(ACCOUNT_ID_ENDPOINT_REGEX)) {
       (0, import_core2.setFeature)(context, "ACCOUNT_ID_ENDPOINT", "O");
     }
-    switch (await ((_e = config.accountIdEndpointMode) == null ? void 0 : _e.call(config))) {
+    switch (await config.accountIdEndpointMode?.()) {
       case "disabled":
         (0, import_core2.setFeature)(context, "ACCOUNT_ID_MODE_DISABLED", "Q");
         break;
@@ -16248,8 +16609,8 @@ async function checkFeatures(context, config, args) {
         break;
     }
   }
-  const identity = (_g = (_f = context.__smithy_context) == null ? void 0 : _f.selectedHttpAuthScheme) == null ? void 0 : _g.identity;
-  if (identity == null ? void 0 : identity.$source) {
+  const identity = context.__smithy_context?.selectedHttpAuthScheme?.identity;
+  if (identity?.$source) {
     const credentials = identity;
     if (credentials.accountId) {
       (0, import_core2.setFeature)(context, "RESOLVED_ACCOUNT_ID", "T");
@@ -16292,22 +16653,21 @@ __name(encodeFeatures, "encodeFeatures");
 
 // src/user-agent-middleware.ts
 var userAgentMiddleware = /* @__PURE__ */ __name((options) => (next, context) => async (args) => {
-  var _a, _b, _c, _d;
   const { request } = args;
   if (!import_protocol_http.HttpRequest.isInstance(request)) {
     return next(args);
   }
   const { headers } = request;
-  const userAgent = ((_a = context == null ? void 0 : context.userAgent) == null ? void 0 : _a.map(escapeUserAgent)) || [];
+  const userAgent = context?.userAgent?.map(escapeUserAgent) || [];
   const defaultUserAgent = (await options.defaultUserAgentProvider()).map(escapeUserAgent);
   await checkFeatures(context, options, args);
   const awsContext = context;
   defaultUserAgent.push(
     `m/${encodeFeatures(
-      Object.assign({}, (_b = context.__smithy_context) == null ? void 0 : _b.features, (_c = awsContext.__aws_sdk_context) == null ? void 0 : _c.features)
+      Object.assign({}, context.__smithy_context?.features, awsContext.__aws_sdk_context?.features)
     )}`
   );
-  const customUserAgent = ((_d = options == null ? void 0 : options.customUserAgent) == null ? void 0 : _d.map(escapeUserAgent)) || [];
+  const customUserAgent = options?.customUserAgent?.map(escapeUserAgent) || [];
   const appId = await options.userAgentAppId();
   if (appId) {
     defaultUserAgent.push(escapeUserAgent([`app/${appId}`]));
@@ -16332,9 +16692,8 @@ var userAgentMiddleware = /* @__PURE__ */ __name((options) => (next, context) =>
   });
 }, "userAgentMiddleware");
 var escapeUserAgent = /* @__PURE__ */ __name((userAgentPair) => {
-  var _a;
   const name = userAgentPair[0].split(UA_NAME_SEPARATOR).map((part) => part.replace(UA_NAME_ESCAPE_REGEX, UA_ESCAPE_CHAR)).join(UA_NAME_SEPARATOR);
-  const version = (_a = userAgentPair[1]) == null ? void 0 : _a.replace(UA_VALUE_ESCAPE_REGEX, UA_ESCAPE_CHAR);
+  const version = userAgentPair[1]?.replace(UA_VALUE_ESCAPE_REGEX, UA_ESCAPE_CHAR);
   const prefixSeparatorIndex = name.indexOf(UA_NAME_SEPARATOR);
   const prefix = name.substring(0, prefixSeparatorIndex);
   let uaName = name.substring(prefixSeparatorIndex + 1);
@@ -16541,12 +16900,11 @@ var REFRESH_MESSAGE = `To refresh this SSO session run 'aws sso login' with the 
 
 // src/getSsoOidcClient.ts
 var getSsoOidcClient = /* @__PURE__ */ __name(async (ssoRegion, init = {}) => {
-  var _a, _b, _c;
   const { SSOOIDCClient } = await Promise.resolve().then(() => __toESM(__nccwpck_require__(8872)));
   const ssoOidcClient = new SSOOIDCClient(
     Object.assign({}, init.clientConfig ?? {}, {
-      region: ssoRegion ?? ((_a = init.clientConfig) == null ? void 0 : _a.region),
-      logger: ((_b = init.clientConfig) == null ? void 0 : _b.logger) ?? ((_c = init.parentClientConfig) == null ? void 0 : _c.logger)
+      region: ssoRegion ?? init.clientConfig?.region,
+      logger: init.clientConfig?.logger ?? init.parentClientConfig?.logger
     })
   );
   return ssoOidcClient;
@@ -16598,7 +16956,6 @@ var writeSSOTokenToFile = /* @__PURE__ */ __name((id, ssoToken) => {
 // src/fromSso.ts
 var lastRefreshAttemptTime = /* @__PURE__ */ new Date(0);
 var fromSso = /* @__PURE__ */ __name((_init = {}) => async ({ callerClientConfig } = {}) => {
-  var _a;
   const init = {
     ..._init,
     parentClientConfig: {
@@ -16606,10 +16963,10 @@ var fromSso = /* @__PURE__ */ __name((_init = {}) => async ({ callerClientConfig
       ..._init.parentClientConfig
     }
   };
-  (_a = init.logger) == null ? void 0 : _a.debug("@aws-sdk/token-providers - fromSso");
+  init.logger?.debug("@aws-sdk/token-providers - fromSso");
   const profiles = await (0, import_shared_ini_file_loader.parseKnownFiles)(init);
   const profileName = (0, import_shared_ini_file_loader.getProfileName)({
-    profile: init.profile ?? (callerClientConfig == null ? void 0 : callerClientConfig.profile)
+    profile: init.profile ?? callerClientConfig?.profile
   });
   const profile = profiles[profileName];
   if (!profile) {
@@ -16687,7 +17044,7 @@ var fromSso = /* @__PURE__ */ __name((_init = {}) => async ({ callerClientConfig
 // src/fromStatic.ts
 
 var fromStatic = /* @__PURE__ */ __name(({ token, logger }) => async () => {
-  logger == null ? void 0 : logger.debug("@aws-sdk/token-providers - fromStatic");
+  logger?.debug("@aws-sdk/token-providers - fromStatic");
   if (!token || !token.token) {
     throw new import_property_provider.TokenProviderError(`Please pass a valid token to fromStatic`, false);
   }
@@ -16747,7 +17104,11 @@ __export(src_exports, {
 module.exports = __toCommonJS(src_exports);
 
 // src/NumberValue.ts
-var _NumberValue = class _NumberValue {
+var NumberValue = class _NumberValue {
+  static {
+    __name(this, "NumberValue");
+  }
+  value;
   /**
    * This class does not validate that your string input is a valid number.
    *
@@ -16807,44 +17168,41 @@ var _NumberValue = class _NumberValue {
     return this.toString();
   }
 };
-__name(_NumberValue, "NumberValue");
-var NumberValue = _NumberValue;
 
 // src/convertToAttr.ts
 var convertToAttr = /* @__PURE__ */ __name((data, options) => {
-  var _a, _b, _c, _d, _e, _f;
   if (data === void 0) {
     throw new Error(`Pass options.removeUndefinedValues=true to remove undefined values from map/array/set.`);
   } else if (data === null && typeof data === "object") {
     return convertToNullAttr();
   } else if (Array.isArray(data)) {
     return convertToListAttr(data, options);
-  } else if (((_a = data == null ? void 0 : data.constructor) == null ? void 0 : _a.name) === "Set") {
+  } else if (data?.constructor?.name === "Set") {
     return convertToSetAttr(data, options);
-  } else if (((_b = data == null ? void 0 : data.constructor) == null ? void 0 : _b.name) === "Map") {
+  } else if (data?.constructor?.name === "Map") {
     return convertToMapAttrFromIterable(data, options);
-  } else if (((_c = data == null ? void 0 : data.constructor) == null ? void 0 : _c.name) === "Object" || // for object which is result of Object.create(null), which doesn't have constructor defined
+  } else if (data?.constructor?.name === "Object" || // for object which is result of Object.create(null), which doesn't have constructor defined
   !data.constructor && typeof data === "object") {
     return convertToMapAttrFromEnumerableProps(data, options);
   } else if (isBinary(data)) {
-    if (data.length === 0 && (options == null ? void 0 : options.convertEmptyValues)) {
+    if (data.length === 0 && options?.convertEmptyValues) {
       return convertToNullAttr();
     }
     return convertToBinaryAttr(data);
-  } else if (typeof data === "boolean" || ((_d = data == null ? void 0 : data.constructor) == null ? void 0 : _d.name) === "Boolean") {
+  } else if (typeof data === "boolean" || data?.constructor?.name === "Boolean") {
     return { BOOL: data.valueOf() };
-  } else if (typeof data === "number" || ((_e = data == null ? void 0 : data.constructor) == null ? void 0 : _e.name) === "Number") {
+  } else if (typeof data === "number" || data?.constructor?.name === "Number") {
     return convertToNumberAttr(data, options);
   } else if (data instanceof NumberValue) {
     return data.toAttributeValue();
   } else if (typeof data === "bigint") {
     return convertToBigIntAttr(data);
-  } else if (typeof data === "string" || ((_f = data == null ? void 0 : data.constructor) == null ? void 0 : _f.name) === "String") {
-    if (data.length === 0 && (options == null ? void 0 : options.convertEmptyValues)) {
+  } else if (typeof data === "string" || data?.constructor?.name === "String") {
+    if (data.length === 0 && options?.convertEmptyValues) {
       return convertToNullAttr();
     }
     return convertToStringAttr(data);
-  } else if ((options == null ? void 0 : options.convertClassInstanceToMap) && typeof data === "object") {
+  } else if (options?.convertClassInstanceToMap && typeof data === "object") {
     return convertToMapAttrFromEnumerableProps(data, options);
   }
   throw new Error(
@@ -16853,16 +17211,16 @@ var convertToAttr = /* @__PURE__ */ __name((data, options) => {
 }, "convertToAttr");
 var convertToListAttr = /* @__PURE__ */ __name((data, options) => ({
   L: data.filter(
-    (item) => typeof item !== "function" && (!(options == null ? void 0 : options.removeUndefinedValues) || (options == null ? void 0 : options.removeUndefinedValues) && item !== void 0)
+    (item) => typeof item !== "function" && (!options?.removeUndefinedValues || options?.removeUndefinedValues && item !== void 0)
   ).map((item) => convertToAttr(item, options))
 }), "convertToListAttr");
 var convertToSetAttr = /* @__PURE__ */ __name((set, options) => {
-  const setToOperate = (options == null ? void 0 : options.removeUndefinedValues) ? new Set([...set].filter((value) => value !== void 0)) : set;
-  if (!(options == null ? void 0 : options.removeUndefinedValues) && setToOperate.has(void 0)) {
+  const setToOperate = options?.removeUndefinedValues ? new Set([...set].filter((value) => value !== void 0)) : set;
+  if (!options?.removeUndefinedValues && setToOperate.has(void 0)) {
     throw new Error(`Pass options.removeUndefinedValues=true to remove undefined values from map/array/set.`);
   }
   if (setToOperate.size === 0) {
-    if (options == null ? void 0 : options.convertEmptyValues) {
+    if (options?.convertEmptyValues) {
       return convertToNullAttr();
     }
     throw new Error(`Pass a non-empty set, or options.convertEmptyValues=true.`);
@@ -16898,7 +17256,7 @@ var convertToMapAttrFromIterable = /* @__PURE__ */ __name((data, options) => ({
   M: ((data2) => {
     const map = {};
     for (const [key, value] of data2) {
-      if (typeof value !== "function" && (value !== void 0 || !(options == null ? void 0 : options.removeUndefinedValues))) {
+      if (typeof value !== "function" && (value !== void 0 || !options?.removeUndefinedValues)) {
         map[key] = convertToAttr(value, options);
       }
     }
@@ -16910,7 +17268,7 @@ var convertToMapAttrFromEnumerableProps = /* @__PURE__ */ __name((data, options)
     const map = {};
     for (const key in data2) {
       const value = data2[key];
-      if (typeof value !== "function" && (value !== void 0 || !(options == null ? void 0 : options.removeUndefinedValues))) {
+      if (typeof value !== "function" && (value !== void 0 || !options?.removeUndefinedValues)) {
         map[key] = convertToAttr(value, options);
       }
     }
@@ -16927,10 +17285,10 @@ var validateBigIntAndThrow = /* @__PURE__ */ __name((errorPrefix) => {
 var convertToNumberAttr = /* @__PURE__ */ __name((num, options) => {
   if ([Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY].map((val) => val.toString()).includes(num.toString())) {
     throw new Error(`Special numeric value ${num.toString()} is not allowed`);
-  } else if (!(options == null ? void 0 : options.allowImpreciseNumbers)) {
-    if (num > Number.MAX_SAFE_INTEGER) {
+  } else if (!options?.allowImpreciseNumbers) {
+    if (Number(num) > Number.MAX_SAFE_INTEGER) {
       validateBigIntAndThrow(`Number ${num.toString()} is greater than Number.MAX_SAFE_INTEGER.`);
-    } else if (num < Number.MIN_SAFE_INTEGER) {
+    } else if (Number(num) < Number.MIN_SAFE_INTEGER) {
       validateBigIntAndThrow(`Number ${num.toString()} is lesser than Number.MIN_SAFE_INTEGER.`);
     }
   }
@@ -16955,7 +17313,7 @@ var isBinary = /* @__PURE__ */ __name((data) => {
     "BigInt64Array",
     "BigUint64Array"
   ];
-  if (data == null ? void 0 : data.constructor) {
+  if (data?.constructor) {
     return binaryTypes.includes(data.constructor.name);
   }
   return false;
@@ -16994,10 +17352,10 @@ var convertToNative = /* @__PURE__ */ __name((data, options) => {
   throw new Error(`No value defined: ${JSON.stringify(data)}`);
 }, "convertToNative");
 var convertNumber = /* @__PURE__ */ __name((numString, options) => {
-  if (typeof (options == null ? void 0 : options.wrapNumbers) === "function") {
-    return options == null ? void 0 : options.wrapNumbers(numString);
+  if (typeof options?.wrapNumbers === "function") {
+    return options?.wrapNumbers(numString);
   }
-  if (options == null ? void 0 : options.wrapNumbers) {
+  if (options?.wrapNumbers) {
     return NumberValue.from(numString);
   }
   const num = Number(numString);
@@ -17031,7 +17389,7 @@ function marshall(data, options) {
   switch (key) {
     case "M":
     case "L":
-      return (options == null ? void 0 : options.convertTopLevelContainer) ? attributeValue : value;
+      return options?.convertTopLevelContainer ? attributeValue : value;
     case "SS":
     case "NS":
     case "BS":
@@ -17049,7 +17407,7 @@ __name(marshall, "marshall");
 
 // src/unmarshall.ts
 var unmarshall = /* @__PURE__ */ __name((data, options) => {
-  if (options == null ? void 0 : options.convertWithoutMapWrapper) {
+  if (options?.convertWithoutMapWrapper) {
     return convertToNative(data, options);
   }
   return convertToNative({ M: data }, options);
@@ -17223,6 +17581,9 @@ var partitions_default = {
       },
       "ap-southeast-5": {
         description: "Asia Pacific (Malaysia)"
+      },
+      "ap-southeast-7": {
+        description: "Asia Pacific (Thailand)"
       },
       "aws-global": {
         description: "AWS Standard global region"
@@ -17534,7 +17895,6 @@ var isCrtAvailable = /* @__PURE__ */ __name(() => {
 // src/defaultUserAgent.ts
 var createDefaultUserAgentProvider = /* @__PURE__ */ __name(({ serviceId, clientVersion }) => {
   return async (config) => {
-    var _a;
     const sections = [
       // sdk-metadata
       ["aws-sdk-js", clientVersion],
@@ -17557,7 +17917,7 @@ var createDefaultUserAgentProvider = /* @__PURE__ */ __name(({ serviceId, client
     if (import_process.env.AWS_EXECUTION_ENV) {
       sections.push([`exec-env/${import_process.env.AWS_EXECUTION_ENV}`]);
     }
-    const appId = await ((_a = config == null ? void 0 : config.userAgentAppId) == null ? void 0 : _a.call(config));
+    const appId = await config?.userAgentAppId?.();
     const resolvedUserAgent = appId ? [...sections, [`app/${appId}`]] : [...sections];
     return resolvedUserAgent;
   };
@@ -17740,12 +18100,9 @@ var resolveRegionConfig = /* @__PURE__ */ __name((input) => {
 }, "resolveRegionConfig");
 
 // src/regionInfo/getHostnameFromVariants.ts
-var getHostnameFromVariants = /* @__PURE__ */ __name((variants = [], { useFipsEndpoint, useDualstackEndpoint }) => {
-  var _a;
-  return (_a = variants.find(
-    ({ tags }) => useFipsEndpoint === tags.includes("fips") && useDualstackEndpoint === tags.includes("dualstack")
-  )) == null ? void 0 : _a.hostname;
-}, "getHostnameFromVariants");
+var getHostnameFromVariants = /* @__PURE__ */ __name((variants = [], { useFipsEndpoint, useDualstackEndpoint }) => variants.find(
+  ({ tags }) => useFipsEndpoint === tags.includes("fips") && useDualstackEndpoint === tags.includes("dualstack")
+)?.hostname, "getHostnameFromVariants");
 
 // src/regionInfo/getResolvedHostname.ts
 var getResolvedHostname = /* @__PURE__ */ __name((resolvedRegion, { regionHostname, partitionHostname }) => regionHostname ? regionHostname : partitionHostname ? partitionHostname.replace("{region}", resolvedRegion) : void 0, "getResolvedHostname");
@@ -17774,18 +18131,17 @@ var getRegionInfo = /* @__PURE__ */ __name((region, {
   regionHash,
   partitionHash
 }) => {
-  var _a, _b, _c, _d, _e;
   const partition = getResolvedPartition(region, { partitionHash });
-  const resolvedRegion = region in regionHash ? region : ((_a = partitionHash[partition]) == null ? void 0 : _a.endpoint) ?? region;
+  const resolvedRegion = region in regionHash ? region : partitionHash[partition]?.endpoint ?? region;
   const hostnameOptions = { useFipsEndpoint, useDualstackEndpoint };
-  const regionHostname = getHostnameFromVariants((_b = regionHash[resolvedRegion]) == null ? void 0 : _b.variants, hostnameOptions);
-  const partitionHostname = getHostnameFromVariants((_c = partitionHash[partition]) == null ? void 0 : _c.variants, hostnameOptions);
+  const regionHostname = getHostnameFromVariants(regionHash[resolvedRegion]?.variants, hostnameOptions);
+  const partitionHostname = getHostnameFromVariants(partitionHash[partition]?.variants, hostnameOptions);
   const hostname = getResolvedHostname(resolvedRegion, { regionHostname, partitionHostname });
   if (hostname === void 0) {
     throw new Error(`Endpoint resolution failed for: ${{ resolvedRegion, useFipsEndpoint, useDualstackEndpoint }}`);
   }
   const signingRegion = getResolvedSigningRegion(hostname, {
-    signingRegion: (_d = regionHash[resolvedRegion]) == null ? void 0 : _d.signingRegion,
+    signingRegion: regionHash[resolvedRegion]?.signingRegion,
     regionRegex: partitionHash[partition].regionRegex,
     useFipsEndpoint
   });
@@ -17794,7 +18150,7 @@ var getRegionInfo = /* @__PURE__ */ __name((region, {
     signingService,
     hostname,
     ...signingRegion && { signingRegion },
-    ...((_e = regionHash[resolvedRegion]) == null ? void 0 : _e.signingService) && {
+    ...regionHash[resolvedRegion]?.signingService && {
       signingService: regionHash[resolvedRegion].signingService
     }
   };
@@ -17872,7 +18228,6 @@ function convertHttpAuthSchemesToMap(httpAuthSchemes) {
 }
 __name(convertHttpAuthSchemesToMap, "convertHttpAuthSchemesToMap");
 var httpAuthSchemeMiddleware = /* @__PURE__ */ __name((config, mwOptions) => (next, context) => async (args) => {
-  var _a;
   const options = config.httpAuthSchemeProvider(
     await mwOptions.httpAuthSchemeParametersProvider(config, context, args.input)
   );
@@ -17890,7 +18245,7 @@ var httpAuthSchemeMiddleware = /* @__PURE__ */ __name((config, mwOptions) => (ne
       failureReasons.push(`HttpAuthScheme \`${option.schemeId}\` did not have an IdentityProvider configured.`);
       continue;
     }
-    const { identityProperties = {}, signingProperties = {} } = ((_a = option.propertiesExtractor) == null ? void 0 : _a.call(option, config, context)) || {};
+    const { identityProperties = {}, signingProperties = {} } = option.propertiesExtractor?.(config, context) || {};
     option.identityProperties = Object.assign(option.identityProperties || {}, identityProperties);
     option.signingProperties = Object.assign(option.signingProperties || {}, signingProperties);
     smithyContext.selectedHttpAuthScheme = {
@@ -18066,7 +18421,7 @@ function setFeature(context, feature, value) {
 __name(setFeature, "setFeature");
 
 // src/util-identity-and-auth/DefaultIdentityProviderConfig.ts
-var _DefaultIdentityProviderConfig = class _DefaultIdentityProviderConfig {
+var DefaultIdentityProviderConfig = class {
   /**
    * Creates an IdentityProviderConfig with a record of scheme IDs to identity providers.
    *
@@ -18080,17 +18435,21 @@ var _DefaultIdentityProviderConfig = class _DefaultIdentityProviderConfig {
       }
     }
   }
+  static {
+    __name(this, "DefaultIdentityProviderConfig");
+  }
   getIdentityProvider(schemeId) {
     return this.authSchemes.get(schemeId);
   }
 };
-__name(_DefaultIdentityProviderConfig, "DefaultIdentityProviderConfig");
-var DefaultIdentityProviderConfig = _DefaultIdentityProviderConfig;
 
 // src/util-identity-and-auth/httpAuthSchemes/httpApiKeyAuth.ts
 
 
-var _HttpApiKeyAuthSigner = class _HttpApiKeyAuthSigner {
+var HttpApiKeyAuthSigner = class {
+  static {
+    __name(this, "HttpApiKeyAuthSigner");
+  }
   async sign(httpRequest, identity, signingProperties) {
     if (!signingProperties) {
       throw new Error(
@@ -18119,12 +18478,13 @@ var _HttpApiKeyAuthSigner = class _HttpApiKeyAuthSigner {
     return clonedRequest;
   }
 };
-__name(_HttpApiKeyAuthSigner, "HttpApiKeyAuthSigner");
-var HttpApiKeyAuthSigner = _HttpApiKeyAuthSigner;
 
 // src/util-identity-and-auth/httpAuthSchemes/httpBearerAuth.ts
 
-var _HttpBearerAuthSigner = class _HttpBearerAuthSigner {
+var HttpBearerAuthSigner = class {
+  static {
+    __name(this, "HttpBearerAuthSigner");
+  }
   async sign(httpRequest, identity, signingProperties) {
     const clonedRequest = import_protocol_http.HttpRequest.clone(httpRequest);
     if (!identity.token) {
@@ -18134,17 +18494,16 @@ var _HttpBearerAuthSigner = class _HttpBearerAuthSigner {
     return clonedRequest;
   }
 };
-__name(_HttpBearerAuthSigner, "HttpBearerAuthSigner");
-var HttpBearerAuthSigner = _HttpBearerAuthSigner;
 
 // src/util-identity-and-auth/httpAuthSchemes/noAuth.ts
-var _NoAuthSigner = class _NoAuthSigner {
+var NoAuthSigner = class {
+  static {
+    __name(this, "NoAuthSigner");
+  }
   async sign(httpRequest, identity, signingProperties) {
     return httpRequest;
   }
 };
-__name(_NoAuthSigner, "NoAuthSigner");
-var NoAuthSigner = _NoAuthSigner;
 
 // src/util-identity-and-auth/memoizeIdentityProvider.ts
 var createIsIdentityExpiredFunction = /* @__PURE__ */ __name((expirationMs) => (identity) => doesIdentityRequireRefresh(identity) && identity.expiration.getTime() - Date.now() < expirationMs, "createIsIdentityExpiredFunction");
@@ -18175,14 +18534,14 @@ var memoizeIdentityProvider = /* @__PURE__ */ __name((provider, isExpired, requi
   }, "coalesceProvider");
   if (isExpired === void 0) {
     return async (options) => {
-      if (!hasResult || (options == null ? void 0 : options.forceRefresh)) {
+      if (!hasResult || options?.forceRefresh) {
         resolved = await coalesceProvider(options);
       }
       return resolved;
     };
   }
   return async (options) => {
-    if (!hasResult || (options == null ? void 0 : options.forceRefresh)) {
+    if (!hasResult || options?.forceRefresh) {
       resolved = await coalesceProvider(options);
     }
     if (isConstant) {
@@ -18324,7 +18683,7 @@ var RequestBuilder = class {
    */
   bp(uriLabel) {
     this.resolvePathStack.push((basePath) => {
-      this.path = `${(basePath == null ? void 0 : basePath.endsWith("/")) ? basePath.slice(0, -1) : basePath || ""}` + uriLabel;
+      this.path = `${basePath?.endsWith("/") ? basePath.slice(0, -1) : basePath || ""}` + uriLabel;
     });
     return this;
   }
@@ -18421,13 +18780,12 @@ var import_buffer = __nccwpck_require__(181);
 var import_http = __nccwpck_require__(8611);
 function httpRequest(options) {
   return new Promise((resolve, reject) => {
-    var _a;
     const req = (0, import_http.request)({
       method: "GET",
       ...options,
       // Node.js http module doesn't accept hostname with square brackets
       // Refs: https://github.com/nodejs/node/issues/39738
-      hostname: (_a = options.hostname) == null ? void 0 : _a.replace(/^\[(.+)\]$/, "$1")
+      hostname: options.hostname?.replace(/^\[(.+)\]$/, "$1")
     });
     req.on("error", (err) => {
       reject(Object.assign(new import_property_provider.ProviderError("Unable to connect to instance metadata service"), err));
@@ -18566,16 +18924,17 @@ var getCmdsUri = /* @__PURE__ */ __name(async ({ logger }) => {
 
 // src/error/InstanceMetadataV1FallbackError.ts
 
-var _InstanceMetadataV1FallbackError = class _InstanceMetadataV1FallbackError extends import_property_provider.CredentialsProviderError {
+var InstanceMetadataV1FallbackError = class _InstanceMetadataV1FallbackError extends import_property_provider.CredentialsProviderError {
   constructor(message, tryNextLink = true) {
     super(message, tryNextLink);
     this.tryNextLink = tryNextLink;
     this.name = "InstanceMetadataV1FallbackError";
     Object.setPrototypeOf(this, _InstanceMetadataV1FallbackError.prototype);
   }
+  static {
+    __name(this, "InstanceMetadataV1FallbackError");
+  }
 };
-__name(_InstanceMetadataV1FallbackError, "InstanceMetadataV1FallbackError");
-var InstanceMetadataV1FallbackError = _InstanceMetadataV1FallbackError;
 
 // src/utils/getInstanceMetadataEndpoint.ts
 var import_node_config_provider = __nccwpck_require__(1172);
@@ -18649,7 +19008,7 @@ For more information, please visit: ` + STATIC_STABILITY_DOC_URL
 
 // src/utils/staticStabilityProvider.ts
 var staticStabilityProvider = /* @__PURE__ */ __name((provider, options = {}) => {
-  const logger = (options == null ? void 0 : options.logger) || console;
+  const logger = options?.logger || console;
   let pastCredentials;
   return async () => {
     let credentials;
@@ -18683,8 +19042,7 @@ var getInstanceMetadataProvider = /* @__PURE__ */ __name((init = {}) => {
   const { logger, profile } = init;
   const { timeout, maxRetries } = providerConfigFromInit(init);
   const getCredentials = /* @__PURE__ */ __name(async (maxRetries2, options) => {
-    var _a;
-    const isImdsV1Fallback = disableFetchToken || ((_a = options.headers) == null ? void 0 : _a[X_AWS_EC2_METADATA_TOKEN]) == null;
+    const isImdsV1Fallback = disableFetchToken || options.headers?.[X_AWS_EC2_METADATA_TOKEN] == null;
     if (isImdsV1Fallback) {
       let fallbackBlockedFromProfile = false;
       let fallbackBlockedFromProcessEnv = false;
@@ -18755,21 +19113,21 @@ var getInstanceMetadataProvider = /* @__PURE__ */ __name((init = {}) => {
   return async () => {
     const endpoint = await getInstanceMetadataEndpoint();
     if (disableFetchToken) {
-      logger == null ? void 0 : logger.debug("AWS SDK Instance Metadata", "using v1 fallback (no token fetch)");
+      logger?.debug("AWS SDK Instance Metadata", "using v1 fallback (no token fetch)");
       return getCredentials(maxRetries, { ...endpoint, timeout });
     } else {
       let token;
       try {
         token = (await getMetadataToken({ ...endpoint, timeout })).toString();
       } catch (error) {
-        if ((error == null ? void 0 : error.statusCode) === 400) {
+        if (error?.statusCode === 400) {
           throw Object.assign(error, {
             message: "EC2 Metadata token request returned error"
           });
         } else if (error.message === "TimeoutError" || [403, 404, 405].includes(error.statusCode)) {
           disableFetchToken = true;
         }
-        logger == null ? void 0 : logger.debug("AWS SDK Instance Metadata", "using v1 fallback (initial)");
+        logger?.debug("AWS SDK Instance Metadata", "using v1 fallback (initial)");
         return getCredentials(maxRetries, { ...endpoint, timeout });
       }
       return getCredentials(maxRetries, {
@@ -18872,13 +19230,16 @@ __name(requestTimeout, "requestTimeout");
 var keepAliveSupport = {
   supported: void 0
 };
-var _FetchHttpHandler = class _FetchHttpHandler {
+var FetchHttpHandler = class _FetchHttpHandler {
+  static {
+    __name(this, "FetchHttpHandler");
+  }
   /**
    * @returns the input if it is an HttpHandler of any class,
    * or instantiates a new instance of this handler.
    */
   static create(instanceOrOptions) {
-    if (typeof (instanceOrOptions == null ? void 0 : instanceOrOptions.handle) === "function") {
+    if (typeof instanceOrOptions?.handle === "function") {
       return instanceOrOptions;
     }
     return new _FetchHttpHandler(instanceOrOptions);
@@ -18899,14 +19260,13 @@ var _FetchHttpHandler = class _FetchHttpHandler {
   destroy() {
   }
   async handle(request, { abortSignal } = {}) {
-    var _a;
     if (!this.config) {
       this.config = await this.configProvider;
     }
     const requestTimeoutInMs = this.config.requestTimeout;
     const keepAlive = this.config.keepAlive === true;
     const credentials = this.config.credentials;
-    if (abortSignal == null ? void 0 : abortSignal.aborted) {
+    if (abortSignal?.aborted) {
       const abortError = new Error("Request aborted");
       abortError.name = "AbortError";
       return Promise.reject(abortError);
@@ -18934,7 +19294,7 @@ var _FetchHttpHandler = class _FetchHttpHandler {
       method,
       credentials
     };
-    if ((_a = this.config) == null ? void 0 : _a.cache) {
+    if (this.config?.cache) {
       requestOptions.cache = this.config.cache;
     }
     if (body) {
@@ -19012,14 +19372,11 @@ var _FetchHttpHandler = class _FetchHttpHandler {
     return this.config ?? {};
   }
 };
-__name(_FetchHttpHandler, "FetchHttpHandler");
-var FetchHttpHandler = _FetchHttpHandler;
 
 // src/stream-collector.ts
 var import_util_base64 = __nccwpck_require__(7245);
 var streamCollector = /* @__PURE__ */ __name(async (stream) => {
-  var _a;
-  if (typeof Blob === "function" && stream instanceof Blob || ((_a = stream.constructor) == null ? void 0 : _a.name) === "Blob") {
+  if (typeof Blob === "function" && stream instanceof Blob || stream.constructor?.name === "Blob") {
     if (Blob.prototype.arrayBuffer !== void 0) {
       return new Uint8Array(await stream.arrayBuffer());
     }
@@ -19113,7 +19470,10 @@ var import_util_buffer_from = __nccwpck_require__(1475);
 var import_util_utf8 = __nccwpck_require__(6005);
 var import_buffer = __nccwpck_require__(181);
 var import_crypto = __nccwpck_require__(6982);
-var _Hash = class _Hash {
+var Hash = class {
+  static {
+    __name(this, "Hash");
+  }
   constructor(algorithmIdentifier, secret) {
     this.algorithmIdentifier = algorithmIdentifier;
     this.secret = secret;
@@ -19129,8 +19489,6 @@ var _Hash = class _Hash {
     this.hash = this.secret ? (0, import_crypto.createHmac)(this.algorithmIdentifier, castSourceData(this.secret)) : (0, import_crypto.createHash)(this.algorithmIdentifier);
   }
 };
-__name(_Hash, "Hash");
-var Hash = _Hash;
 function castSourceData(toCast, encoding) {
   if (import_buffer.Buffer.isBuffer(toCast)) {
     return toCast;
@@ -19358,7 +19716,7 @@ module.exports = __toCommonJS(src_exports);
 
 // src/service-customizations/s3.ts
 var resolveParamsForS3 = /* @__PURE__ */ __name(async (endpointParams) => {
-  const bucket = (endpointParams == null ? void 0 : endpointParams.Bucket) || "";
+  const bucket = endpointParams?.Bucket || "";
   if (typeof endpointParams.Bucket === "string") {
     endpointParams.Bucket = bucket.replace(/#/g, encodeURIComponent("#")).replace(/\?/g, encodeURIComponent("?"));
   }
@@ -19401,14 +19759,14 @@ var createConfigValueProvider = /* @__PURE__ */ __name((configKey, canonicalEndp
   if (configKey === "credentialScope" || canonicalEndpointParamKey === "CredentialScope") {
     return async () => {
       const credentials = typeof config.credentials === "function" ? await config.credentials() : config.credentials;
-      const configValue = (credentials == null ? void 0 : credentials.credentialScope) ?? (credentials == null ? void 0 : credentials.CredentialScope);
+      const configValue = credentials?.credentialScope ?? credentials?.CredentialScope;
       return configValue;
     };
   }
   if (configKey === "accountId" || canonicalEndpointParamKey === "AccountId") {
     return async () => {
       const credentials = typeof config.credentials === "function" ? await config.credentials() : config.credentials;
-      const configValue = (credentials == null ? void 0 : credentials.accountId) ?? (credentials == null ? void 0 : credentials.AccountId);
+      const configValue = credentials?.accountId ?? credentials?.AccountId;
       return configValue;
     };
   }
@@ -19466,9 +19824,8 @@ var getEndpointFromInstructions = /* @__PURE__ */ __name(async (commandInput, in
   return endpoint;
 }, "getEndpointFromInstructions");
 var resolveParams = /* @__PURE__ */ __name(async (commandInput, instructionsSupplier, clientConfig) => {
-  var _a;
   const endpointParams = {};
-  const instructions = ((_a = instructionsSupplier == null ? void 0 : instructionsSupplier.getEndpointParameterInstructions) == null ? void 0 : _a.call(instructionsSupplier)) || {};
+  const instructions = instructionsSupplier?.getEndpointParameterInstructions?.() || {};
   for (const [name, instruction] of Object.entries(instructions)) {
     switch (instruction.type) {
       case "staticContextParams":
@@ -19505,7 +19862,6 @@ var endpointMiddleware = /* @__PURE__ */ __name(({
   instructions
 }) => {
   return (next, context) => async (args) => {
-    var _a, _b, _c;
     if (config.endpoint) {
       (0, import_core.setFeature)(context, "ENDPOINT_OVERRIDE", "N");
     }
@@ -19520,13 +19876,13 @@ var endpointMiddleware = /* @__PURE__ */ __name(({
       context
     );
     context.endpointV2 = endpoint;
-    context.authSchemes = (_a = endpoint.properties) == null ? void 0 : _a.authSchemes;
-    const authScheme = (_b = context.authSchemes) == null ? void 0 : _b[0];
+    context.authSchemes = endpoint.properties?.authSchemes;
+    const authScheme = context.authSchemes?.[0];
     if (authScheme) {
       context["signing_region"] = authScheme.signingRegion;
       context["signing_service"] = authScheme.signingName;
       const smithyContext = (0, import_util_middleware.getSmithyContext)(context);
-      const httpAuthOption = (_c = smithyContext == null ? void 0 : smithyContext.selectedHttpAuthScheme) == null ? void 0 : _c.httpAuthOption;
+      const httpAuthOption = smithyContext?.selectedHttpAuthScheme?.httpAuthOption;
       if (httpAuthOption) {
         httpAuthOption.signingProperties = Object.assign(
           httpAuthOption.signingProperties || {},
@@ -19661,9 +20017,9 @@ var import_uuid = __nccwpck_require__(8404);
 var import_util_retry = __nccwpck_require__(4506);
 var getDefaultRetryQuota = /* @__PURE__ */ __name((initialRetryTokens, options) => {
   const MAX_CAPACITY = initialRetryTokens;
-  const noRetryIncrement = (options == null ? void 0 : options.noRetryIncrement) ?? import_util_retry.NO_RETRY_INCREMENT;
-  const retryCost = (options == null ? void 0 : options.retryCost) ?? import_util_retry.RETRY_COST;
-  const timeoutRetryCost = (options == null ? void 0 : options.timeoutRetryCost) ?? import_util_retry.TIMEOUT_RETRY_COST;
+  const noRetryIncrement = options?.noRetryIncrement ?? import_util_retry.NO_RETRY_INCREMENT;
+  const retryCost = options?.retryCost ?? import_util_retry.RETRY_COST;
+  const timeoutRetryCost = options?.timeoutRetryCost ?? import_util_retry.TIMEOUT_RETRY_COST;
   let availableCapacity = initialRetryTokens;
   const getCapacityAmount = /* @__PURE__ */ __name((error) => error.name === "TimeoutError" ? timeoutRetryCost : retryCost, "getCapacityAmount");
   const hasRetryTokens = /* @__PURE__ */ __name((error) => getCapacityAmount(error) <= availableCapacity, "hasRetryTokens");
@@ -19711,13 +20067,16 @@ var asSdkError = /* @__PURE__ */ __name((error) => {
 }, "asSdkError");
 
 // src/StandardRetryStrategy.ts
-var _StandardRetryStrategy = class _StandardRetryStrategy {
+var StandardRetryStrategy = class {
   constructor(maxAttemptsProvider, options) {
     this.maxAttemptsProvider = maxAttemptsProvider;
     this.mode = import_util_retry.RETRY_MODES.STANDARD;
-    this.retryDecider = (options == null ? void 0 : options.retryDecider) ?? defaultRetryDecider;
-    this.delayDecider = (options == null ? void 0 : options.delayDecider) ?? defaultDelayDecider;
-    this.retryQuota = (options == null ? void 0 : options.retryQuota) ?? getDefaultRetryQuota(import_util_retry.INITIAL_RETRY_TOKENS);
+    this.retryDecider = options?.retryDecider ?? defaultRetryDecider;
+    this.delayDecider = options?.delayDecider ?? defaultDelayDecider;
+    this.retryQuota = options?.retryQuota ?? getDefaultRetryQuota(import_util_retry.INITIAL_RETRY_TOKENS);
+  }
+  static {
+    __name(this, "StandardRetryStrategy");
   }
   shouldRetry(error, attempts, maxAttempts) {
     return attempts < maxAttempts && this.retryDecider(error) && this.retryQuota.hasRetryTokens(error);
@@ -19745,11 +20104,11 @@ var _StandardRetryStrategy = class _StandardRetryStrategy {
         if (import_protocol_http.HttpRequest.isInstance(request)) {
           request.headers[import_util_retry.REQUEST_HEADER] = `attempt=${attempts + 1}; max=${maxAttempts}`;
         }
-        if (options == null ? void 0 : options.beforeRequest) {
+        if (options?.beforeRequest) {
           await options.beforeRequest();
         }
         const { response, output } = await next(args);
-        if (options == null ? void 0 : options.afterRequest) {
+        if (options?.afterRequest) {
           options.afterRequest(response);
         }
         this.retryQuota.releaseRetryTokens(retryTokenAmount);
@@ -19781,8 +20140,6 @@ var _StandardRetryStrategy = class _StandardRetryStrategy {
     }
   }
 };
-__name(_StandardRetryStrategy, "StandardRetryStrategy");
-var StandardRetryStrategy = _StandardRetryStrategy;
 var getDelayFromRetryAfterHeader = /* @__PURE__ */ __name((response) => {
   if (!import_protocol_http.HttpResponse.isInstance(response))
     return;
@@ -19798,7 +20155,10 @@ var getDelayFromRetryAfterHeader = /* @__PURE__ */ __name((response) => {
 }, "getDelayFromRetryAfterHeader");
 
 // src/AdaptiveRetryStrategy.ts
-var _AdaptiveRetryStrategy = class _AdaptiveRetryStrategy extends StandardRetryStrategy {
+var AdaptiveRetryStrategy = class extends StandardRetryStrategy {
+  static {
+    __name(this, "AdaptiveRetryStrategy");
+  }
   constructor(maxAttemptsProvider, options) {
     const { rateLimiter, ...superOptions } = options ?? {};
     super(maxAttemptsProvider, superOptions);
@@ -19816,8 +20176,6 @@ var _AdaptiveRetryStrategy = class _AdaptiveRetryStrategy extends StandardRetryS
     });
   }
 };
-__name(_AdaptiveRetryStrategy, "AdaptiveRetryStrategy");
-var AdaptiveRetryStrategy = _AdaptiveRetryStrategy;
 
 // src/configurations.ts
 var import_util_middleware = __nccwpck_require__(4160);
@@ -19905,7 +20263,6 @@ var import_smithy_client = __nccwpck_require__(8015);
 
 var import_isStreamingPayload = __nccwpck_require__(6131);
 var retryMiddleware = /* @__PURE__ */ __name((options) => (next, context) => async (args) => {
-  var _a;
   let retryStrategy = await options.retryStrategy();
   const maxAttempts = await options.maxAttempts();
   if (isRetryStrategyV2(retryStrategy)) {
@@ -19933,7 +20290,7 @@ var retryMiddleware = /* @__PURE__ */ __name((options) => (next, context) => asy
         const retryErrorInfo = getRetryErrorInfo(e);
         lastError = asSdkError(e);
         if (isRequest && (0, import_isStreamingPayload.isStreamingPayload)(request)) {
-          (_a = context.logger instanceof import_smithy_client.NoOpLogger ? console : context.logger) == null ? void 0 : _a.warn(
+          (context.logger instanceof import_smithy_client.NoOpLogger ? console : context.logger)?.warn(
             "An error was encountered in a non-retryable streaming request."
           );
           throw lastError;
@@ -19956,7 +20313,7 @@ var retryMiddleware = /* @__PURE__ */ __name((options) => (next, context) => asy
     }
   } else {
     retryStrategy = retryStrategy;
-    if (retryStrategy == null ? void 0 : retryStrategy.mode)
+    if (retryStrategy?.mode)
       context.userAgent = [...context.userAgent || [], ["cfg/retry-mode", retryStrategy.mode]];
     return retryStrategy.retry(next, args);
   }
@@ -20091,8 +20448,7 @@ var deserializerMiddleware = /* @__PURE__ */ __name((options, deserializer) => (
 
 // src/serializerMiddleware.ts
 var serializerMiddleware = /* @__PURE__ */ __name((options, serializer) => (next, context) => async (args) => {
-  var _a;
-  const endpoint = ((_a = context.endpointV2) == null ? void 0 : _a.url) && options.urlParser ? async () => options.urlParser(context.endpointV2.url) : options.endpoint;
+  const endpoint = context.endpointV2?.url && options.urlParser ? async () => options.urlParser(context.endpointV2.url) : options.endpoint;
   if (!endpoint) {
     throw new Error("No valid endpoint provider available.");
   }
@@ -20220,14 +20576,13 @@ var constructStack = /* @__PURE__ */ __name(() => {
     return isRemoved;
   }, "removeByReference");
   const cloneTo = /* @__PURE__ */ __name((toStack) => {
-    var _a;
     absoluteEntries.forEach((entry) => {
       toStack.add(entry.middleware, { ...entry });
     });
     relativeEntries.forEach((entry) => {
       toStack.addRelativeTo(entry.middleware, { ...entry });
     });
-    (_a = toStack.identifyOnResolve) == null ? void 0 : _a.call(toStack, stack.identifyOnResolve());
+    toStack.identifyOnResolve?.(stack.identifyOnResolve());
     return toStack;
   }, "cloneTo");
   const expandRelativeMiddlewareList = /* @__PURE__ */ __name((from) => {
@@ -20319,10 +20674,7 @@ var constructStack = /* @__PURE__ */ __name(() => {
             throw new Error(`Duplicate middleware name '${getMiddlewareNameWithAliases(name, _aliases)}'`);
           for (const alias of aliases) {
             const toOverrideIndex = absoluteEntries.findIndex(
-              (entry2) => {
-                var _a;
-                return entry2.name === alias || ((_a = entry2.aliases) == null ? void 0 : _a.some((a) => a === alias));
-              }
+              (entry2) => entry2.name === alias || entry2.aliases?.some((a) => a === alias)
             );
             if (toOverrideIndex === -1) {
               continue;
@@ -20355,10 +20707,7 @@ var constructStack = /* @__PURE__ */ __name(() => {
             throw new Error(`Duplicate middleware name '${getMiddlewareNameWithAliases(name, _aliases)}'`);
           for (const alias of aliases) {
             const toOverrideIndex = relativeEntries.findIndex(
-              (entry2) => {
-                var _a;
-                return entry2.name === alias || ((_a = entry2.aliases) == null ? void 0 : _a.some((a) => a === alias));
-              }
+              (entry2) => entry2.name === alias || entry2.aliases?.some((a) => a === alias)
             );
             if (toOverrideIndex === -1) {
               continue;
@@ -20407,11 +20756,10 @@ var constructStack = /* @__PURE__ */ __name(() => {
       return isRemoved;
     },
     concat: (from) => {
-      var _a;
       const cloned = cloneTo(constructStack());
       cloned.use(from);
       cloned.identifyOnResolve(
-        identifyOnResolve || cloned.identifyOnResolve() || (((_a = from.identifyOnResolve) == null ? void 0 : _a.call(from)) ?? false)
+        identifyOnResolve || cloned.identifyOnResolve() || (from.identifyOnResolve?.() ?? false)
       );
       return cloned;
     },
@@ -20652,7 +21000,7 @@ var setConnectionTimeout = /* @__PURE__ */ __name((request, reject, timeoutInMs 
       );
     }, timeoutInMs - offset);
     const doWithSocket = /* @__PURE__ */ __name((socket) => {
-      if (socket == null ? void 0 : socket.connecting) {
+      if (socket?.connecting) {
         socket.on("connect", () => {
           timing.clearTimeout(timeoutId);
         });
@@ -20697,7 +21045,7 @@ var setSocketKeepAlive = /* @__PURE__ */ __name((request, { keepAlive, keepAlive
 
 // src/set-socket-timeout.ts
 var DEFER_EVENT_LISTENER_TIME3 = 3e3;
-var setSocketTimeout = /* @__PURE__ */ __name((request, reject, timeoutInMs = 0) => {
+var setSocketTimeout = /* @__PURE__ */ __name((request, reject, timeoutInMs = DEFAULT_REQUEST_TIMEOUT) => {
   const registerTimeout = /* @__PURE__ */ __name((offset) => {
     const timeout = timeoutInMs - offset;
     const onTimeout = /* @__PURE__ */ __name(() => {
@@ -20778,7 +21126,7 @@ __name(writeBody, "writeBody");
 
 // src/node-http-handler.ts
 var DEFAULT_REQUEST_TIMEOUT = 0;
-var _NodeHttpHandler = class _NodeHttpHandler {
+var NodeHttpHandler = class _NodeHttpHandler {
   constructor(options) {
     this.socketWarningTimestamp = 0;
     // Node http handler is hard-coded to http/1.1: https://github.com/nodejs/node/blob/ff5664b83b89c55e4ab5d5f60068fb457f1f5872/lib/_http_server.js#L286
@@ -20793,12 +21141,15 @@ var _NodeHttpHandler = class _NodeHttpHandler {
       }
     });
   }
+  static {
+    __name(this, "NodeHttpHandler");
+  }
   /**
    * @returns the input if it is an HttpHandler of any class,
    * or instantiates a new instance of this handler.
    */
   static create(instanceOrOptions) {
-    if (typeof (instanceOrOptions == null ? void 0 : instanceOrOptions.handle) === "function") {
+    if (typeof instanceOrOptions?.handle === "function") {
       return instanceOrOptions;
     }
     return new _NodeHttpHandler(instanceOrOptions);
@@ -20812,7 +21163,6 @@ var _NodeHttpHandler = class _NodeHttpHandler {
    * @returns timestamp of last emitted warning.
    */
   static checkSocketUsage(agent, socketWarningTimestamp, logger = console) {
-    var _a, _b, _c;
     const { sockets, requests, maxSockets } = agent;
     if (typeof maxSockets !== "number" || maxSockets === Infinity) {
       return socketWarningTimestamp;
@@ -20823,11 +21173,10 @@ var _NodeHttpHandler = class _NodeHttpHandler {
     }
     if (sockets && requests) {
       for (const origin in sockets) {
-        const socketsInUse = ((_a = sockets[origin]) == null ? void 0 : _a.length) ?? 0;
-        const requestsEnqueued = ((_b = requests[origin]) == null ? void 0 : _b.length) ?? 0;
+        const socketsInUse = sockets[origin]?.length ?? 0;
+        const requestsEnqueued = requests[origin]?.length ?? 0;
         if (socketsInUse >= maxSockets && requestsEnqueued >= 2 * maxSockets) {
-          (_c = logger == null ? void 0 : logger.warn) == null ? void 0 : _c.call(
-            logger,
+          logger?.warn?.(
             `@smithy/node-http-handler:WARN - socket usage at capacity=${socketsInUse} and ${requestsEnqueued} additional requests are enqueued.
 See https://docs.aws.amazon.com/sdk-for-javascript/v3/developer-guide/node-configuring-maxsockets.html
 or increase socketAcquisitionWarningTimeout=(millis) in the NodeHttpHandler config.`
@@ -20846,13 +21195,13 @@ or increase socketAcquisitionWarningTimeout=(millis) in the NodeHttpHandler conf
       connectionTimeout,
       requestTimeout: requestTimeout ?? socketTimeout,
       httpAgent: (() => {
-        if (httpAgent instanceof import_http.Agent || typeof (httpAgent == null ? void 0 : httpAgent.destroy) === "function") {
+        if (httpAgent instanceof import_http.Agent || typeof httpAgent?.destroy === "function") {
           return httpAgent;
         }
         return new import_http.Agent({ keepAlive, maxSockets, ...httpAgent });
       })(),
       httpsAgent: (() => {
-        if (httpsAgent instanceof import_https.Agent || typeof (httpsAgent == null ? void 0 : httpsAgent.destroy) === "function") {
+        if (httpsAgent instanceof import_https.Agent || typeof httpsAgent?.destroy === "function") {
           return httpsAgent;
         }
         return new import_https.Agent({ keepAlive, maxSockets, ...httpsAgent });
@@ -20861,9 +21210,8 @@ or increase socketAcquisitionWarningTimeout=(millis) in the NodeHttpHandler conf
     };
   }
   destroy() {
-    var _a, _b, _c, _d;
-    (_b = (_a = this.config) == null ? void 0 : _a.httpAgent) == null ? void 0 : _b.destroy();
-    (_d = (_c = this.config) == null ? void 0 : _c.httpsAgent) == null ? void 0 : _d.destroy();
+    this.config?.httpAgent?.destroy();
+    this.config?.httpsAgent?.destroy();
   }
   async handle(request, { abortSignal } = {}) {
     if (!this.config) {
@@ -20885,7 +21233,7 @@ or increase socketAcquisitionWarningTimeout=(millis) in the NodeHttpHandler conf
       if (!this.config) {
         throw new Error("Node HTTP request handler config is not resolved");
       }
-      if (abortSignal == null ? void 0 : abortSignal.aborted) {
+      if (abortSignal?.aborted) {
         const abortError = new Error("Request aborted");
         abortError.name = "AbortError";
         reject(abortError);
@@ -20998,8 +21346,6 @@ or increase socketAcquisitionWarningTimeout=(millis) in the NodeHttpHandler conf
     return this.config ?? {};
   }
 };
-__name(_NodeHttpHandler, "NodeHttpHandler");
-var NodeHttpHandler = _NodeHttpHandler;
 
 // src/node-http2-handler.ts
 
@@ -21010,10 +21356,13 @@ var import_http22 = __nccwpck_require__(5675);
 var import_http2 = __toESM(__nccwpck_require__(5675));
 
 // src/node-http2-connection-pool.ts
-var _NodeHttp2ConnectionPool = class _NodeHttp2ConnectionPool {
+var NodeHttp2ConnectionPool = class {
   constructor(sessions) {
     this.sessions = [];
     this.sessions = sessions ?? [];
+  }
+  static {
+    __name(this, "NodeHttp2ConnectionPool");
   }
   poll() {
     if (this.sessions.length > 0) {
@@ -21042,17 +21391,18 @@ var _NodeHttp2ConnectionPool = class _NodeHttp2ConnectionPool {
     }
   }
 };
-__name(_NodeHttp2ConnectionPool, "NodeHttp2ConnectionPool");
-var NodeHttp2ConnectionPool = _NodeHttp2ConnectionPool;
 
 // src/node-http2-connection-manager.ts
-var _NodeHttp2ConnectionManager = class _NodeHttp2ConnectionManager {
+var NodeHttp2ConnectionManager = class {
   constructor(config) {
     this.sessionCache = /* @__PURE__ */ new Map();
     this.config = config;
     if (this.config.maxConcurrency && this.config.maxConcurrency <= 0) {
       throw new RangeError("maxConcurrency must be greater than zero.");
     }
+  }
+  static {
+    __name(this, "NodeHttp2ConnectionManager");
   }
   lease(requestContext, connectionConfiguration) {
     const url = this.getUrlString(requestContext);
@@ -21107,9 +21457,8 @@ var _NodeHttp2ConnectionManager = class _NodeHttp2ConnectionManager {
     this.sessionCache.set(authority, existingConnectionPool);
   }
   release(requestContext, session) {
-    var _a;
     const cacheKey = this.getUrlString(requestContext);
-    (_a = this.sessionCache.get(cacheKey)) == null ? void 0 : _a.offerLast(session);
+    this.sessionCache.get(cacheKey)?.offerLast(session);
   }
   destroy() {
     for (const [key, connectionPool] of this.sessionCache) {
@@ -21135,11 +21484,9 @@ var _NodeHttp2ConnectionManager = class _NodeHttp2ConnectionManager {
     return request.destination.toString();
   }
 };
-__name(_NodeHttp2ConnectionManager, "NodeHttp2ConnectionManager");
-var NodeHttp2ConnectionManager = _NodeHttp2ConnectionManager;
 
 // src/node-http2-handler.ts
-var _NodeHttp2Handler = class _NodeHttp2Handler {
+var NodeHttp2Handler = class _NodeHttp2Handler {
   constructor(options) {
     this.metadata = { handlerProtocol: "h2" };
     this.connectionManager = new NodeHttp2ConnectionManager({});
@@ -21153,12 +21500,15 @@ var _NodeHttp2Handler = class _NodeHttp2Handler {
       }
     });
   }
+  static {
+    __name(this, "NodeHttp2Handler");
+  }
   /**
    * @returns the input if it is an HttpHandler of any class,
    * or instantiates a new instance of this handler.
    */
   static create(instanceOrOptions) {
-    if (typeof (instanceOrOptions == null ? void 0 : instanceOrOptions.handle) === "function") {
+    if (typeof instanceOrOptions?.handle === "function") {
       return instanceOrOptions;
     }
     return new _NodeHttp2Handler(instanceOrOptions);
@@ -21176,7 +21526,6 @@ var _NodeHttp2Handler = class _NodeHttp2Handler {
     }
     const { requestTimeout, disableConcurrentStreams } = this.config;
     return new Promise((_resolve, _reject) => {
-      var _a;
       let fulfilled = false;
       let writeRequestBodyPromise = void 0;
       const resolve = /* @__PURE__ */ __name(async (arg) => {
@@ -21187,7 +21536,7 @@ var _NodeHttp2Handler = class _NodeHttp2Handler {
         await writeRequestBodyPromise;
         _reject(arg);
       }, "reject");
-      if (abortSignal == null ? void 0 : abortSignal.aborted) {
+      if (abortSignal?.aborted) {
         fulfilled = true;
         const abortError = new Error("Request aborted");
         abortError.name = "AbortError";
@@ -21204,7 +21553,7 @@ var _NodeHttp2Handler = class _NodeHttp2Handler {
       const authority = `${protocol}//${auth}${hostname}${port ? `:${port}` : ""}`;
       const requestContext = { destination: new URL(authority) };
       const session = this.connectionManager.lease(requestContext, {
-        requestTimeout: (_a = this.config) == null ? void 0 : _a.sessionTimeout,
+        requestTimeout: this.config?.sessionTimeout,
         disableConcurrentStreams: disableConcurrentStreams || false
       });
       const rejectWithDestroy = /* @__PURE__ */ __name((err) => {
@@ -21299,7 +21648,7 @@ var _NodeHttp2Handler = class _NodeHttp2Handler {
   }
   /**
    * Destroys a session.
-   * @param session The session to destroy.
+   * @param session - the session to destroy.
    */
   destroySession(session) {
     if (!session.destroyed) {
@@ -21307,23 +21656,22 @@ var _NodeHttp2Handler = class _NodeHttp2Handler {
     }
   }
 };
-__name(_NodeHttp2Handler, "NodeHttp2Handler");
-var NodeHttp2Handler = _NodeHttp2Handler;
 
 // src/stream-collector/collector.ts
 
-var _Collector = class _Collector extends import_stream.Writable {
+var Collector = class extends import_stream.Writable {
   constructor() {
     super(...arguments);
     this.bufferedBytes = [];
+  }
+  static {
+    __name(this, "Collector");
   }
   _write(chunk, encoding, callback) {
     this.bufferedBytes.push(chunk);
     callback();
   }
 };
-__name(_Collector, "Collector");
-var Collector = _Collector;
 
 // src/stream-collector/index.ts
 var streamCollector = /* @__PURE__ */ __name((stream) => {
@@ -21410,9 +21758,8 @@ __export(src_exports, {
 module.exports = __toCommonJS(src_exports);
 
 // src/ProviderError.ts
-var _ProviderError = class _ProviderError extends Error {
+var ProviderError = class _ProviderError extends Error {
   constructor(message, options = true) {
-    var _a;
     let logger;
     let tryNextLink = true;
     if (typeof options === "boolean") {
@@ -21426,7 +21773,10 @@ var _ProviderError = class _ProviderError extends Error {
     this.name = "ProviderError";
     this.tryNextLink = tryNextLink;
     Object.setPrototypeOf(this, _ProviderError.prototype);
-    (_a = logger == null ? void 0 : logger.debug) == null ? void 0 : _a.call(logger, `@smithy/property-provider ${tryNextLink ? "->" : "(!)"} ${message}`);
+    logger?.debug?.(`@smithy/property-provider ${tryNextLink ? "->" : "(!)"} ${message}`);
+  }
+  static {
+    __name(this, "ProviderError");
   }
   /**
    * @deprecated use new operator.
@@ -21435,11 +21785,9 @@ var _ProviderError = class _ProviderError extends Error {
     return Object.assign(new this(error.message, options), error);
   }
 };
-__name(_ProviderError, "ProviderError");
-var ProviderError = _ProviderError;
 
 // src/CredentialsProviderError.ts
-var _CredentialsProviderError = class _CredentialsProviderError extends ProviderError {
+var CredentialsProviderError = class _CredentialsProviderError extends ProviderError {
   /**
    * @override
    */
@@ -21448,12 +21796,13 @@ var _CredentialsProviderError = class _CredentialsProviderError extends Provider
     this.name = "CredentialsProviderError";
     Object.setPrototypeOf(this, _CredentialsProviderError.prototype);
   }
+  static {
+    __name(this, "CredentialsProviderError");
+  }
 };
-__name(_CredentialsProviderError, "CredentialsProviderError");
-var CredentialsProviderError = _CredentialsProviderError;
 
 // src/TokenProviderError.ts
-var _TokenProviderError = class _TokenProviderError extends ProviderError {
+var TokenProviderError = class _TokenProviderError extends ProviderError {
   /**
    * @override
    */
@@ -21462,9 +21811,10 @@ var _TokenProviderError = class _TokenProviderError extends ProviderError {
     this.name = "TokenProviderError";
     Object.setPrototypeOf(this, _TokenProviderError.prototype);
   }
+  static {
+    __name(this, "TokenProviderError");
+  }
 };
-__name(_TokenProviderError, "TokenProviderError");
-var TokenProviderError = _TokenProviderError;
 
 // src/chain.ts
 var chain = /* @__PURE__ */ __name((...providers) => async () => {
@@ -21478,7 +21828,7 @@ var chain = /* @__PURE__ */ __name((...providers) => async () => {
       return credentials;
     } catch (err) {
       lastProviderError = err;
-      if (err == null ? void 0 : err.tryNextLink) {
+      if (err?.tryNextLink) {
         continue;
       }
       throw err;
@@ -21511,14 +21861,14 @@ var memoize = /* @__PURE__ */ __name((provider, isExpired, requiresRefresh) => {
   }, "coalesceProvider");
   if (isExpired === void 0) {
     return async (options) => {
-      if (!hasResult || (options == null ? void 0 : options.forceRefresh)) {
+      if (!hasResult || options?.forceRefresh) {
         resolved = await coalesceProvider();
       }
       return resolved;
     };
   }
   return async (options) => {
-    if (!hasResult || (options == null ? void 0 : options.forceRefresh)) {
+    if (!hasResult || options?.forceRefresh) {
       resolved = await coalesceProvider();
     }
     if (isConstant) {
@@ -21605,7 +21955,10 @@ var resolveHttpHandlerRuntimeConfig = /* @__PURE__ */ __name((httpHandlerExtensi
 
 // src/Field.ts
 var import_types = __nccwpck_require__(4566);
-var _Field = class _Field {
+var Field = class {
+  static {
+    __name(this, "Field");
+  }
   constructor({ name, kind = import_types.FieldPosition.HEADER, values = [] }) {
     this.name = name;
     this.kind = kind;
@@ -21652,15 +22005,16 @@ var _Field = class _Field {
     return this.values;
   }
 };
-__name(_Field, "Field");
-var Field = _Field;
 
 // src/Fields.ts
-var _Fields = class _Fields {
+var Fields = class {
   constructor({ fields = [], encoding = "utf-8" }) {
     this.entries = {};
     fields.forEach(this.setField.bind(this));
     this.encoding = encoding;
+  }
+  static {
+    __name(this, "Fields");
   }
   /**
    * Set entry for a {@link Field} name. The `name`
@@ -21701,12 +22055,13 @@ var _Fields = class _Fields {
     return Object.values(this.entries).filter((field) => field.kind === kind);
   }
 };
-__name(_Fields, "Fields");
-var Fields = _Fields;
 
 // src/httpRequest.ts
 
-var _HttpRequest = class _HttpRequest {
+var HttpRequest = class _HttpRequest {
+  static {
+    __name(this, "HttpRequest");
+  }
   constructor(options) {
     this.method = options.method || "GET";
     this.hostname = options.hostname || "localhost";
@@ -21756,8 +22111,6 @@ var _HttpRequest = class _HttpRequest {
     return _HttpRequest.clone(this);
   }
 };
-__name(_HttpRequest, "HttpRequest");
-var HttpRequest = _HttpRequest;
 function cloneQuery(query) {
   return Object.keys(query).reduce((carry, paramName) => {
     const param = query[paramName];
@@ -21770,7 +22123,10 @@ function cloneQuery(query) {
 __name(cloneQuery, "cloneQuery");
 
 // src/httpResponse.ts
-var _HttpResponse = class _HttpResponse {
+var HttpResponse = class {
+  static {
+    __name(this, "HttpResponse");
+  }
   constructor(options) {
     this.statusCode = options.statusCode;
     this.reason = options.reason;
@@ -21784,8 +22140,6 @@ var _HttpResponse = class _HttpResponse {
     return typeof resp.statusCode === "number" && typeof resp.headers === "object";
   }
 };
-__name(_HttpResponse, "HttpResponse");
-var HttpResponse = _HttpResponse;
 
 // src/isValidHostname.ts
 function isValidHostname(hostname) {
@@ -21983,21 +22337,11 @@ var NODEJS_TIMEOUT_ERROR_CODES = ["ECONNRESET", "ECONNREFUSED", "EPIPE", "ETIMED
 // src/index.ts
 var isRetryableByTrait = /* @__PURE__ */ __name((error) => error.$retryable !== void 0, "isRetryableByTrait");
 var isClockSkewError = /* @__PURE__ */ __name((error) => CLOCK_SKEW_ERROR_CODES.includes(error.name), "isClockSkewError");
-var isClockSkewCorrectedError = /* @__PURE__ */ __name((error) => {
-  var _a;
-  return (_a = error.$metadata) == null ? void 0 : _a.clockSkewCorrected;
-}, "isClockSkewCorrectedError");
-var isThrottlingError = /* @__PURE__ */ __name((error) => {
-  var _a, _b;
-  return ((_a = error.$metadata) == null ? void 0 : _a.httpStatusCode) === 429 || THROTTLING_ERROR_CODES.includes(error.name) || ((_b = error.$retryable) == null ? void 0 : _b.throttling) == true;
-}, "isThrottlingError");
-var isTransientError = /* @__PURE__ */ __name((error, depth = 0) => {
-  var _a;
-  return isClockSkewCorrectedError(error) || TRANSIENT_ERROR_CODES.includes(error.name) || NODEJS_TIMEOUT_ERROR_CODES.includes((error == null ? void 0 : error.code) || "") || TRANSIENT_ERROR_STATUS_CODES.includes(((_a = error.$metadata) == null ? void 0 : _a.httpStatusCode) || 0) || error.cause !== void 0 && depth <= 10 && isTransientError(error.cause, depth + 1);
-}, "isTransientError");
+var isClockSkewCorrectedError = /* @__PURE__ */ __name((error) => error.$metadata?.clockSkewCorrected, "isClockSkewCorrectedError");
+var isThrottlingError = /* @__PURE__ */ __name((error) => error.$metadata?.httpStatusCode === 429 || THROTTLING_ERROR_CODES.includes(error.name) || error.$retryable?.throttling == true, "isThrottlingError");
+var isTransientError = /* @__PURE__ */ __name((error, depth = 0) => isClockSkewCorrectedError(error) || TRANSIENT_ERROR_CODES.includes(error.name) || NODEJS_TIMEOUT_ERROR_CODES.includes(error?.code || "") || TRANSIENT_ERROR_STATUS_CODES.includes(error.$metadata?.httpStatusCode || 0) || error.cause !== void 0 && depth <= 10 && isTransientError(error.cause, depth + 1), "isTransientError");
 var isServerError = /* @__PURE__ */ __name((error) => {
-  var _a;
-  if (((_a = error.$metadata) == null ? void 0 : _a.httpStatusCode) !== void 0) {
+  if (error.$metadata?.httpStatusCode !== void 0) {
     const statusCode = error.$metadata.httpStatusCode;
     if (500 <= statusCode && statusCode <= 599 && !isTransientError(error)) {
       return true;
@@ -22437,7 +22781,7 @@ var getCanonicalHeaders = /* @__PURE__ */ __name(({ headers }, unsignableHeaders
       continue;
     }
     const canonicalHeaderName = headerName.toLowerCase();
-    if (canonicalHeaderName in ALWAYS_UNSIGNABLE_HEADERS || (unsignableHeaders == null ? void 0 : unsignableHeaders.has(canonicalHeaderName)) || PROXY_HEADER_PATTERN.test(canonicalHeaderName) || SEC_HEADER_PATTERN.test(canonicalHeaderName)) {
+    if (canonicalHeaderName in ALWAYS_UNSIGNABLE_HEADERS || unsignableHeaders?.has(canonicalHeaderName) || PROXY_HEADER_PATTERN.test(canonicalHeaderName) || SEC_HEADER_PATTERN.test(canonicalHeaderName)) {
       if (!signableHeaders || signableHeaders && !signableHeaders.has(canonicalHeaderName)) {
         continue;
       }
@@ -22491,7 +22835,10 @@ var getPayloadHash = /* @__PURE__ */ __name(async ({ headers, body }, hashConstr
 // src/HeaderFormatter.ts
 
 var import_util_utf83 = __nccwpck_require__(6005);
-var _HeaderFormatter = class _HeaderFormatter {
+var HeaderFormatter = class {
+  static {
+    __name(this, "HeaderFormatter");
+  }
   format(headers) {
     const chunks = [];
     for (const headerName of Object.keys(headers)) {
@@ -22558,15 +22905,16 @@ var _HeaderFormatter = class _HeaderFormatter {
     }
   }
 };
-__name(_HeaderFormatter, "HeaderFormatter");
-var HeaderFormatter = _HeaderFormatter;
 var UUID_PATTERN = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
-var _Int64 = class _Int64 {
+var Int64 = class _Int64 {
   constructor(bytes) {
     this.bytes = bytes;
     if (bytes.byteLength !== 8) {
       throw new Error("Int64 buffers must be exactly 8 bytes");
     }
+  }
+  static {
+    __name(this, "Int64");
   }
   static fromNumber(number) {
     if (number > 9223372036854776e3 || number < -9223372036854776e3) {
@@ -22596,8 +22944,6 @@ var _Int64 = class _Int64 {
     return String(this.valueOf());
   }
 };
-__name(_Int64, "Int64");
-var Int64 = _Int64;
 function negate(bytes) {
   for (let i = 0; i < 8; i++) {
     bytes[i] ^= 255;
@@ -22624,11 +22970,10 @@ var hasHeader = /* @__PURE__ */ __name((soughtHeader, headers) => {
 // src/moveHeadersToQuery.ts
 var import_protocol_http = __nccwpck_require__(9752);
 var moveHeadersToQuery = /* @__PURE__ */ __name((request, options = {}) => {
-  var _a, _b;
   const { headers, query = {} } = import_protocol_http.HttpRequest.clone(request);
   for (const name of Object.keys(headers)) {
     const lname = name.toLowerCase();
-    if (lname.slice(0, 6) === "x-amz-" && !((_a = options.unhoistableHeaders) == null ? void 0 : _a.has(lname)) || ((_b = options.hoistableHeaders) == null ? void 0 : _b.has(lname))) {
+    if (lname.slice(0, 6) === "x-amz-" && !options.unhoistableHeaders?.has(lname) || options.hoistableHeaders?.has(lname)) {
       query[name] = headers[name];
       delete headers[name];
     }
@@ -22668,7 +23013,7 @@ var toDate = /* @__PURE__ */ __name((time) => {
 }, "toDate");
 
 // src/SignatureV4.ts
-var _SignatureV4 = class _SignatureV4 {
+var SignatureV4 = class {
   constructor({
     applyChecksum,
     credentials,
@@ -22684,6 +23029,9 @@ var _SignatureV4 = class _SignatureV4 {
     this.applyChecksum = typeof applyChecksum === "boolean" ? applyChecksum : true;
     this.regionProvider = (0, import_util_middleware.normalizeProvider)(region);
     this.credentialProvider = (0, import_util_middleware.normalizeProvider)(credentials);
+  }
+  static {
+    __name(this, "SignatureV4");
   }
   async presign(originalRequest, options = {}) {
     const {
@@ -22833,7 +23181,7 @@ ${(0, import_util_hex_encoding.toHex)(hashedRequest)}`;
     if (this.uriEscapePath) {
       const normalizedPathSegments = [];
       for (const pathSegment of path.split("/")) {
-        if ((pathSegment == null ? void 0 : pathSegment.length) === 0)
+        if (pathSegment?.length === 0)
           continue;
         if (pathSegment === ".")
           continue;
@@ -22843,7 +23191,7 @@ ${(0, import_util_hex_encoding.toHex)(hashedRequest)}`;
           normalizedPathSegments.push(pathSegment);
         }
       }
-      const normalizedPath = `${(path == null ? void 0 : path.startsWith("/")) ? "/" : ""}${normalizedPathSegments.join("/")}${normalizedPathSegments.length > 0 && (path == null ? void 0 : path.endsWith("/")) ? "/" : ""}`;
+      const normalizedPath = `${path?.startsWith("/") ? "/" : ""}${normalizedPathSegments.join("/")}${normalizedPathSegments.length > 0 && path?.endsWith("/") ? "/" : ""}`;
       const doubleEncoded = (0, import_util_uri_escape.escapeUri)(normalizedPath);
       return doubleEncoded.replace(/%2F/g, "/");
     }
@@ -22866,8 +23214,6 @@ ${(0, import_util_hex_encoding.toHex)(hashedRequest)}`;
     }
   }
 };
-__name(_SignatureV4, "SignatureV4");
-var SignatureV4 = _SignatureV4;
 var formatDate = /* @__PURE__ */ __name((now) => {
   const longDate = iso8601(now).replace(/[\-:]/g, "");
   return {
@@ -22975,10 +23321,13 @@ module.exports = __toCommonJS(src_exports);
 
 // src/client.ts
 var import_middleware_stack = __nccwpck_require__(3964);
-var _Client = class _Client {
+var Client = class {
   constructor(config) {
     this.config = config;
     this.middlewareStack = (0, import_middleware_stack.constructStack)();
+  }
+  static {
+    __name(this, "Client");
   }
   send(command, optionsOrCb, cb) {
     const options = typeof optionsOrCb !== "function" ? optionsOrCb : void 0;
@@ -23015,13 +23364,10 @@ var _Client = class _Client {
     }
   }
   destroy() {
-    var _a, _b, _c;
-    (_c = (_b = (_a = this.config) == null ? void 0 : _a.requestHandler) == null ? void 0 : _b.destroy) == null ? void 0 : _c.call(_b);
+    this.config?.requestHandler?.destroy?.();
     delete this.handlers;
   }
 };
-__name(_Client, "Client");
-var Client = _Client;
 
 // src/collect-stream-body.ts
 var import_protocols = __nccwpck_require__(9922);
@@ -23029,9 +23375,12 @@ var import_protocols = __nccwpck_require__(9922);
 // src/command.ts
 
 var import_types = __nccwpck_require__(4566);
-var _Command = class _Command {
+var Command = class {
   constructor() {
     this.middlewareStack = (0, import_middleware_stack.constructStack)();
+  }
+  static {
+    __name(this, "Command");
   }
   /**
    * Factory for Command ClassBuilder.
@@ -23077,9 +23426,7 @@ var _Command = class _Command {
     );
   }
 };
-__name(_Command, "Command");
-var Command = _Command;
-var _ClassBuilder = class _ClassBuilder {
+var ClassBuilder = class {
   constructor() {
     this._init = () => {
     };
@@ -23093,6 +23440,9 @@ var _ClassBuilder = class _ClassBuilder {
     this._outputFilterSensitiveLog = (_) => _;
     this._serializer = null;
     this._deserializer = null;
+  }
+  static {
+    __name(this, "ClassBuilder");
   }
   /**
    * Optional init callback.
@@ -23166,10 +23516,9 @@ var _ClassBuilder = class _ClassBuilder {
    * @returns a Command class with the classBuilder properties.
    */
   build() {
-    var _a;
     const closure = this;
     let CommandRef;
-    return CommandRef = (_a = class extends Command {
+    return CommandRef = class extends Command {
       /**
        * @public
        */
@@ -23187,6 +23536,9 @@ var _ClassBuilder = class _ClassBuilder {
         this.deserialize = closure._deserializer;
         this.input = input ?? {};
         closure._init(this);
+      }
+      static {
+        __name(this, "CommandRef");
       }
       /**
        * @public
@@ -23209,11 +23561,9 @@ var _ClassBuilder = class _ClassBuilder {
           additionalContext: closure._additionalContext
         });
       }
-    }, __name(_a, "CommandRef"), _a);
+    };
   }
 };
-__name(_ClassBuilder, "ClassBuilder");
-var ClassBuilder = _ClassBuilder;
 
 // src/constants.ts
 var SENSITIVE_STRING = "***SensitiveInformation***";
@@ -23694,7 +24044,10 @@ var stripLeadingZeroes = /* @__PURE__ */ __name((value) => {
 }, "stripLeadingZeroes");
 
 // src/exceptions.ts
-var _ServiceException = class _ServiceException extends Error {
+var ServiceException = class _ServiceException extends Error {
+  static {
+    __name(this, "ServiceException");
+  }
   constructor(options) {
     super(options.message);
     Object.setPrototypeOf(this, _ServiceException.prototype);
@@ -23712,8 +24065,6 @@ var _ServiceException = class _ServiceException extends Error {
     return Boolean(candidate.$fault) && Boolean(candidate.$metadata) && (candidate.$fault === "client" || candidate.$fault === "server");
   }
 };
-__name(_ServiceException, "ServiceException");
-var ServiceException = _ServiceException;
 var decorateServiceException = /* @__PURE__ */ __name((exception, additions = {}) => {
   Object.entries(additions).filter(([, v]) => v !== void 0).forEach(([k, v]) => {
     if (exception[k] == void 0 || exception[k] === "") {
@@ -23731,7 +24082,7 @@ var throwDefaultError = /* @__PURE__ */ __name(({ output, parsedBody, exceptionC
   const $metadata = deserializeMetadata(output);
   const statusCode = $metadata.httpStatusCode ? $metadata.httpStatusCode + "" : void 0;
   const response = new exceptionCtor({
-    name: (parsedBody == null ? void 0 : parsedBody.code) || (parsedBody == null ? void 0 : parsedBody.Code) || errorCode || statusCode || "UnknownError",
+    name: parsedBody?.code || parsedBody?.Code || errorCode || statusCode || "UnknownError",
     $fault: "client",
     $metadata
   });
@@ -23900,7 +24251,10 @@ LazyJsonString.from = (object) => {
 LazyJsonString.fromObject = LazyJsonString.from;
 
 // src/NoOpLogger.ts
-var _NoOpLogger = class _NoOpLogger {
+var NoOpLogger = class {
+  static {
+    __name(this, "NoOpLogger");
+  }
   trace() {
   }
   debug() {
@@ -23912,8 +24266,6 @@ var _NoOpLogger = class _NoOpLogger {
   error() {
   }
 };
-__name(_NoOpLogger, "NoOpLogger");
-var NoOpLogger = _NoOpLogger;
 
 // src/object-mapping.ts
 function map(arg0, arg1, arg2) {
@@ -24662,7 +25014,7 @@ var resolveDefaultsModeConfig = /* @__PURE__ */ __name(({
   defaultsMode = (0, import_node_config_provider.loadConfig)(NODE_DEFAULTS_MODE_CONFIG_OPTIONS)
 } = {}) => (0, import_property_provider.memoize)(async () => {
   const mode = typeof defaultsMode === "function" ? await defaultsMode() : defaultsMode;
-  switch (mode == null ? void 0 : mode.toLowerCase()) {
+  switch (mode?.toLowerCase()) {
     case "auto":
       return resolveNodeDefaultsModeAuto(region);
     case "in-region":
@@ -24670,7 +25022,7 @@ var resolveDefaultsModeConfig = /* @__PURE__ */ __name(({
     case "mobile":
     case "standard":
     case "legacy":
-      return Promise.resolve(mode == null ? void 0 : mode.toLocaleLowerCase());
+      return Promise.resolve(mode?.toLocaleLowerCase());
     case void 0:
       return Promise.resolve("legacy");
     default:
@@ -24750,7 +25102,7 @@ __export(src_exports, {
 module.exports = __toCommonJS(src_exports);
 
 // src/cache/EndpointCache.ts
-var _EndpointCache = class _EndpointCache {
+var EndpointCache = class {
   /**
    * @param [size] - desired average maximum capacity. A buffer of 10 additional keys will be allowed
    *                 before keys are dropped.
@@ -24766,6 +25118,9 @@ var _EndpointCache = class _EndpointCache {
     if (params) {
       this.parameters = params;
     }
+  }
+  static {
+    __name(this, "EndpointCache");
   }
   /**
    * @param endpointParams - query for endpoint.
@@ -24815,8 +25170,6 @@ var _EndpointCache = class _EndpointCache {
     return buffer;
   }
 };
-__name(_EndpointCache, "EndpointCache");
-var EndpointCache = _EndpointCache;
 
 // src/lib/isIpAddress.ts
 var IP_V4_REGEX = new RegExp(
@@ -24861,14 +25214,15 @@ function toDebugString(input) {
 __name(toDebugString, "toDebugString");
 
 // src/types/EndpointError.ts
-var _EndpointError = class _EndpointError extends Error {
+var EndpointError = class extends Error {
+  static {
+    __name(this, "EndpointError");
+  }
   constructor(message) {
     super(message);
     this.name = "EndpointError";
   }
 };
-__name(_EndpointError, "EndpointError");
-var EndpointError = _EndpointError;
 
 // src/lib/booleanEquals.ts
 var booleanEquals = /* @__PURE__ */ __name((value1, value2) => value1 === value2, "booleanEquals");
@@ -25063,12 +25417,11 @@ var callFunction = /* @__PURE__ */ __name(({ fn, argv }, options) => {
 
 // src/utils/evaluateCondition.ts
 var evaluateCondition = /* @__PURE__ */ __name(({ assign, ...fnArgs }, options) => {
-  var _a, _b;
   if (assign && assign in options.referenceRecord) {
     throw new EndpointError(`'${assign}' is already defined in Reference Record.`);
   }
   const value = callFunction(fnArgs, options);
-  (_b = (_a = options.logger) == null ? void 0 : _a.debug) == null ? void 0 : _b.call(_a, `${debugId} evaluateCondition: ${toDebugString(fnArgs)} = ${toDebugString(value)}`);
+  options.logger?.debug?.(`${debugId} evaluateCondition: ${toDebugString(fnArgs)} = ${toDebugString(value)}`);
   return {
     result: value === "" ? true : !!value,
     ...assign != null && { toAssign: { name: assign, value } }
@@ -25077,7 +25430,6 @@ var evaluateCondition = /* @__PURE__ */ __name(({ assign, ...fnArgs }, options) 
 
 // src/utils/evaluateConditions.ts
 var evaluateConditions = /* @__PURE__ */ __name((conditions = [], options) => {
-  var _a, _b;
   const conditionsReferenceRecord = {};
   for (const condition of conditions) {
     const { result, toAssign } = evaluateCondition(condition, {
@@ -25092,7 +25444,7 @@ var evaluateConditions = /* @__PURE__ */ __name((conditions = [], options) => {
     }
     if (toAssign) {
       conditionsReferenceRecord[toAssign.name] = toAssign.value;
-      (_b = (_a = options.logger) == null ? void 0 : _a.debug) == null ? void 0 : _b.call(_a, `${debugId} assign: ${toAssign.name} := ${toDebugString(toAssign.value)}`);
+      options.logger?.debug?.(`${debugId} assign: ${toAssign.name} := ${toDebugString(toAssign.value)}`);
     }
   }
   return { result: true, referenceRecord: conditionsReferenceRecord };
@@ -25158,7 +25510,6 @@ var getEndpointUrl = /* @__PURE__ */ __name((endpointUrl, options) => {
 
 // src/utils/evaluateEndpointRule.ts
 var evaluateEndpointRule = /* @__PURE__ */ __name((endpointRule, options) => {
-  var _a, _b;
   const { conditions, endpoint } = endpointRule;
   const { result, referenceRecord } = evaluateConditions(conditions, options);
   if (!result) {
@@ -25169,7 +25520,7 @@ var evaluateEndpointRule = /* @__PURE__ */ __name((endpointRule, options) => {
     referenceRecord: { ...options.referenceRecord, ...referenceRecord }
   };
   const { url, properties, headers } = endpoint;
-  (_b = (_a = options.logger) == null ? void 0 : _a.debug) == null ? void 0 : _b.call(_a, `${debugId} Resolving endpoint from template: ${toDebugString(endpoint)}`);
+  options.logger?.debug?.(`${debugId} Resolving endpoint from template: ${toDebugString(endpoint)}`);
   return {
     ...headers != void 0 && {
       headers: getEndpointHeaders(headers, endpointRuleOptions)
@@ -25233,10 +25584,9 @@ var evaluateRules = /* @__PURE__ */ __name((rules, options) => {
 
 // src/resolveEndpoint.ts
 var resolveEndpoint = /* @__PURE__ */ __name((ruleSetObject, options) => {
-  var _a, _b, _c, _d;
   const { endpointParams, logger } = options;
   const { parameters, rules } = ruleSetObject;
-  (_b = (_a = options.logger) == null ? void 0 : _a.debug) == null ? void 0 : _b.call(_a, `${debugId} Initial EndpointParams: ${toDebugString(endpointParams)}`);
+  options.logger?.debug?.(`${debugId} Initial EndpointParams: ${toDebugString(endpointParams)}`);
   const paramsWithDefault = Object.entries(parameters).filter(([, v]) => v.default != null).map(([k, v]) => [k, v.default]);
   if (paramsWithDefault.length > 0) {
     for (const [paramKey, paramDefaultValue] of paramsWithDefault) {
@@ -25250,7 +25600,7 @@ var resolveEndpoint = /* @__PURE__ */ __name((ruleSetObject, options) => {
     }
   }
   const endpoint = evaluateRules(rules, { endpointParams, logger, referenceRecord: {} });
-  (_d = (_c = options.logger) == null ? void 0 : _c.debug) == null ? void 0 : _d.call(_c, `${debugId} Resolved endpoint: ${toDebugString(endpoint)}`);
+  options.logger?.debug?.(`${debugId} Resolved endpoint: ${toDebugString(endpoint)}`);
   return endpoint;
 }, "resolveEndpoint");
 // Annotate the CommonJS export names for ESM import in node:
@@ -25436,7 +25786,7 @@ var DEFAULT_RETRY_MODE = "standard" /* STANDARD */;
 
 // src/DefaultRateLimiter.ts
 var import_service_error_classification = __nccwpck_require__(6934);
-var _DefaultRateLimiter = class _DefaultRateLimiter {
+var DefaultRateLimiter = class _DefaultRateLimiter {
   constructor(options) {
     // Pre-set state variables
     this.currentCapacity = 0;
@@ -25446,16 +25796,25 @@ var _DefaultRateLimiter = class _DefaultRateLimiter {
     this.requestCount = 0;
     this.lastTimestamp = 0;
     this.timeWindow = 0;
-    this.beta = (options == null ? void 0 : options.beta) ?? 0.7;
-    this.minCapacity = (options == null ? void 0 : options.minCapacity) ?? 1;
-    this.minFillRate = (options == null ? void 0 : options.minFillRate) ?? 0.5;
-    this.scaleConstant = (options == null ? void 0 : options.scaleConstant) ?? 0.4;
-    this.smooth = (options == null ? void 0 : options.smooth) ?? 0.8;
+    this.beta = options?.beta ?? 0.7;
+    this.minCapacity = options?.minCapacity ?? 1;
+    this.minFillRate = options?.minFillRate ?? 0.5;
+    this.scaleConstant = options?.scaleConstant ?? 0.4;
+    this.smooth = options?.smooth ?? 0.8;
     const currentTimeInSeconds = this.getCurrentTimeInSeconds();
     this.lastThrottleTime = currentTimeInSeconds;
     this.lastTxRateBucket = Math.floor(this.getCurrentTimeInSeconds());
     this.fillRate = this.minFillRate;
     this.maxCapacity = this.minCapacity;
+  }
+  static {
+    __name(this, "DefaultRateLimiter");
+  }
+  static {
+    /**
+     * Only used in testing.
+     */
+    this.setTimeoutFn = setTimeout;
   }
   getCurrentTimeInSeconds() {
     return Date.now() / 1e3;
@@ -25536,12 +25895,6 @@ var _DefaultRateLimiter = class _DefaultRateLimiter {
     return parseFloat(num.toFixed(8));
   }
 };
-__name(_DefaultRateLimiter, "DefaultRateLimiter");
-/**
- * Only used in testing.
- */
-_DefaultRateLimiter.setTimeoutFn = setTimeout;
-var DefaultRateLimiter = _DefaultRateLimiter;
 
 // src/constants.ts
 var DEFAULT_RETRY_DELAY_BASE = 100;
@@ -25586,13 +25939,16 @@ var createDefaultRetryToken = /* @__PURE__ */ __name(({
 }, "createDefaultRetryToken");
 
 // src/StandardRetryStrategy.ts
-var _StandardRetryStrategy = class _StandardRetryStrategy {
+var StandardRetryStrategy = class {
   constructor(maxAttempts) {
     this.maxAttempts = maxAttempts;
     this.mode = "standard" /* STANDARD */;
     this.capacity = INITIAL_RETRY_TOKENS;
     this.retryBackoffStrategy = getDefaultRetryBackoffStrategy();
     this.maxAttemptsProvider = typeof maxAttempts === "function" ? maxAttempts : async () => maxAttempts;
+  }
+  static {
+    __name(this, "StandardRetryStrategy");
   }
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async acquireInitialRetryToken(retryTokenScope) {
@@ -25650,17 +26006,18 @@ var _StandardRetryStrategy = class _StandardRetryStrategy {
     return errorType === "THROTTLING" || errorType === "TRANSIENT";
   }
 };
-__name(_StandardRetryStrategy, "StandardRetryStrategy");
-var StandardRetryStrategy = _StandardRetryStrategy;
 
 // src/AdaptiveRetryStrategy.ts
-var _AdaptiveRetryStrategy = class _AdaptiveRetryStrategy {
+var AdaptiveRetryStrategy = class {
   constructor(maxAttemptsProvider, options) {
     this.maxAttemptsProvider = maxAttemptsProvider;
     this.mode = "adaptive" /* ADAPTIVE */;
     const { rateLimiter } = options ?? {};
     this.rateLimiter = rateLimiter ?? new DefaultRateLimiter();
     this.standardRetryStrategy = new StandardRetryStrategy(maxAttemptsProvider);
+  }
+  static {
+    __name(this, "AdaptiveRetryStrategy");
   }
   async acquireInitialRetryToken(retryTokenScope) {
     await this.rateLimiter.getSendToken();
@@ -25675,11 +26032,12 @@ var _AdaptiveRetryStrategy = class _AdaptiveRetryStrategy {
     this.standardRetryStrategy.recordSuccess(token);
   }
 };
-__name(_AdaptiveRetryStrategy, "AdaptiveRetryStrategy");
-var AdaptiveRetryStrategy = _AdaptiveRetryStrategy;
 
 // src/ConfiguredRetryStrategy.ts
-var _ConfiguredRetryStrategy = class _ConfiguredRetryStrategy extends StandardRetryStrategy {
+var ConfiguredRetryStrategy = class extends StandardRetryStrategy {
+  static {
+    __name(this, "ConfiguredRetryStrategy");
+  }
   /**
    * @param maxAttempts - the maximum number of retry attempts allowed.
    *                      e.g., if set to 3, then 4 total requests are possible.
@@ -25713,8 +26071,6 @@ var _ConfiguredRetryStrategy = class _ConfiguredRetryStrategy extends StandardRe
     return token;
   }
 };
-__name(_ConfiguredRetryStrategy, "ConfiguredRetryStrategy");
-var ConfiguredRetryStrategy = _ConfiguredRetryStrategy;
 // Annotate the CommonJS export names for ESM import in node:
 
 0 && (0);
@@ -26049,7 +26405,10 @@ function transformFromString(str, encoding) {
 __name(transformFromString, "transformFromString");
 
 // src/blob/Uint8ArrayBlobAdapter.ts
-var _Uint8ArrayBlobAdapter = class _Uint8ArrayBlobAdapter extends Uint8Array {
+var Uint8ArrayBlobAdapter = class _Uint8ArrayBlobAdapter extends Uint8Array {
+  static {
+    __name(this, "Uint8ArrayBlobAdapter");
+  }
   /**
    * @param source - such as a string or Stream.
    * @returns a new Uint8ArrayBlobAdapter extending Uint8Array.
@@ -26078,8 +26437,6 @@ var _Uint8ArrayBlobAdapter = class _Uint8ArrayBlobAdapter extends Uint8Array {
     return transformToString(this, encoding);
   }
 };
-__name(_Uint8ArrayBlobAdapter, "Uint8ArrayBlobAdapter");
-var Uint8ArrayBlobAdapter = _Uint8ArrayBlobAdapter;
 
 // src/index.ts
 __reExport(src_exports, __nccwpck_require__(4774), module.exports);
@@ -26225,7 +26582,7 @@ const sdkStreamMixin = (stream) => {
                 throw new Error("The stream has been consumed by other callbacks.");
             }
             if (typeof stream_1.Readable.toWeb !== "function") {
-                throw new Error("Readable.toWeb() is not supported. Please make sure you are using Node.js >= 17.0.0, or polyfill is available.");
+                throw new Error("Readable.toWeb() is not supported. Please ensure a polyfill is available.");
             }
             transformed = true;
             return stream_1.Readable.toWeb(stream);
@@ -26502,7 +26859,6 @@ var exponentialBackoffWithJitter = /* @__PURE__ */ __name((minDelay, maxDelay, a
 }, "exponentialBackoffWithJitter");
 var randomInRange = /* @__PURE__ */ __name((min, max) => min + Math.random() * (max - min), "randomInRange");
 var runPolling = /* @__PURE__ */ __name(async ({ minDelay, maxDelay, maxWaitTime, abortController, client, abortSignal }, input, acceptorChecks) => {
-  var _a;
   const observedResponses = {};
   const { state, reason } = await acceptorChecks(client, input);
   if (reason) {
@@ -26517,7 +26873,7 @@ var runPolling = /* @__PURE__ */ __name(async ({ minDelay, maxDelay, maxWaitTime
   const waitUntil = Date.now() + maxWaitTime * 1e3;
   const attemptCeiling = Math.log(maxDelay / minDelay) / Math.log(2) + 1;
   while (true) {
-    if (((_a = abortController == null ? void 0 : abortController.signal) == null ? void 0 : _a.aborted) || (abortSignal == null ? void 0 : abortSignal.aborted)) {
+    if (abortController?.signal?.aborted || abortSignal?.aborted) {
       const message = "AbortController signal aborted.";
       observedResponses[message] |= 0;
       observedResponses[message] += 1;
@@ -26541,17 +26897,16 @@ var runPolling = /* @__PURE__ */ __name(async ({ minDelay, maxDelay, maxWaitTime
   }
 }, "runPolling");
 var createMessageFromResponse = /* @__PURE__ */ __name((reason) => {
-  var _a;
-  if (reason == null ? void 0 : reason.$responseBodyText) {
+  if (reason?.$responseBodyText) {
     return `Deserialization error for body: ${reason.$responseBodyText}`;
   }
-  if ((_a = reason == null ? void 0 : reason.$metadata) == null ? void 0 : _a.httpStatusCode) {
+  if (reason?.$metadata?.httpStatusCode) {
     if (reason.$response || reason.message) {
       return `${reason.$response.statusCode ?? reason.$metadata.httpStatusCode ?? "Unknown"}: ${reason.message}`;
     }
     return `${reason.$metadata.httpStatusCode}: OK`;
   }
-  return String((reason == null ? void 0 : reason.message) ?? JSON.stringify(reason) ?? "Unknown");
+  return String(reason?.message ?? JSON.stringify(reason) ?? "Unknown");
 }, "createMessageFromResponse");
 
 // src/utils/validate.ts
@@ -59987,7 +60342,7 @@ module.exports = parseParams
 /***/ ((module) => {
 
 "use strict";
-module.exports = /*#__PURE__*/JSON.parse('{"name":"@aws-sdk/client-dynamodb","description":"AWS SDK for JavaScript Dynamodb Client for Node.js, Browser and React Native","version":"3.721.0","scripts":{"build":"concurrently \'yarn:build:cjs\' \'yarn:build:es\' \'yarn:build:types\'","build:cjs":"node ../../scripts/compilation/inline client-dynamodb","build:es":"tsc -p tsconfig.es.json","build:include:deps":"lerna run --scope $npm_package_name --include-dependencies build","build:types":"tsc -p tsconfig.types.json","build:types:downlevel":"downlevel-dts dist-types dist-types/ts3.4","clean":"rimraf ./dist-* && rimraf *.tsbuildinfo","extract:docs":"api-extractor run --local","generate:client":"node ../../scripts/generate-clients/single-service --solo dynamodb"},"main":"./dist-cjs/index.js","types":"./dist-types/index.d.ts","module":"./dist-es/index.js","sideEffects":false,"dependencies":{"@aws-crypto/sha256-browser":"5.2.0","@aws-crypto/sha256-js":"5.2.0","@aws-sdk/client-sso-oidc":"3.721.0","@aws-sdk/client-sts":"3.721.0","@aws-sdk/core":"3.716.0","@aws-sdk/credential-provider-node":"3.721.0","@aws-sdk/middleware-endpoint-discovery":"3.714.0","@aws-sdk/middleware-host-header":"3.714.0","@aws-sdk/middleware-logger":"3.714.0","@aws-sdk/middleware-recursion-detection":"3.714.0","@aws-sdk/middleware-user-agent":"3.721.0","@aws-sdk/region-config-resolver":"3.714.0","@aws-sdk/types":"3.714.0","@aws-sdk/util-endpoints":"3.714.0","@aws-sdk/util-user-agent-browser":"3.714.0","@aws-sdk/util-user-agent-node":"3.721.0","@smithy/config-resolver":"^3.0.13","@smithy/core":"^2.5.5","@smithy/fetch-http-handler":"^4.1.2","@smithy/hash-node":"^3.0.11","@smithy/invalid-dependency":"^3.0.11","@smithy/middleware-content-length":"^3.0.13","@smithy/middleware-endpoint":"^3.2.6","@smithy/middleware-retry":"^3.0.31","@smithy/middleware-serde":"^3.0.11","@smithy/middleware-stack":"^3.0.11","@smithy/node-config-provider":"^3.1.12","@smithy/node-http-handler":"^3.3.2","@smithy/protocol-http":"^4.1.8","@smithy/smithy-client":"^3.5.1","@smithy/types":"^3.7.2","@smithy/url-parser":"^3.0.11","@smithy/util-base64":"^3.0.0","@smithy/util-body-length-browser":"^3.0.0","@smithy/util-body-length-node":"^3.0.0","@smithy/util-defaults-mode-browser":"^3.0.31","@smithy/util-defaults-mode-node":"^3.0.31","@smithy/util-endpoints":"^2.1.7","@smithy/util-middleware":"^3.0.11","@smithy/util-retry":"^3.0.11","@smithy/util-utf8":"^3.0.0","@smithy/util-waiter":"^3.2.0","@types/uuid":"^9.0.1","tslib":"^2.6.2","uuid":"^9.0.1"},"devDependencies":{"@tsconfig/node16":"16.1.3","@types/node":"^16.18.96","concurrently":"7.0.0","downlevel-dts":"0.10.1","rimraf":"3.0.2","typescript":"~4.9.5"},"engines":{"node":">=16.0.0"},"typesVersions":{"<4.0":{"dist-types/*":["dist-types/ts3.4/*"]}},"files":["dist-*/**"],"author":{"name":"AWS SDK for JavaScript Team","url":"https://aws.amazon.com/javascript/"},"license":"Apache-2.0","browser":{"./dist-es/runtimeConfig":"./dist-es/runtimeConfig.browser"},"react-native":{"./dist-es/runtimeConfig":"./dist-es/runtimeConfig.native"},"homepage":"https://github.com/aws/aws-sdk-js-v3/tree/main/clients/client-dynamodb","repository":{"type":"git","url":"https://github.com/aws/aws-sdk-js-v3.git","directory":"clients/client-dynamodb"}}');
+module.exports = /*#__PURE__*/JSON.parse('{"name":"@aws-sdk/client-dynamodb","description":"AWS SDK for JavaScript Dynamodb Client for Node.js, Browser and React Native","version":"3.726.0","scripts":{"build":"concurrently \'yarn:build:cjs\' \'yarn:build:es\' \'yarn:build:types\'","build:cjs":"node ../../scripts/compilation/inline client-dynamodb","build:es":"tsc -p tsconfig.es.json","build:include:deps":"lerna run --scope $npm_package_name --include-dependencies build","build:types":"tsc -p tsconfig.types.json","build:types:downlevel":"downlevel-dts dist-types dist-types/ts3.4","clean":"rimraf ./dist-* && rimraf *.tsbuildinfo","extract:docs":"api-extractor run --local","generate:client":"node ../../scripts/generate-clients/single-service --solo dynamodb"},"main":"./dist-cjs/index.js","types":"./dist-types/index.d.ts","module":"./dist-es/index.js","sideEffects":false,"dependencies":{"@aws-crypto/sha256-browser":"5.2.0","@aws-crypto/sha256-js":"5.2.0","@aws-sdk/client-sso-oidc":"3.726.0","@aws-sdk/client-sts":"3.726.0","@aws-sdk/core":"3.723.0","@aws-sdk/credential-provider-node":"3.726.0","@aws-sdk/middleware-endpoint-discovery":"3.723.0","@aws-sdk/middleware-host-header":"3.723.0","@aws-sdk/middleware-logger":"3.723.0","@aws-sdk/middleware-recursion-detection":"3.723.0","@aws-sdk/middleware-user-agent":"3.726.0","@aws-sdk/region-config-resolver":"3.723.0","@aws-sdk/types":"3.723.0","@aws-sdk/util-endpoints":"3.726.0","@aws-sdk/util-user-agent-browser":"3.723.0","@aws-sdk/util-user-agent-node":"3.726.0","@smithy/config-resolver":"^4.0.0","@smithy/core":"^3.0.0","@smithy/fetch-http-handler":"^5.0.0","@smithy/hash-node":"^4.0.0","@smithy/invalid-dependency":"^4.0.0","@smithy/middleware-content-length":"^4.0.0","@smithy/middleware-endpoint":"^4.0.0","@smithy/middleware-retry":"^4.0.0","@smithy/middleware-serde":"^4.0.0","@smithy/middleware-stack":"^4.0.0","@smithy/node-config-provider":"^4.0.0","@smithy/node-http-handler":"^4.0.0","@smithy/protocol-http":"^5.0.0","@smithy/smithy-client":"^4.0.0","@smithy/types":"^4.0.0","@smithy/url-parser":"^4.0.0","@smithy/util-base64":"^4.0.0","@smithy/util-body-length-browser":"^4.0.0","@smithy/util-body-length-node":"^4.0.0","@smithy/util-defaults-mode-browser":"^4.0.0","@smithy/util-defaults-mode-node":"^4.0.0","@smithy/util-endpoints":"^3.0.0","@smithy/util-middleware":"^4.0.0","@smithy/util-retry":"^4.0.0","@smithy/util-utf8":"^4.0.0","@smithy/util-waiter":"^4.0.0","@types/uuid":"^9.0.1","tslib":"^2.6.2","uuid":"^9.0.1"},"devDependencies":{"@tsconfig/node18":"18.2.4","@types/node":"^18.19.69","concurrently":"7.0.0","downlevel-dts":"0.10.1","rimraf":"3.0.2","typescript":"~5.2.2"},"engines":{"node":">=18.0.0"},"typesVersions":{"<4.0":{"dist-types/*":["dist-types/ts3.4/*"]}},"files":["dist-*/**"],"author":{"name":"AWS SDK for JavaScript Team","url":"https://aws.amazon.com/javascript/"},"license":"Apache-2.0","browser":{"./dist-es/runtimeConfig":"./dist-es/runtimeConfig.browser"},"react-native":{"./dist-es/runtimeConfig":"./dist-es/runtimeConfig.native"},"homepage":"https://github.com/aws/aws-sdk-js-v3/tree/main/clients/client-dynamodb","repository":{"type":"git","url":"https://github.com/aws/aws-sdk-js-v3.git","directory":"clients/client-dynamodb"}}');
 
 /***/ }),
 
@@ -59995,7 +60350,7 @@ module.exports = /*#__PURE__*/JSON.parse('{"name":"@aws-sdk/client-dynamodb","de
 /***/ ((module) => {
 
 "use strict";
-module.exports = /*#__PURE__*/JSON.parse('{"name":"@aws-sdk/client-sso-oidc","description":"AWS SDK for JavaScript Sso Oidc Client for Node.js, Browser and React Native","version":"3.721.0","scripts":{"build":"concurrently \'yarn:build:cjs\' \'yarn:build:es\' \'yarn:build:types\'","build:cjs":"node ../../scripts/compilation/inline client-sso-oidc","build:es":"tsc -p tsconfig.es.json","build:include:deps":"lerna run --scope $npm_package_name --include-dependencies build","build:types":"tsc -p tsconfig.types.json","build:types:downlevel":"downlevel-dts dist-types dist-types/ts3.4","clean":"rimraf ./dist-* && rimraf *.tsbuildinfo","extract:docs":"api-extractor run --local","generate:client":"node ../../scripts/generate-clients/single-service --solo sso-oidc"},"main":"./dist-cjs/index.js","types":"./dist-types/index.d.ts","module":"./dist-es/index.js","sideEffects":false,"dependencies":{"@aws-crypto/sha256-browser":"5.2.0","@aws-crypto/sha256-js":"5.2.0","@aws-sdk/core":"3.716.0","@aws-sdk/credential-provider-node":"3.721.0","@aws-sdk/middleware-host-header":"3.714.0","@aws-sdk/middleware-logger":"3.714.0","@aws-sdk/middleware-recursion-detection":"3.714.0","@aws-sdk/middleware-user-agent":"3.721.0","@aws-sdk/region-config-resolver":"3.714.0","@aws-sdk/types":"3.714.0","@aws-sdk/util-endpoints":"3.714.0","@aws-sdk/util-user-agent-browser":"3.714.0","@aws-sdk/util-user-agent-node":"3.721.0","@smithy/config-resolver":"^3.0.13","@smithy/core":"^2.5.5","@smithy/fetch-http-handler":"^4.1.2","@smithy/hash-node":"^3.0.11","@smithy/invalid-dependency":"^3.0.11","@smithy/middleware-content-length":"^3.0.13","@smithy/middleware-endpoint":"^3.2.6","@smithy/middleware-retry":"^3.0.31","@smithy/middleware-serde":"^3.0.11","@smithy/middleware-stack":"^3.0.11","@smithy/node-config-provider":"^3.1.12","@smithy/node-http-handler":"^3.3.2","@smithy/protocol-http":"^4.1.8","@smithy/smithy-client":"^3.5.1","@smithy/types":"^3.7.2","@smithy/url-parser":"^3.0.11","@smithy/util-base64":"^3.0.0","@smithy/util-body-length-browser":"^3.0.0","@smithy/util-body-length-node":"^3.0.0","@smithy/util-defaults-mode-browser":"^3.0.31","@smithy/util-defaults-mode-node":"^3.0.31","@smithy/util-endpoints":"^2.1.7","@smithy/util-middleware":"^3.0.11","@smithy/util-retry":"^3.0.11","@smithy/util-utf8":"^3.0.0","tslib":"^2.6.2"},"devDependencies":{"@tsconfig/node16":"16.1.3","@types/node":"^16.18.96","concurrently":"7.0.0","downlevel-dts":"0.10.1","rimraf":"3.0.2","typescript":"~4.9.5"},"engines":{"node":">=16.0.0"},"typesVersions":{"<4.0":{"dist-types/*":["dist-types/ts3.4/*"]}},"files":["dist-*/**"],"author":{"name":"AWS SDK for JavaScript Team","url":"https://aws.amazon.com/javascript/"},"license":"Apache-2.0","peerDependencies":{"@aws-sdk/client-sts":"^3.721.0"},"browser":{"./dist-es/runtimeConfig":"./dist-es/runtimeConfig.browser"},"react-native":{"./dist-es/runtimeConfig":"./dist-es/runtimeConfig.native"},"homepage":"https://github.com/aws/aws-sdk-js-v3/tree/main/clients/client-sso-oidc","repository":{"type":"git","url":"https://github.com/aws/aws-sdk-js-v3.git","directory":"clients/client-sso-oidc"}}');
+module.exports = /*#__PURE__*/JSON.parse('{"name":"@aws-sdk/client-sso-oidc","description":"AWS SDK for JavaScript Sso Oidc Client for Node.js, Browser and React Native","version":"3.726.0","scripts":{"build":"concurrently \'yarn:build:cjs\' \'yarn:build:es\' \'yarn:build:types\'","build:cjs":"node ../../scripts/compilation/inline client-sso-oidc","build:es":"tsc -p tsconfig.es.json","build:include:deps":"lerna run --scope $npm_package_name --include-dependencies build","build:types":"tsc -p tsconfig.types.json","build:types:downlevel":"downlevel-dts dist-types dist-types/ts3.4","clean":"rimraf ./dist-* && rimraf *.tsbuildinfo","extract:docs":"api-extractor run --local","generate:client":"node ../../scripts/generate-clients/single-service --solo sso-oidc"},"main":"./dist-cjs/index.js","types":"./dist-types/index.d.ts","module":"./dist-es/index.js","sideEffects":false,"dependencies":{"@aws-crypto/sha256-browser":"5.2.0","@aws-crypto/sha256-js":"5.2.0","@aws-sdk/core":"3.723.0","@aws-sdk/credential-provider-node":"3.726.0","@aws-sdk/middleware-host-header":"3.723.0","@aws-sdk/middleware-logger":"3.723.0","@aws-sdk/middleware-recursion-detection":"3.723.0","@aws-sdk/middleware-user-agent":"3.726.0","@aws-sdk/region-config-resolver":"3.723.0","@aws-sdk/types":"3.723.0","@aws-sdk/util-endpoints":"3.726.0","@aws-sdk/util-user-agent-browser":"3.723.0","@aws-sdk/util-user-agent-node":"3.726.0","@smithy/config-resolver":"^4.0.0","@smithy/core":"^3.0.0","@smithy/fetch-http-handler":"^5.0.0","@smithy/hash-node":"^4.0.0","@smithy/invalid-dependency":"^4.0.0","@smithy/middleware-content-length":"^4.0.0","@smithy/middleware-endpoint":"^4.0.0","@smithy/middleware-retry":"^4.0.0","@smithy/middleware-serde":"^4.0.0","@smithy/middleware-stack":"^4.0.0","@smithy/node-config-provider":"^4.0.0","@smithy/node-http-handler":"^4.0.0","@smithy/protocol-http":"^5.0.0","@smithy/smithy-client":"^4.0.0","@smithy/types":"^4.0.0","@smithy/url-parser":"^4.0.0","@smithy/util-base64":"^4.0.0","@smithy/util-body-length-browser":"^4.0.0","@smithy/util-body-length-node":"^4.0.0","@smithy/util-defaults-mode-browser":"^4.0.0","@smithy/util-defaults-mode-node":"^4.0.0","@smithy/util-endpoints":"^3.0.0","@smithy/util-middleware":"^4.0.0","@smithy/util-retry":"^4.0.0","@smithy/util-utf8":"^4.0.0","tslib":"^2.6.2"},"devDependencies":{"@tsconfig/node18":"18.2.4","@types/node":"^18.19.69","concurrently":"7.0.0","downlevel-dts":"0.10.1","rimraf":"3.0.2","typescript":"~5.2.2"},"engines":{"node":">=18.0.0"},"typesVersions":{"<4.0":{"dist-types/*":["dist-types/ts3.4/*"]}},"files":["dist-*/**"],"author":{"name":"AWS SDK for JavaScript Team","url":"https://aws.amazon.com/javascript/"},"license":"Apache-2.0","peerDependencies":{"@aws-sdk/client-sts":"^3.726.0"},"browser":{"./dist-es/runtimeConfig":"./dist-es/runtimeConfig.browser"},"react-native":{"./dist-es/runtimeConfig":"./dist-es/runtimeConfig.native"},"homepage":"https://github.com/aws/aws-sdk-js-v3/tree/main/clients/client-sso-oidc","repository":{"type":"git","url":"https://github.com/aws/aws-sdk-js-v3.git","directory":"clients/client-sso-oidc"}}');
 
 /***/ }),
 
@@ -60003,7 +60358,7 @@ module.exports = /*#__PURE__*/JSON.parse('{"name":"@aws-sdk/client-sso-oidc","de
 /***/ ((module) => {
 
 "use strict";
-module.exports = /*#__PURE__*/JSON.parse('{"name":"@aws-sdk/client-sso","description":"AWS SDK for JavaScript Sso Client for Node.js, Browser and React Native","version":"3.721.0","scripts":{"build":"concurrently \'yarn:build:cjs\' \'yarn:build:es\' \'yarn:build:types\'","build:cjs":"node ../../scripts/compilation/inline client-sso","build:es":"tsc -p tsconfig.es.json","build:include:deps":"lerna run --scope $npm_package_name --include-dependencies build","build:types":"tsc -p tsconfig.types.json","build:types:downlevel":"downlevel-dts dist-types dist-types/ts3.4","clean":"rimraf ./dist-* && rimraf *.tsbuildinfo","extract:docs":"api-extractor run --local","generate:client":"node ../../scripts/generate-clients/single-service --solo sso"},"main":"./dist-cjs/index.js","types":"./dist-types/index.d.ts","module":"./dist-es/index.js","sideEffects":false,"dependencies":{"@aws-crypto/sha256-browser":"5.2.0","@aws-crypto/sha256-js":"5.2.0","@aws-sdk/core":"3.716.0","@aws-sdk/middleware-host-header":"3.714.0","@aws-sdk/middleware-logger":"3.714.0","@aws-sdk/middleware-recursion-detection":"3.714.0","@aws-sdk/middleware-user-agent":"3.721.0","@aws-sdk/region-config-resolver":"3.714.0","@aws-sdk/types":"3.714.0","@aws-sdk/util-endpoints":"3.714.0","@aws-sdk/util-user-agent-browser":"3.714.0","@aws-sdk/util-user-agent-node":"3.721.0","@smithy/config-resolver":"^3.0.13","@smithy/core":"^2.5.5","@smithy/fetch-http-handler":"^4.1.2","@smithy/hash-node":"^3.0.11","@smithy/invalid-dependency":"^3.0.11","@smithy/middleware-content-length":"^3.0.13","@smithy/middleware-endpoint":"^3.2.6","@smithy/middleware-retry":"^3.0.31","@smithy/middleware-serde":"^3.0.11","@smithy/middleware-stack":"^3.0.11","@smithy/node-config-provider":"^3.1.12","@smithy/node-http-handler":"^3.3.2","@smithy/protocol-http":"^4.1.8","@smithy/smithy-client":"^3.5.1","@smithy/types":"^3.7.2","@smithy/url-parser":"^3.0.11","@smithy/util-base64":"^3.0.0","@smithy/util-body-length-browser":"^3.0.0","@smithy/util-body-length-node":"^3.0.0","@smithy/util-defaults-mode-browser":"^3.0.31","@smithy/util-defaults-mode-node":"^3.0.31","@smithy/util-endpoints":"^2.1.7","@smithy/util-middleware":"^3.0.11","@smithy/util-retry":"^3.0.11","@smithy/util-utf8":"^3.0.0","tslib":"^2.6.2"},"devDependencies":{"@tsconfig/node16":"16.1.3","@types/node":"^16.18.96","concurrently":"7.0.0","downlevel-dts":"0.10.1","rimraf":"3.0.2","typescript":"~4.9.5"},"engines":{"node":">=16.0.0"},"typesVersions":{"<4.0":{"dist-types/*":["dist-types/ts3.4/*"]}},"files":["dist-*/**"],"author":{"name":"AWS SDK for JavaScript Team","url":"https://aws.amazon.com/javascript/"},"license":"Apache-2.0","browser":{"./dist-es/runtimeConfig":"./dist-es/runtimeConfig.browser"},"react-native":{"./dist-es/runtimeConfig":"./dist-es/runtimeConfig.native"},"homepage":"https://github.com/aws/aws-sdk-js-v3/tree/main/clients/client-sso","repository":{"type":"git","url":"https://github.com/aws/aws-sdk-js-v3.git","directory":"clients/client-sso"}}');
+module.exports = /*#__PURE__*/JSON.parse('{"name":"@aws-sdk/client-sso","description":"AWS SDK for JavaScript Sso Client for Node.js, Browser and React Native","version":"3.726.0","scripts":{"build":"concurrently \'yarn:build:cjs\' \'yarn:build:es\' \'yarn:build:types\'","build:cjs":"node ../../scripts/compilation/inline client-sso","build:es":"tsc -p tsconfig.es.json","build:include:deps":"lerna run --scope $npm_package_name --include-dependencies build","build:types":"tsc -p tsconfig.types.json","build:types:downlevel":"downlevel-dts dist-types dist-types/ts3.4","clean":"rimraf ./dist-* && rimraf *.tsbuildinfo","extract:docs":"api-extractor run --local","generate:client":"node ../../scripts/generate-clients/single-service --solo sso"},"main":"./dist-cjs/index.js","types":"./dist-types/index.d.ts","module":"./dist-es/index.js","sideEffects":false,"dependencies":{"@aws-crypto/sha256-browser":"5.2.0","@aws-crypto/sha256-js":"5.2.0","@aws-sdk/core":"3.723.0","@aws-sdk/middleware-host-header":"3.723.0","@aws-sdk/middleware-logger":"3.723.0","@aws-sdk/middleware-recursion-detection":"3.723.0","@aws-sdk/middleware-user-agent":"3.726.0","@aws-sdk/region-config-resolver":"3.723.0","@aws-sdk/types":"3.723.0","@aws-sdk/util-endpoints":"3.726.0","@aws-sdk/util-user-agent-browser":"3.723.0","@aws-sdk/util-user-agent-node":"3.726.0","@smithy/config-resolver":"^4.0.0","@smithy/core":"^3.0.0","@smithy/fetch-http-handler":"^5.0.0","@smithy/hash-node":"^4.0.0","@smithy/invalid-dependency":"^4.0.0","@smithy/middleware-content-length":"^4.0.0","@smithy/middleware-endpoint":"^4.0.0","@smithy/middleware-retry":"^4.0.0","@smithy/middleware-serde":"^4.0.0","@smithy/middleware-stack":"^4.0.0","@smithy/node-config-provider":"^4.0.0","@smithy/node-http-handler":"^4.0.0","@smithy/protocol-http":"^5.0.0","@smithy/smithy-client":"^4.0.0","@smithy/types":"^4.0.0","@smithy/url-parser":"^4.0.0","@smithy/util-base64":"^4.0.0","@smithy/util-body-length-browser":"^4.0.0","@smithy/util-body-length-node":"^4.0.0","@smithy/util-defaults-mode-browser":"^4.0.0","@smithy/util-defaults-mode-node":"^4.0.0","@smithy/util-endpoints":"^3.0.0","@smithy/util-middleware":"^4.0.0","@smithy/util-retry":"^4.0.0","@smithy/util-utf8":"^4.0.0","tslib":"^2.6.2"},"devDependencies":{"@tsconfig/node18":"18.2.4","@types/node":"^18.19.69","concurrently":"7.0.0","downlevel-dts":"0.10.1","rimraf":"3.0.2","typescript":"~5.2.2"},"engines":{"node":">=18.0.0"},"typesVersions":{"<4.0":{"dist-types/*":["dist-types/ts3.4/*"]}},"files":["dist-*/**"],"author":{"name":"AWS SDK for JavaScript Team","url":"https://aws.amazon.com/javascript/"},"license":"Apache-2.0","browser":{"./dist-es/runtimeConfig":"./dist-es/runtimeConfig.browser"},"react-native":{"./dist-es/runtimeConfig":"./dist-es/runtimeConfig.native"},"homepage":"https://github.com/aws/aws-sdk-js-v3/tree/main/clients/client-sso","repository":{"type":"git","url":"https://github.com/aws/aws-sdk-js-v3.git","directory":"clients/client-sso"}}');
 
 /***/ }),
 
@@ -60011,7 +60366,7 @@ module.exports = /*#__PURE__*/JSON.parse('{"name":"@aws-sdk/client-sso","descrip
 /***/ ((module) => {
 
 "use strict";
-module.exports = /*#__PURE__*/JSON.parse('{"name":"@aws-sdk/client-sts","description":"AWS SDK for JavaScript Sts Client for Node.js, Browser and React Native","version":"3.721.0","scripts":{"build":"concurrently \'yarn:build:cjs\' \'yarn:build:es\' \'yarn:build:types\'","build:cjs":"node ../../scripts/compilation/inline client-sts","build:es":"tsc -p tsconfig.es.json","build:include:deps":"lerna run --scope $npm_package_name --include-dependencies build","build:types":"rimraf ./dist-types tsconfig.types.tsbuildinfo && tsc -p tsconfig.types.json","build:types:downlevel":"downlevel-dts dist-types dist-types/ts3.4","clean":"rimraf ./dist-* && rimraf *.tsbuildinfo","extract:docs":"api-extractor run --local","generate:client":"node ../../scripts/generate-clients/single-service --solo sts","test":"yarn g:vitest run","test:watch":"yarn g:vitest watch"},"main":"./dist-cjs/index.js","types":"./dist-types/index.d.ts","module":"./dist-es/index.js","sideEffects":false,"dependencies":{"@aws-crypto/sha256-browser":"5.2.0","@aws-crypto/sha256-js":"5.2.0","@aws-sdk/client-sso-oidc":"3.721.0","@aws-sdk/core":"3.716.0","@aws-sdk/credential-provider-node":"3.721.0","@aws-sdk/middleware-host-header":"3.714.0","@aws-sdk/middleware-logger":"3.714.0","@aws-sdk/middleware-recursion-detection":"3.714.0","@aws-sdk/middleware-user-agent":"3.721.0","@aws-sdk/region-config-resolver":"3.714.0","@aws-sdk/types":"3.714.0","@aws-sdk/util-endpoints":"3.714.0","@aws-sdk/util-user-agent-browser":"3.714.0","@aws-sdk/util-user-agent-node":"3.721.0","@smithy/config-resolver":"^3.0.13","@smithy/core":"^2.5.5","@smithy/fetch-http-handler":"^4.1.2","@smithy/hash-node":"^3.0.11","@smithy/invalid-dependency":"^3.0.11","@smithy/middleware-content-length":"^3.0.13","@smithy/middleware-endpoint":"^3.2.6","@smithy/middleware-retry":"^3.0.31","@smithy/middleware-serde":"^3.0.11","@smithy/middleware-stack":"^3.0.11","@smithy/node-config-provider":"^3.1.12","@smithy/node-http-handler":"^3.3.2","@smithy/protocol-http":"^4.1.8","@smithy/smithy-client":"^3.5.1","@smithy/types":"^3.7.2","@smithy/url-parser":"^3.0.11","@smithy/util-base64":"^3.0.0","@smithy/util-body-length-browser":"^3.0.0","@smithy/util-body-length-node":"^3.0.0","@smithy/util-defaults-mode-browser":"^3.0.31","@smithy/util-defaults-mode-node":"^3.0.31","@smithy/util-endpoints":"^2.1.7","@smithy/util-middleware":"^3.0.11","@smithy/util-retry":"^3.0.11","@smithy/util-utf8":"^3.0.0","tslib":"^2.6.2"},"devDependencies":{"@tsconfig/node16":"16.1.3","@types/node":"^16.18.96","concurrently":"7.0.0","downlevel-dts":"0.10.1","rimraf":"3.0.2","typescript":"~4.9.5"},"engines":{"node":">=16.0.0"},"typesVersions":{"<4.0":{"dist-types/*":["dist-types/ts3.4/*"]}},"files":["dist-*/**"],"author":{"name":"AWS SDK for JavaScript Team","url":"https://aws.amazon.com/javascript/"},"license":"Apache-2.0","browser":{"./dist-es/runtimeConfig":"./dist-es/runtimeConfig.browser"},"react-native":{"./dist-es/runtimeConfig":"./dist-es/runtimeConfig.native"},"homepage":"https://github.com/aws/aws-sdk-js-v3/tree/main/clients/client-sts","repository":{"type":"git","url":"https://github.com/aws/aws-sdk-js-v3.git","directory":"clients/client-sts"}}');
+module.exports = /*#__PURE__*/JSON.parse('{"name":"@aws-sdk/client-sts","description":"AWS SDK for JavaScript Sts Client for Node.js, Browser and React Native","version":"3.726.0","scripts":{"build":"concurrently \'yarn:build:cjs\' \'yarn:build:es\' \'yarn:build:types\'","build:cjs":"node ../../scripts/compilation/inline client-sts","build:es":"tsc -p tsconfig.es.json","build:include:deps":"lerna run --scope $npm_package_name --include-dependencies build","build:types":"rimraf ./dist-types tsconfig.types.tsbuildinfo && tsc -p tsconfig.types.json","build:types:downlevel":"downlevel-dts dist-types dist-types/ts3.4","clean":"rimraf ./dist-* && rimraf *.tsbuildinfo","extract:docs":"api-extractor run --local","generate:client":"node ../../scripts/generate-clients/single-service --solo sts","test":"yarn g:vitest run","test:watch":"yarn g:vitest watch"},"main":"./dist-cjs/index.js","types":"./dist-types/index.d.ts","module":"./dist-es/index.js","sideEffects":false,"dependencies":{"@aws-crypto/sha256-browser":"5.2.0","@aws-crypto/sha256-js":"5.2.0","@aws-sdk/client-sso-oidc":"3.726.0","@aws-sdk/core":"3.723.0","@aws-sdk/credential-provider-node":"3.726.0","@aws-sdk/middleware-host-header":"3.723.0","@aws-sdk/middleware-logger":"3.723.0","@aws-sdk/middleware-recursion-detection":"3.723.0","@aws-sdk/middleware-user-agent":"3.726.0","@aws-sdk/region-config-resolver":"3.723.0","@aws-sdk/types":"3.723.0","@aws-sdk/util-endpoints":"3.726.0","@aws-sdk/util-user-agent-browser":"3.723.0","@aws-sdk/util-user-agent-node":"3.726.0","@smithy/config-resolver":"^4.0.0","@smithy/core":"^3.0.0","@smithy/fetch-http-handler":"^5.0.0","@smithy/hash-node":"^4.0.0","@smithy/invalid-dependency":"^4.0.0","@smithy/middleware-content-length":"^4.0.0","@smithy/middleware-endpoint":"^4.0.0","@smithy/middleware-retry":"^4.0.0","@smithy/middleware-serde":"^4.0.0","@smithy/middleware-stack":"^4.0.0","@smithy/node-config-provider":"^4.0.0","@smithy/node-http-handler":"^4.0.0","@smithy/protocol-http":"^5.0.0","@smithy/smithy-client":"^4.0.0","@smithy/types":"^4.0.0","@smithy/url-parser":"^4.0.0","@smithy/util-base64":"^4.0.0","@smithy/util-body-length-browser":"^4.0.0","@smithy/util-body-length-node":"^4.0.0","@smithy/util-defaults-mode-browser":"^4.0.0","@smithy/util-defaults-mode-node":"^4.0.0","@smithy/util-endpoints":"^3.0.0","@smithy/util-middleware":"^4.0.0","@smithy/util-retry":"^4.0.0","@smithy/util-utf8":"^4.0.0","tslib":"^2.6.2"},"devDependencies":{"@tsconfig/node18":"18.2.4","@types/node":"^18.19.69","concurrently":"7.0.0","downlevel-dts":"0.10.1","rimraf":"3.0.2","typescript":"~5.2.2"},"engines":{"node":">=18.0.0"},"typesVersions":{"<4.0":{"dist-types/*":["dist-types/ts3.4/*"]}},"files":["dist-*/**"],"author":{"name":"AWS SDK for JavaScript Team","url":"https://aws.amazon.com/javascript/"},"license":"Apache-2.0","browser":{"./dist-es/runtimeConfig":"./dist-es/runtimeConfig.browser"},"react-native":{"./dist-es/runtimeConfig":"./dist-es/runtimeConfig.native"},"homepage":"https://github.com/aws/aws-sdk-js-v3/tree/main/clients/client-sts","repository":{"type":"git","url":"https://github.com/aws/aws-sdk-js-v3.git","directory":"clients/client-sts"}}');
 
 /***/ })
 
