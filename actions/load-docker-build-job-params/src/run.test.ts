@@ -76,6 +76,7 @@ describe('run', () => {
       globalConfig: stubGlobalConfig,
       jobs: [stubJob],
       context: stubContext,
+      timezone: 'UTC',
     });
     const expected: OutputJob[] = [
       {

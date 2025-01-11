@@ -7,11 +7,13 @@ type generateTagsType = {
   context: Context;
   globalConfig: DockerBuildGlobalConfig;
   inputJob: InputJob;
+  timezone: string;
 };
 export const generateImageReferences = ({
   context,
   globalConfig,
   inputJob,
+  timezone,
 }: generateTagsType): string[] => {
   const registry = inputJob.configs.docker_build.registry;
 
@@ -31,11 +33,12 @@ export const generateImageReferences = ({
         return [`${join(repository.base_url, inputJob.app.name)}:latest`];
 
       case 'semver_datetime':
+        const timestamp = getCommittedAt(context);
         return [
           `${join(
             repository.base_url,
             inputJob.app.name,
-          )}:${generateSemverDatetimeTag(context)}`,
+          )}:${generateSemverDatetimeTag(timestamp, timezone)}`,
         ];
 
       case 'pull_request':
@@ -59,10 +62,22 @@ export const generateImageReferences = ({
   throw new Error(`Unsupported environment: ${registry.type}`);
 };
 
-export const generateSemverDatetimeTag = (context: Context): string => {
-  return `0.0.${DateTime.fromSeconds(getCommittedAt(context)).toFormat('yyyyMMddHHmmss')}`;
+export const generateSemverDatetimeTag = (
+  timestamp: number,
+  timezone: string,
+): string => {
+  const datetime = DateTime.fromSeconds(timestamp).setZone(timezone);
+  if (!datetime.isValid) {
+    throw new Error(`Invalid timezone: ${timezone}`);
+  }
+
+  return `0.0.${datetime.toFormat('yyyyMMddHHmmss')}`;
 };
 
-export function getCommittedAt(context: Context) {
-  return new Date(context.payload.head_commit.timestamp).getTime() / 1000;
+export function getCommittedAt(context: Context): number {
+  if (context.payload.head_commit && context.payload.head_commit.timestamp) {
+    return DateTime.fromISO(context.payload.head_commit.timestamp).toSeconds();
+  }
+
+  throw new Error('head_commit.timestamp is required');
 }

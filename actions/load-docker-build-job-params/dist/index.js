@@ -46297,7 +46297,7 @@ exports.generateSemverDatetimeTag = exports.generateImageReferences = void 0;
 exports.getCommittedAt = getCommittedAt;
 const path_1 = __nccwpck_require__(6928);
 const luxon_1 = __nccwpck_require__(9888);
-const generateImageReferences = ({ context, globalConfig, inputJob, }) => {
+const generateImageReferences = ({ context, globalConfig, inputJob, timezone, }) => {
     const registry = inputJob.configs.docker_build.registry;
     if (registry.type === 'aws') {
         const repository = globalConfig.job_types.docker_build.registries.aws.repositories[inputJob.configs.docker_build.registry.aws.repository];
@@ -46308,8 +46308,9 @@ const generateImageReferences = ({ context, globalConfig, inputJob, }) => {
             case 'always_latest':
                 return [`${(0, path_1.join)(repository.base_url, inputJob.app.name)}:latest`];
             case 'semver_datetime':
+                const timestamp = getCommittedAt(context);
                 return [
-                    `${(0, path_1.join)(repository.base_url, inputJob.app.name)}:${(0, exports.generateSemverDatetimeTag)(context)}`,
+                    `${(0, path_1.join)(repository.base_url, inputJob.app.name)}:${(0, exports.generateSemverDatetimeTag)(timestamp, timezone)}`,
                 ];
             case 'pull_request':
                 if (!context.payload.pull_request) {
@@ -46325,12 +46326,19 @@ const generateImageReferences = ({ context, globalConfig, inputJob, }) => {
     throw new Error(`Unsupported environment: ${registry.type}`);
 };
 exports.generateImageReferences = generateImageReferences;
-const generateSemverDatetimeTag = (context) => {
-    return `0.0.${luxon_1.DateTime.fromSeconds(getCommittedAt(context)).toFormat('yyyyMMddHHmmss')}`;
+const generateSemverDatetimeTag = (timestamp, timezone) => {
+    const datetime = luxon_1.DateTime.fromSeconds(timestamp).setZone(timezone);
+    if (!datetime.isValid) {
+        throw new Error(`Invalid timezone: ${timezone}`);
+    }
+    return `0.0.${datetime.toFormat('yyyyMMddHHmmss')}`;
 };
 exports.generateSemverDatetimeTag = generateSemverDatetimeTag;
 function getCommittedAt(context) {
-    return new Date(context.payload.head_commit.timestamp).getTime() / 1000;
+    if (context.payload.head_commit && context.payload.head_commit.timestamp) {
+        return luxon_1.DateTime.fromISO(context.payload.head_commit.timestamp).toSeconds();
+    }
+    throw new Error('head_commit.timestamp is required');
 }
 
 
@@ -46344,7 +46352,7 @@ function getCommittedAt(context) {
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.run = run;
 const generateImageReferences_1 = __nccwpck_require__(3924);
-function run({ globalConfig, jobs, context }) {
+function run({ globalConfig, jobs, context, timezone, }) {
     return jobs.map((job) => {
         const localDockerBuildConfig = job.configs.docker_build;
         const repository = globalConfig.job_types.docker_build.registries.aws.repositories[localDockerBuildConfig.registry.aws.repository];
@@ -46377,6 +46385,7 @@ function run({ globalConfig, jobs, context }) {
                         context,
                         globalConfig,
                         inputJob: job,
+                        timezone,
                     }).join(','),
                     platforms: localDockerBuildConfig.platforms.join(','),
                 },
@@ -48372,6 +48381,7 @@ const github_1 = __nccwpck_require__(5683);
 const config_1 = __nccwpck_require__(8374);
 const run_1 = __nccwpck_require__(4795);
 const schema_1 = __nccwpck_require__(855);
+const luxon_1 = __nccwpck_require__(9888);
 try {
     const globalConfigFilePath = (0, core_1.getInput)('global-config-file-path') || 'monotonix-global.yaml';
     const globalConfig = (0, config_1.loadGlobalConfig)(globalConfigFilePath);
@@ -48380,7 +48390,11 @@ try {
         throw new Error('Input jobs or env $MONOTONIX_JOBS is required');
     }
     const jobs = schema_1.InputJobsSchema.parse(JSON.parse(jobsJson));
-    const result = (0, run_1.run)({ globalConfig, jobs, context: github_1.context });
+    const timezone = (0, core_1.getInput)('timezone');
+    if (timezone && !luxon_1.DateTime.local().setZone(timezone).isValid) {
+        throw new Error(`Invalid timezone: ${timezone}`);
+    }
+    const result = (0, run_1.run)({ globalConfig, jobs, context: github_1.context, timezone });
     (0, core_1.setOutput)('result', result);
     (0, core_1.exportVariable)('MONOTONIX_JOBS', result);
 }
