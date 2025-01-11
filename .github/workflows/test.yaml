@@ -20,13 +20,10 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm install --workspaces
+        run: npm install
 
       - name: Build
-        run: |
-          npm run build -w @monotonix/schema -w @monotonix/dynamodb-common
-          npm run build
-          npm run package
+        run: npm run package
 
       - name: Test
         run: npm run test
