@@ -7,8 +7,11 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run build --workspaces",
+    "build": "turbo run build",
     "package": "npm run package --workspaces --if-present",
-    "test": "npm run test --workspaces"
+    "test": "turbo run test"
+  },
+  "devDependencies": {
+    "turbo": "^2.3.3"
   }
 }
