@@ -10,7 +10,7 @@
     "build": "turbo run build",
     "test": "turbo run test"
   },
-  "packageManager": "npm@10.8.2",
+  "packageManager": "npm@11.0.0",
   "devDependencies": {
     "turbo": "^2.3.3"
   }
