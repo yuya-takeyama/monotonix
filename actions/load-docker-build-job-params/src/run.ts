@@ -11,8 +11,14 @@ type runParams = {
   globalConfig: DockerBuildGlobalConfig;
   jobs: InputJobs;
   context: Context;
+  timezone: string;
 };
-export function run({ globalConfig, jobs, context }: runParams): OutputJobs {
+export function run({
+  globalConfig,
+  jobs,
+  context,
+  timezone,
+}: runParams): OutputJobs {
   return jobs.map((job): OutputJob => {
     const localDockerBuildConfig = job.configs.docker_build;
     const repository =
@@ -57,6 +63,7 @@ export function run({ globalConfig, jobs, context }: runParams): OutputJobs {
             context,
             globalConfig,
             inputJob: job,
+            timezone,
           }).join(','),
           platforms: localDockerBuildConfig.platforms.join(','),
         },

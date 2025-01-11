@@ -3,6 +3,7 @@ import { context } from '@actions/github';
 import { loadGlobalConfig } from './config';
 import { run } from './run';
 import { InputJobsSchema } from './schema';
+import { DateTime } from 'luxon';
 
 try {
   const globalConfigFilePath =
@@ -13,8 +14,13 @@ try {
     throw new Error('Input jobs or env $MONOTONIX_JOBS is required');
   }
   const jobs = InputJobsSchema.parse(JSON.parse(jobsJson));
+  const timezone = getInput('timezone');
 
-  const result = run({ globalConfig, jobs, context });
+  if (timezone && !DateTime.local().setZone(timezone).isValid) {
+    throw new Error(`Invalid timezone: ${timezone}`);
+  }
+
+  const result = run({ globalConfig, jobs, context, timezone });
 
   setOutput('result', result);
   exportVariable('MONOTONIX_JOBS', result);
