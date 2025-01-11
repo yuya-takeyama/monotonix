@@ -1,5 +1,4 @@
-import { GlobalConfigSchema } from './index';
-const { JobConfigsSchema } = require('./index');
+import { GlobalConfigSchema, JobConfigsSchema } from './index';
 
 describe('GlobalConfigSchema', () => {
   it('drops non-allowed keys', () => {
@@ -93,7 +92,15 @@ describe('GlobalConfigSchema', () => {
       expect(() => JobConfigsSchema.parse(input)).toThrow(/Expected object/);
     });
 
-    it('rejects non-object values at first nested level', () => {
+    it('allows null at first nested level', () => {
+      const input = {
+        config: null,
+      };
+      const result = JobConfigsSchema.parse(input);
+      expect(result).toEqual(input);
+    });
+
+    it('rejects non-object and non-null at first nested level', () => {
       const input = {
         config: 'not-an-object',
       };
