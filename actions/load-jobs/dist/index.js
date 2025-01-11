@@ -38819,7 +38819,7 @@ exports.NEVER = parseUtil_1.INVALID;
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.JobsSchema = exports.JobSchema = exports.LocalConfigSchema = exports.GlobalConfigSchema = void 0;
+exports.JobsSchema = exports.JobSchema = exports.LocalConfigSchema = exports.JobConfigsSchema = exports.GlobalConfigSchema = void 0;
 const zod_1 = __nccwpck_require__(5421);
 exports.GlobalConfigSchema = zod_1.z.object({
     job_types: zod_1.z.record(zod_1.z.string(), zod_1.z.object({}).passthrough()),
@@ -38864,10 +38864,13 @@ const PullRequestTargetEventSchema = zod_1.z.object({
         .nullable(),
 });
 const JobEventSchema = zod_1.z.intersection(PushEventScema, zod_1.z.intersection(PullRequestEventSchema, PullRequestTargetEventSchema));
-const JobConfigsSchema = zod_1.z.object({}).catchall(zod_1.z.object({}).catchall(zod_1.z.any()));
+const JobConfigSchema = zod_1.z.object({}).passthrough();
+exports.JobConfigsSchema = zod_1.z
+    .object({})
+    .catchall(JobConfigSchema.nullable());
 const LocalConfigJobSchema = zod_1.z.object({
     on: JobEventSchema,
-    configs: JobConfigsSchema,
+    configs: exports.JobConfigsSchema,
 });
 exports.LocalConfigSchema = zod_1.z.object({
     app: zod_1.z.object({
@@ -38880,7 +38883,7 @@ exports.JobSchema = zod_1.z.object({
     app: AppSchema,
     context: ContextSchema,
     on: JobEventSchema,
-    configs: JobConfigsSchema,
+    configs: exports.JobConfigsSchema,
     params: JobParamsSchema,
 });
 exports.JobsSchema = zod_1.z.array(exports.JobSchema);

@@ -55,7 +55,11 @@ const JobEventSchema = z.intersection(
   z.intersection(PullRequestEventSchema, PullRequestTargetEventSchema),
 );
 
-const JobConfigsSchema = z.object({}).catchall(z.object({}).catchall(z.any()));
+const JobConfigSchema = z.object({}).passthrough();
+
+export const JobConfigsSchema = z
+  .object({})
+  .catchall(JobConfigSchema.nullable());
 
 const LocalConfigJobSchema = z.object({
   on: JobEventSchema,
