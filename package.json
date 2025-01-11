@@ -11,6 +11,7 @@
     "package": "npm run package --workspaces --if-present",
     "test": "turbo run test"
   },
+  "packageManager": "npm@10.8.2",
   "devDependencies": {
     "turbo": "^2.3.3"
   }
