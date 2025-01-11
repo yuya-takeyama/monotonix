@@ -1,9 +1,8 @@
 {
   "name": "@monotonix/filter-jobs-by-changed-files",
   "scripts": {
-    "build": "tsc",
+    "build": "ncc build src/index.ts -o dist --source-map --license licenses.txt",
     "format": "prettier --write .",
-    "package": "ncc build src/index.ts -o dist --source-map --license licenses.txt",
     "test": "jest --passWithNoTests",
     "all": "npm run format && npm run test && npm run package"
   },

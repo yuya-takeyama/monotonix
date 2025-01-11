@@ -1,10 +1,8 @@
 {
   "name": "@monotonix/load-jobs",
   "scripts": {
-    "build": "tsc",
-    "ci-test": "jest",
+    "build": "ncc build src/index.ts -o dist --source-map --license licenses.txt",
     "format": "prettier --write .",
-    "package": "ncc build src/index.ts -o dist --source-map --license licenses.txt",
     "test": "jest",
     "all": "npm run format && npm run test && npm run package"
   },
