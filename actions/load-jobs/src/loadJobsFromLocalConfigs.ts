@@ -59,7 +59,7 @@ export const loadJobsFromLocalConfigFiles = async ({
 
   return jobs
     .flat()
-    .filter(job => requiredConfigKeys.every(key => job.configs[key]));
+    .filter(job => requiredConfigKeys.every(key => key in job.configs));
 };
 
 type createJobParams = {
