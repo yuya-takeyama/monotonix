@@ -7,7 +7,7 @@ Monotonix is an extensible, composable set of building blocks for CI/CD pipeline
 ## Key Features
 
 - **Monotonic Deployment**: Only build and deploy changed applications, preventing duplicate work
-- **Application Dependencies**: Define inter-application dependencies with automatic resolution and circular dependency detection
+- **Application Dependencies**: Define inter-application dependencies with automatic change propagation
 - **State Tracking**: Uses DynamoDB to track job execution state with automatic cleanup
 - **Multi-Environment Support**: Configure different environments (production, staging, PR) with separate AWS accounts and IAM roles
 - **Docker Build Integration**: Seamless AWS ECR integration with multi-platform builds
@@ -77,7 +77,7 @@ Create `monotonix.yaml` in each app directory:
 ```yaml
 app:
   name: your-app
-  depends_on:  # Optional: specify dependencies on other apps
+  depends_on:  # Optional: when these apps change, this app is also considered changed
     - shared-lib
     - database-migrations
 
@@ -393,14 +393,14 @@ Applications can specify dependencies using the `depends_on` field:
 app:
   name: api-server
   depends_on:
-    - shared-lib       # This app will build after shared-lib
-    - auth-service     # And after auth-service
+    - shared-lib       # When shared-lib changes, api-server is also considered changed
+    - auth-service     # When auth-service changes, api-server is also considered changed
 ```
 
-- **Dependency Resolution**: Jobs are automatically reordered to respect dependencies
-- **Circular Detection**: Circular dependencies are detected and will cause an error
-- **Missing Dependencies**: References to non-existent apps will cause an error
-- **Execution Order**: Dependent applications are built before their dependents
+- **Change Propagation**: When a dependency changes, all dependent applications are automatically included in the build
+- **Transitive Dependencies**: Changes propagate through the entire dependency chain (A depends on B, B depends on C → C changes triggers A and B)
+- **Matrix Execution**: Dependencies don't affect execution order - all jobs run in parallel as usual
+- **Smart Filtering**: Only applications with actual dependencies are affected by changes
 
 ### Tagging Strategies
 
