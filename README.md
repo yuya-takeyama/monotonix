@@ -308,29 +308,60 @@ Monotonix is designed to be extensible beyond Docker builds. You can define any 
          pull_request:
        configs:
          my_job_type: # Any key you choose
-           # Your custom configuration
+           # Your custom configuration (can be empty)
    ```
 
-2. **Creating a corresponding GitHub Actions job** that processes the job type:
+2. **Creating a separate GitHub Actions workflow** that targets that job type:
    ```yaml
-   my-custom-workflow:
-     needs: filter-jobs-by-dynamodb-state
-     if: fromJson(needs.filter-jobs-by-dynamodb-state.outputs.jobs).my_job_type != null
-     strategy:
-       matrix:
-         job: ${{ fromJson(needs.filter-jobs-by-dynamodb-state.outputs.jobs).my_job_type }}
-     # ... your custom steps
+   name: My Custom Workflow
+   
+   on:
+     pull_request:
+       paths:
+         - .github/workflows/my-custom.yml
+         - apps/**
+   
+   jobs:
+     setup:
+       runs-on: ubuntu-latest
+       outputs:
+         jobs: ${{ env.MONOTONIX_JOBS }}
+       steps:
+         - uses: actions/checkout@v4
+           with:
+             fetch-depth: 0
+         - uses: yuya-takeyama/monotonix/actions/load-jobs@main
+           with:
+             root-dir: apps
+             required-config-keys: 'my_job_type'  # Filter for your job type
+         - uses: yuya-takeyama/monotonix/actions/filter-jobs-by-changed-files@main
+         # ... state management steps
+   
+     execute:
+       needs: setup
+       if: ${{ needs.setup.outputs.jobs != '[]' }}
+       strategy:
+         matrix:
+           job: ${{ fromJSON(needs.setup.outputs.jobs) }}
+       steps:
+         # ... your custom execution steps
    ```
 
 ### Examples of Custom Job Types
 
-- **Go Testing**: `go_test` with Go setup and test execution
-- **Linting**: `lint` with ESLint, Prettier, or language-specific linters
-- **Security Scanning**: `security_scan` with vulnerability scanners
-- **Database Migrations**: `migrate` with database migration scripts
-- **Terraform**: `terraform` with infrastructure as code deployment
+- **Go Testing**: `go_test` with separate go-test.yml workflow
+- **Linting**: `lint` with lint.yml workflow for ESLint, Prettier, etc.
+- **Security Scanning**: `security_scan` with security.yml workflow
+- **Database Migrations**: `migrate` with migrate.yml workflow
+- **Terraform**: `terraform` with terraform.yml workflow
 
-The framework automatically handles:
+Each job type gets its own workflow file, allowing for:
+- Independent triggering and execution
+- Job-specific configuration and steps
+- Parallel execution of different job types
+- Clear separation of concerns
+
+The Monotonix actions automatically handle:
 
 - Job filtering by changed files
 - State tracking in DynamoDB
