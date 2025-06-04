@@ -33,10 +33,7 @@ const createMockJob = (
 
 describe('calculateEffectiveTimestamps', () => {
   it('should keep original timestamp when no dependencies', () => {
-    const jobs = [
-      createMockJob('app-a', 100),
-      createMockJob('app-b', 200),
-    ];
+    const jobs = [createMockJob('app-a', 100), createMockJob('app-b', 200)];
 
     const result = calculateEffectiveTimestamps(jobs);
 
@@ -125,14 +122,16 @@ describe('calculateEffectiveTimestamps', () => {
       createMockJob('app-b', 200, ['app-a']),
     ];
 
-    expect(() => calculateEffectiveTimestamps(jobs)).toThrow('Circular dependency detected');
+    expect(() => calculateEffectiveTimestamps(jobs)).toThrow(
+      'Circular dependency detected',
+    );
   });
 
   it('should throw error for missing dependency', () => {
-    const jobs = [
-      createMockJob('api-server', 100, ['missing-app']),
-    ];
+    const jobs = [createMockJob('api-server', 100, ['missing-app'])];
 
-    expect(() => calculateEffectiveTimestamps(jobs)).toThrow("Dependency app 'missing-app' not found");
+    expect(() => calculateEffectiveTimestamps(jobs)).toThrow(
+      "Dependency app 'missing-app' not found",
+    );
   });
 });

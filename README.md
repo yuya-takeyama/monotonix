@@ -77,7 +77,7 @@ Create `monotonix.yaml` in each app directory:
 ```yaml
 app:
   name: your-app
-  depends_on:  # Optional: when these apps change, this app is also considered changed
+  depends_on: # Optional: when these apps change, this app is also considered changed
     - shared-lib
     - database-migrations
 
@@ -393,8 +393,8 @@ Applications can specify dependencies using the `depends_on` field:
 app:
   name: api-server
   depends_on:
-    - shared-lib       # When shared-lib changes, api-server is also considered changed
-    - auth-service     # When auth-service changes, api-server is also considered changed
+    - shared-lib # When shared-lib changes, api-server is also considered changed
+    - auth-service # When auth-service changes, api-server is also considered changed
 ```
 
 - **Change Propagation**: When a dependency changes, all dependent applications are automatically included in the build
