@@ -145,113 +145,85 @@ name: Docker Build
 
 on:
   pull_request:
+    paths:
+      - .github/workflows/docker-build.yml
+      - apps/**
+
+env:
+  CHECKOUT_REF: ${{ github.event.pull_request.head.sha || github.sha }}
 
 jobs:
-  load-jobs:
-    runs-on: ubuntu-latest
-    outputs:
-      jobs: ${{ steps.load-jobs.outputs.jobs }}
-    steps:
-      - uses: actions/checkout@v4
-      - id: load-jobs
-        uses: yuya-takeyama/monotonix/actions/load-jobs@main
-
-  filter-jobs-by-changed-files:
-    needs: load-jobs
-    runs-on: ubuntu-latest
-    outputs:
-      jobs: ${{ steps.filter-jobs.outputs.jobs }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - id: filter-jobs
-        uses: yuya-takeyama/monotonix/actions/filter-jobs-by-changed-files@main
-        with:
-          jobs: ${{ needs.load-jobs.outputs.jobs }}
-
-  filter-jobs-by-dynamodb-state:
-    needs: filter-jobs-by-changed-files
-    runs-on: ubuntu-latest
-    outputs:
-      jobs: ${{ steps.filter-jobs.outputs.jobs }}
-    steps:
-      - id: filter-jobs
-        uses: yuya-takeyama/monotonix/actions/filter-jobs-by-dynamodb-state@main
-        with:
-          jobs: ${{ needs.filter-jobs-by-changed-files.outputs.jobs }}
-          aws-region: ap-northeast-1
-          dynamodb-table-name: monotonix-state
-
-  load-docker-build-job-params:
-    needs: filter-jobs-by-dynamodb-state
-    runs-on: ubuntu-latest
-    outputs:
-      jobs: ${{ steps.load-params.outputs.jobs }}
-    steps:
-      - uses: actions/checkout@v4
-      - id: load-params
-        uses: yuya-takeyama/monotonix/actions/load-docker-build-job-params@main
-        with:
-          jobs: ${{ needs.filter-jobs-by-dynamodb-state.outputs.jobs }}
-
-  docker-build:
-    needs: load-docker-build-job-params
-    if: fromJson(needs.load-docker-build-job-params.outputs.jobs).docker_build != null
-    strategy:
-      matrix:
-        job: ${{ fromJson(needs.load-docker-build-job-params.outputs.jobs).docker_build }}
+  setup:
     runs-on: ubuntu-latest
     permissions:
-      id-token: write
       contents: read
+      id-token: write
+    outputs:
+      jobs: ${{ env.MONOTONIX_JOBS }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.CHECKOUT_REF }}
+          fetch-depth: 0
+      - uses: yuya-takeyama/monotonix/actions/load-jobs@main
+        with:
+          root-dir: apps
+          required-config-keys: 'docker_build'
+      - if: ${{ github.event_name == 'pull_request' }}
+        uses: yuya-takeyama/monotonix/actions/filter-jobs-by-changed-files@main
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::YOUR-ACCOUNT:role/monotonix-state-manager
+          aws-region: YOUR-REGION
+      - uses: yuya-takeyama/monotonix/actions/filter-jobs-by-dynamodb-state@main
+        with:
+          dynamodb-table: monotonix-state
+          dynamodb-region: YOUR-REGION
+      - uses: yuya-takeyama/monotonix/actions/load-docker-build-job-params@main
+        with:
+          global-config-file-path: apps/monotonix-global.yaml
+          timezone: YOUR-TIMEZONE
+
+  build:
+    name: ${{ matrix.job.context.label }}
+    needs: setup
+    if: ${{ needs.setup.outputs.jobs != '[]' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      actions: read
+    strategy:
+      matrix:
+        job: ${{ fromJSON(needs.setup.outputs.jobs) }}
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::YOUR-ACCOUNT:role/monotonix-state-manager
+          aws-region: YOUR-REGION
       - uses: yuya-takeyama/monotonix/actions/set-dynamodb-state-to-running@main
         with:
-          app-path: ${{ matrix.job.app_path }}
-          job-key: ${{ matrix.job.job_key }}
-          aws-region: ap-northeast-1
-          dynamodb-table-name: monotonix-state
+          dynamodb-table: monotonix-state
+          dynamodb-region: YOUR-REGION
+          job: ${{ toJSON(matrix.job) }}
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.CHECKOUT_REF }}
 
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ matrix.job.aws_iam_role }}
-          aws-region: ${{ matrix.job.aws_region }}
-
-      - uses: docker/setup-buildx-action@v3
+          role-to-assume: ${{ matrix.job.params.docker_build.registry.aws.iam.role }}
+          aws-region: ${{ matrix.job.params.docker_build.registry.aws.iam.region }}
       - uses: aws-actions/amazon-ecr-login@v2
-
+        with:
+          registry-type: ${{ matrix.job.params.docker_build.registry.aws.repository.type }}
+      - uses: docker/setup-buildx-action@v3
       - uses: docker/build-push-action@v6
         with:
-          context: ${{ matrix.job.app_path }}
-          platforms: ${{ join(matrix.job.platforms, ',') }}
+          context: ${{ matrix.job.params.docker_build.context }}
           push: true
-          tags: ${{ join(matrix.job.image_references, ',') }}
-
-  # Example: Go testing job (you can define any custom job type)
-  go-test:
-    needs: filter-jobs-by-dynamodb-state
-    if: fromJson(needs.filter-jobs-by-dynamodb-state.outputs.jobs).go_test != null
-    strategy:
-      matrix:
-        job: ${{ fromJson(needs.filter-jobs-by-dynamodb-state.outputs.jobs).go_test }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: yuya-takeyama/monotonix/actions/set-dynamodb-state-to-running@main
-        with:
-          app-path: ${{ matrix.job.app_path }}
-          job-key: ${{ matrix.job.job_key }}
-          aws-region: ap-northeast-1
-          dynamodb-table-name: monotonix-state
-
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: ${{ matrix.job.app_path }}/go.mod
-
-      - working-directory: ${{ matrix.job.app_path }}
-        run: go test ./...
+          tags: ${{ matrix.job.params.docker_build.tags }}
+          platforms: ${{ matrix.job.params.docker_build.platforms }}
 ```
 
 ## AWS Setup
