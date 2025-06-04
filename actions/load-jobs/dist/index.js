@@ -38915,6 +38915,87 @@ exports.JobsSchema = zod_1.z.array(exports.JobSchema);
 
 /***/ }),
 
+/***/ 8737:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.calculateEffectiveTimestamps = void 0;
+const calculateEffectiveTimestamps = (jobs) => {
+    // Create maps for quick lookup
+    const appNameToJobs = new Map();
+    const appNameToMaxTimestamp = new Map();
+    // Group jobs by app name and calculate initial max timestamp per app
+    for (const job of jobs) {
+        const appName = job.app.name;
+        const timestamp = job.context.last_commit.timestamp;
+        if (!appNameToJobs.has(appName)) {
+            appNameToJobs.set(appName, []);
+        }
+        appNameToJobs.get(appName).push(job);
+        const currentMax = appNameToMaxTimestamp.get(appName) || 0;
+        appNameToMaxTimestamp.set(appName, Math.max(currentMax, timestamp));
+    }
+    // Calculate effective timestamps considering dependencies
+    const effectiveTimestamps = new Map();
+    const visited = new Set();
+    const visiting = new Set();
+    const calculateEffectiveTimestamp = (appName) => {
+        if (effectiveTimestamps.has(appName)) {
+            return effectiveTimestamps.get(appName);
+        }
+        if (visiting.has(appName)) {
+            throw new Error(`Circular dependency detected involving app: ${appName}`);
+        }
+        visiting.add(appName);
+        const appJobs = appNameToJobs.get(appName);
+        if (!appJobs || appJobs.length === 0) {
+            visiting.delete(appName);
+            visited.add(appName);
+            return 0;
+        }
+        // Start with this app's own max timestamp
+        let maxTimestamp = appNameToMaxTimestamp.get(appName) || 0;
+        // Check dependencies
+        const dependsOn = appJobs[0]?.app.depends_on || [];
+        for (const depAppName of dependsOn) {
+            if (!appNameToJobs.has(depAppName)) {
+                throw new Error(`Dependency app '${depAppName}' not found for app '${appName}'`);
+            }
+            const depTimestamp = calculateEffectiveTimestamp(depAppName);
+            maxTimestamp = Math.max(maxTimestamp, depTimestamp);
+        }
+        effectiveTimestamps.set(appName, maxTimestamp);
+        visiting.delete(appName);
+        visited.add(appName);
+        return maxTimestamp;
+    };
+    // Calculate effective timestamps for all apps
+    for (const appName of appNameToJobs.keys()) {
+        calculateEffectiveTimestamp(appName);
+    }
+    // Update jobs with effective timestamps
+    return jobs.map(job => {
+        const appName = job.app.name;
+        const effectiveTimestamp = effectiveTimestamps.get(appName) || job.context.last_commit.timestamp;
+        return {
+            ...job,
+            context: {
+                ...job.context,
+                last_commit: {
+                    ...job.context.last_commit,
+                    timestamp: effectiveTimestamp,
+                },
+            },
+        };
+    });
+};
+exports.calculateEffectiveTimestamps = calculateEffectiveTimestamps;
+
+
+/***/ }),
+
 /***/ 3935:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
@@ -39039,7 +39120,7 @@ const node_fs_1 = __nccwpck_require__(3024);
 const glob_1 = __nccwpck_require__(447);
 const node_path_1 = __nccwpck_require__(6760);
 const getLastCommit_1 = __nccwpck_require__(4815);
-const resolveDependencies_1 = __nccwpck_require__(7311);
+const calculateEffectiveTimestamp_1 = __nccwpck_require__(8737);
 const loadJobsFromLocalConfigFiles = async ({ rootDir, dedupeKey, requiredConfigKeys, localConfigFileName, event, }) => {
     const pattern = (0, node_path_1.join)(rootDir, '**', localConfigFileName);
     const localConfigPaths = (0, glob_1.globSync)(pattern);
@@ -39066,7 +39147,7 @@ const loadJobsFromLocalConfigFiles = async ({ rootDir, dedupeKey, requiredConfig
     const flatJobs = jobs
         .flat()
         .filter(job => requiredConfigKeys.every(key => key in job.configs));
-    return (0, resolveDependencies_1.resolveDependencies)(flatJobs);
+    return (0, calculateEffectiveTimestamp_1.calculateEffectiveTimestamps)(flatJobs);
 };
 exports.loadJobsFromLocalConfigFiles = loadJobsFromLocalConfigFiles;
 const createJob = ({ localConfig, dedupeKey, appPath, lastCommit, jobKey, job, event, }) => ({
@@ -39083,63 +39164,6 @@ const createJob = ({ localConfig, dedupeKey, appPath, lastCommit, jobKey, job, e
     params: {},
 });
 exports.createJob = createJob;
-
-
-/***/ }),
-
-/***/ 7311:
-/***/ ((__unused_webpack_module, exports) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.resolveDependencies = void 0;
-const resolveDependencies = (jobs) => {
-    const appNameToJobs = new Map();
-    // Group jobs by app name
-    for (const job of jobs) {
-        const appName = job.app.name;
-        if (!appNameToJobs.has(appName)) {
-            appNameToJobs.set(appName, []);
-        }
-        appNameToJobs.get(appName).push(job);
-    }
-    const resolvedJobs = [];
-    const visited = new Set();
-    const visiting = new Set();
-    const resolveApp = (appName) => {
-        if (visited.has(appName))
-            return;
-        if (visiting.has(appName)) {
-            throw new Error(`Circular dependency detected involving app: ${appName}`);
-        }
-        visiting.add(appName);
-        const appJobs = appNameToJobs.get(appName);
-        if (!appJobs || appJobs.length === 0) {
-            visiting.delete(appName);
-            visited.add(appName);
-            return;
-        }
-        // Resolve dependencies first
-        const dependsOn = appJobs[0]?.app.depends_on || [];
-        for (const depAppName of dependsOn) {
-            if (!appNameToJobs.has(depAppName)) {
-                throw new Error(`Dependency app '${depAppName}' not found for app '${appName}'`);
-            }
-            resolveApp(depAppName);
-        }
-        // Add this app's jobs after dependencies
-        resolvedJobs.push(...appJobs);
-        visiting.delete(appName);
-        visited.add(appName);
-    };
-    // Resolve all apps
-    for (const appName of appNameToJobs.keys()) {
-        resolveApp(appName);
-    }
-    return resolvedJobs;
-};
-exports.resolveDependencies = resolveDependencies;
 
 
 /***/ }),
