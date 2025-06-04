@@ -37,8 +37,11 @@ describe('calculateEffectiveTimestamps', () => {
 
     const result = calculateEffectiveTimestamps(jobs);
 
-    expect(result[0]!.context.last_commit.timestamp).toBe(100);
-    expect(result[1]!.context.last_commit.timestamp).toBe(200);
+    const appAJob = result.find(job => job.app.name === 'app-a')!;
+    const appBJob = result.find(job => job.app.name === 'app-b')!;
+
+    expect(appAJob.context.last_commit.timestamp).toBe(100);
+    expect(appBJob.context.last_commit.timestamp).toBe(200);
   });
 
   it('should use dependency timestamp when newer', () => {
@@ -112,8 +115,12 @@ describe('calculateEffectiveTimestamps', () => {
     // All api-server jobs should have the same effective timestamp (200)
     const apiServerJobs = result.filter(job => job.app.name === 'api-server');
     expect(apiServerJobs).toHaveLength(2);
-    expect(apiServerJobs[0]!.context.last_commit.timestamp).toBe(200);
-    expect(apiServerJobs[1]!.context.last_commit.timestamp).toBe(200);
+    
+    const apiServerBuildJob = apiServerJobs.find(job => job.context.job_key === 'build')!;
+    const apiServerTestJob = apiServerJobs.find(job => job.context.job_key === 'test')!;
+    
+    expect(apiServerBuildJob.context.last_commit.timestamp).toBe(200);
+    expect(apiServerTestJob.context.last_commit.timestamp).toBe(200);
   });
 
   it('should throw error for circular dependencies', () => {
