@@ -5,7 +5,7 @@ export const propagateDependencyChanges = (
   changedJobs: Jobs,
 ): Jobs => {
   // Create a map of app name to all jobs for that app
-  const appNameToAllJobs = new Map<string, typeof jobs>();
+  const appNameToAllJobs = new Map<string, Jobs>();
 
   for (const job of jobs) {
     const appName = job.app.name;
