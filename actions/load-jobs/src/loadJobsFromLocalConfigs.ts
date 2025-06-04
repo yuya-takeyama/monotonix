@@ -11,7 +11,6 @@ import { globSync } from 'glob';
 import { join, dirname } from 'node:path';
 import { CommitInfo, getLastCommit } from './getLastCommit';
 import { Event } from './schema';
-import { resolveDependencies } from './resolveDependencies';
 
 type loadJobsFromLocalConfigFilesParams = {
   rootDir: string;
@@ -58,11 +57,9 @@ export const loadJobsFromLocalConfigFiles = async ({
     }),
   );
 
-  const flatJobs = jobs
+  return jobs
     .flat()
     .filter(job => requiredConfigKeys.every(key => key in job.configs));
-
-  return resolveDependencies(flatJobs);
 };
 
 type createJobParams = {
