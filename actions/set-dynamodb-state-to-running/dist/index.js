@@ -57542,6 +57542,7 @@ exports.GlobalConfigSchema = zod_1.z.object({
 });
 const AppSchema = zod_1.z.object({
     name: zod_1.z.string(),
+    depends_on: zod_1.z.array(zod_1.z.string()).optional(),
 });
 const ContextSchema = zod_1.z.object({
     dedupe_key: zod_1.z.string(),
