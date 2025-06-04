@@ -34527,6 +34527,56 @@ exports.JobsSchema = zod_1.z.array(exports.JobSchema);
 
 /***/ }),
 
+/***/ 5915:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.propagateDependencyChanges = void 0;
+const propagateDependencyChanges = (jobs, changedJobs) => {
+    // Create a map of app name to all jobs for that app
+    const appNameToAllJobs = new Map();
+    for (const job of jobs) {
+        const appName = job.app.name;
+        if (!appNameToAllJobs.has(appName)) {
+            appNameToAllJobs.set(appName, []);
+        }
+        appNameToAllJobs.get(appName).push(job);
+    }
+    // Get set of initially changed app names
+    const changedAppNames = new Set();
+    for (const job of changedJobs) {
+        changedAppNames.add(job.app.name);
+    }
+    // Find all apps that should be considered changed (including transitive dependencies)
+    const allChangedAppNames = new Set(changedAppNames);
+    let changed = true;
+    while (changed) {
+        changed = false;
+        for (const job of jobs) {
+            const dependsOn = job.app.depends_on || [];
+            // Check if any of this job's dependencies are in the changed apps
+            const hasDependencyChanges = dependsOn.some(depAppName => allChangedAppNames.has(depAppName));
+            if (hasDependencyChanges && !allChangedAppNames.has(job.app.name)) {
+                allChangedAppNames.add(job.app.name);
+                changed = true;
+            }
+        }
+    }
+    // Collect all jobs for all changed apps
+    const allChangedJobs = [];
+    for (const appName of allChangedAppNames) {
+        const appJobs = appNameToAllJobs.get(appName) || [];
+        allChangedJobs.push(...appJobs);
+    }
+    return allChangedJobs;
+};
+exports.propagateDependencyChanges = propagateDependencyChanges;
+
+
+/***/ }),
+
 /***/ 4795:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
@@ -34535,6 +34585,7 @@ exports.JobsSchema = zod_1.z.array(exports.JobSchema);
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.run = void 0;
 const github_1 = __nccwpck_require__(5683);
+const propagateDependencyChanges_1 = __nccwpck_require__(5915);
 const run = async ({ githubToken, jobs }) => {
     const octokit = (0, github_1.getOctokit)(githubToken);
     switch (github_1.context.eventName) {
@@ -34545,22 +34596,24 @@ const run = async ({ githubToken, jobs }) => {
                 repo: github_1.context.repo.repo,
                 pull_number: github_1.context.issue.number,
             });
-            return jobs.filter(job => {
+            const prChangedJobs = jobs.filter(job => {
                 return files
                     .map(file => file.filename)
                     .some(file => file.startsWith(job.context.app_path));
             });
+            return (0, propagateDependencyChanges_1.propagateDependencyChanges)(jobs, prChangedJobs);
         default:
             const { data: commits } = await octokit.rest.repos.getCommit({
                 owner: github_1.context.repo.owner,
                 repo: github_1.context.repo.repo,
                 ref: github_1.context.sha,
             });
-            return jobs.filter(job => {
+            const pushChangedJobs = jobs.filter(job => {
                 return (commits.files || [])
                     .map(file => file.filename)
                     .some(file => file.startsWith(job.context.app_path));
             });
+            return (0, propagateDependencyChanges_1.propagateDependencyChanges)(jobs, pushChangedJobs);
     }
 };
 exports.run = run;
