@@ -35,7 +35,7 @@ your-repo/
 │       └── monotonix.yaml
 └── .github/
     └── workflows/
-        └── monotonix.yml
+        └── docker-build.yml
 ```
 
 ### 2. Global Configuration
@@ -138,10 +138,10 @@ jobs:
 
 ### 4. GitHub Actions Workflow
 
-Create `.github/workflows/monotonix.yml`:
+Create `.github/workflows/docker-build.yml`:
 
 ```yaml
-name: Monotonix
+name: Docker Build
 
 on:
   pull_request:
