@@ -144,9 +144,7 @@ Create `.github/workflows/monotonix.yml`:
 name: Monotonix
 
 on:
-  push:
   pull_request:
-  pull_request_target:
 
 jobs:
   load-jobs:
