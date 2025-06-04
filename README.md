@@ -7,6 +7,7 @@ Monotonix is an extensible, composable set of building blocks for CI/CD pipeline
 ## Key Features
 
 - **Monotonic Deployment**: Only build and deploy changed applications, preventing duplicate work
+- **Application Dependencies**: Define inter-application dependencies with automatic resolution and circular dependency detection
 - **State Tracking**: Uses DynamoDB to track job execution state with automatic cleanup
 - **Multi-Environment Support**: Configure different environments (production, staging, PR) with separate AWS accounts and IAM roles
 - **Docker Build Integration**: Seamless AWS ECR integration with multi-platform builds
@@ -76,6 +77,9 @@ Create `monotonix.yaml` in each app directory:
 ```yaml
 app:
   name: your-app
+  depends_on:  # Optional: specify dependencies on other apps
+    - shared-lib
+    - database-migrations
 
 jobs:
   # Production build on main branch
@@ -380,6 +384,23 @@ The Monotonix actions automatically handle:
 - Deduplication across environments
 
 ## Configuration Reference
+
+### Application Dependencies
+
+Applications can specify dependencies using the `depends_on` field:
+
+```yaml
+app:
+  name: api-server
+  depends_on:
+    - shared-lib       # This app will build after shared-lib
+    - auth-service     # And after auth-service
+```
+
+- **Dependency Resolution**: Jobs are automatically reordered to respect dependencies
+- **Circular Detection**: Circular dependencies are detected and will cause an error
+- **Missing Dependencies**: References to non-existent apps will cause an error
+- **Execution Order**: Dependent applications are built before their dependents
 
 ### Tagging Strategies
 
