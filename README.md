@@ -113,7 +113,7 @@ jobs:
   # PR builds
   build_dev_pr:
     on:
-      pull_request_target:
+      pull_request:
     configs:
       docker_build:
         registry:
@@ -133,7 +133,6 @@ jobs:
         branches: [main]
     configs:
       go_test:
-        # Configuration specific to your Go test workflow
 ```
 
 ### 4. GitHub Actions Workflow
@@ -144,13 +143,12 @@ Create `.github/workflows/docker-build.yml`:
 name: Docker Build
 
 on:
+  push:
+    branches: [main]
   pull_request:
     paths:
       - .github/workflows/docker-build.yml
       - apps/**
-
-env:
-  CHECKOUT_REF: ${{ github.event.pull_request.head.sha || github.sha }}
 
 jobs:
   setup:
@@ -163,7 +161,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ env.CHECKOUT_REF }}
           fetch-depth: 0
       - uses: yuya-takeyama/monotonix/actions/load-jobs@main
         with:
@@ -182,7 +179,7 @@ jobs:
       - uses: yuya-takeyama/monotonix/actions/load-docker-build-job-params@main
         with:
           global-config-file-path: apps/monotonix-global.yaml
-          timezone: YOUR-TIMEZONE
+          timezone: Asia/Tokyo  # Timezone for semver_datetime tagging
 
   build:
     name: ${{ matrix.job.context.label }}
@@ -207,8 +204,6 @@ jobs:
           dynamodb-region: YOUR-REGION
           job: ${{ toJSON(matrix.job) }}
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ env.CHECKOUT_REF }}
 
       - uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -241,9 +236,30 @@ aws dynamodb create-table \
 
 ### 2. Create IAM Roles
 
-Create IAM roles for each environment with the following permissions:
+Create IAM roles with the following permissions:
 
-#### For Docker Builds:
+#### State Manager Role
+For DynamoDB state management operations:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:GetItem",
+        "dynamodb:PutItem",
+        "dynamodb:Query"
+      ],
+      "Resource": "arn:aws:dynamodb:*:*:table/monotonix-state"
+    }
+  ]
+}
+```
+
+#### Docker Build Roles
+For each environment (prd, dev_main, dev_pr):
 
 ```json
 {
@@ -267,20 +283,6 @@ Create IAM roles for each environment with the following permissions:
 }
 ```
 
-#### For State Management:
-
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Action": ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:Query"],
-      "Resource": "arn:aws:dynamodb:*:*:table/monotonix-state"
-    }
-  ]
-}
-```
 
 ### 3. Create ECR Repositories
 
@@ -316,6 +318,8 @@ Monotonix is designed to be extensible beyond Docker builds. You can define any 
    name: My Custom Workflow
    
    on:
+     push:
+       branches: [main]
      pull_request:
        paths:
          - .github/workflows/my-custom.yml
@@ -334,8 +338,9 @@ Monotonix is designed to be extensible beyond Docker builds. You can define any 
            with:
              root-dir: apps
              required-config-keys: 'my_job_type'  # Filter for your job type
-         - uses: yuya-takeyama/monotonix/actions/filter-jobs-by-changed-files@main
-         # ... state management steps
+         - if: ${{ github.event_name == 'pull_request' }}
+           uses: yuya-takeyama/monotonix/actions/filter-jobs-by-changed-files@main
+         # ... state management steps (AWS credentials, DynamoDB filtering)
    
      execute:
        needs: setup
