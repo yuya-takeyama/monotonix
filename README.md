@@ -144,7 +144,11 @@ name: Docker Build
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+    paths:
+      - .github/workflows/docker-build.yml
+      - apps/**
   pull_request:
     paths:
       - .github/workflows/docker-build.yml
@@ -179,7 +183,7 @@ jobs:
       - uses: yuya-takeyama/monotonix/actions/load-docker-build-job-params@main
         with:
           global-config-file-path: apps/monotonix-global.yaml
-          timezone: Asia/Tokyo  # Timezone for semver_datetime tagging
+          timezone: Asia/Tokyo # Timezone for semver_datetime tagging
 
   build:
     name: ${{ matrix.job.context.label }}
@@ -239,6 +243,7 @@ aws dynamodb create-table \
 Create IAM roles with the following permissions:
 
 #### State Manager Role
+
 For DynamoDB state management operations:
 
 ```json
@@ -247,11 +252,7 @@ For DynamoDB state management operations:
   "Statement": [
     {
       "Effect": "Allow",
-      "Action": [
-        "dynamodb:GetItem",
-        "dynamodb:PutItem",
-        "dynamodb:Query"
-      ],
+      "Action": ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:Query"],
       "Resource": "arn:aws:dynamodb:*:*:table/monotonix-state"
     }
   ]
@@ -259,6 +260,7 @@ For DynamoDB state management operations:
 ```
 
 #### Docker Build Roles
+
 For each environment (prd, dev_main, dev_pr):
 
 ```json
@@ -282,7 +284,6 @@ For each environment (prd, dev_main, dev_pr):
   ]
 }
 ```
-
 
 ### 3. Create ECR Repositories
 
@@ -314,17 +315,22 @@ Monotonix is designed to be extensible beyond Docker builds. You can define any 
    ```
 
 2. **Creating a separate GitHub Actions workflow** that targets that job type:
+
    ```yaml
    name: My Custom Workflow
-   
+
    on:
      push:
-       branches: [main]
+       branches:
+         - main
+        paths:
+          - .github/workflows/my-custom.yml
+          - apps/**
      pull_request:
        paths:
          - .github/workflows/my-custom.yml
          - apps/**
-   
+
    jobs:
      setup:
        runs-on: ubuntu-latest
@@ -337,11 +343,11 @@ Monotonix is designed to be extensible beyond Docker builds. You can define any 
          - uses: yuya-takeyama/monotonix/actions/load-jobs@main
            with:
              root-dir: apps
-             required-config-keys: 'my_job_type'  # Filter for your job type
+             required-config-keys: 'my_job_type' # Filter for your job type
          - if: ${{ github.event_name == 'pull_request' }}
            uses: yuya-takeyama/monotonix/actions/filter-jobs-by-changed-files@main
          # ... state management steps (AWS credentials, DynamoDB filtering)
-   
+
      execute:
        needs: setup
        if: ${{ needs.setup.outputs.jobs != '[]' }}
@@ -361,6 +367,7 @@ Monotonix is designed to be extensible beyond Docker builds. You can define any 
 - **Terraform**: `terraform` with terraform.yml workflow
 
 Each job type gets its own workflow file, allowing for:
+
 - Independent triggering and execution
 - Job-specific configuration and steps
 - Parallel execution of different job types
