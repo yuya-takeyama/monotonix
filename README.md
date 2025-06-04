@@ -10,7 +10,7 @@ Monotonix is an extensible, composable set of building blocks for CI/CD pipeline
 - **State Tracking**: Uses DynamoDB to track job execution state with automatic cleanup
 - **Multi-Environment Support**: Configure different environments (production, staging, PR) with separate AWS accounts and IAM roles
 - **Docker Build Integration**: Seamless AWS ECR integration with multi-platform builds
-- **Go Testing**: Built-in support for Go test execution
+- **Extensible Job Types**: Define custom job types for any workflow (testing, linting, deployment, etc.)
 - **Flexible Configuration**: YAML-based configuration with global and per-app settings
 
 ## Quick Start
@@ -22,6 +22,7 @@ Create the following directory structure in your monorepo:
 ```
 your-repo/
 ├── apps/
+│   ├── monotonix-global.yaml
 │   ├── app1/
 │   │   ├── Dockerfile
 │   │   ├── go.mod
@@ -32,7 +33,6 @@ your-repo/
 │       ├── go.mod
 │       ├── main.go
 │       └── monotonix.yaml
-├── monotonix-global.yaml
 └── .github/
     └── workflows/
         └── monotonix.yml
@@ -40,7 +40,7 @@ your-repo/
 
 ### 2. Global Configuration
 
-Create `monotonix-global.yaml` at the repository root:
+Create `monotonix-global.yaml` in the `apps/` directory:
 
 ```yaml
 job_types:
@@ -125,7 +125,7 @@ jobs:
         platforms:
           - linux/amd64
 
-  # Go testing
+  # Go testing (custom job type)
   go_test:
     on:
       pull_request:
@@ -133,6 +133,7 @@ jobs:
         branches: [main]
     configs:
       go_test:
+        # Configuration specific to your Go test workflow
 ```
 
 ### 4. GitHub Actions Workflow
@@ -230,6 +231,7 @@ jobs:
           push: true
           tags: ${{ join(matrix.job.image_references, ',') }}
 
+  # Example: Go testing job (you can define any custom job type)
   go-test:
     needs: filter-jobs-by-dynamodb-state
     if: fromJson(needs.filter-jobs-by-dynamodb-state.outputs.jobs).go_test != null
@@ -272,6 +274,7 @@ aws dynamodb create-table \
 Create IAM roles for each environment with the following permissions:
 
 #### For Docker Builds:
+
 ```json
 {
   "Version": "2012-10-17",
@@ -295,17 +298,14 @@ Create IAM roles for each environment with the following permissions:
 ```
 
 #### For State Management:
+
 ```json
 {
   "Version": "2012-10-17",
   "Statement": [
     {
       "Effect": "Allow",
-      "Action": [
-        "dynamodb:GetItem",
-        "dynamodb:PutItem",
-        "dynamodb:Query"
-      ],
+      "Action": ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:Query"],
       "Resource": "arn:aws:dynamodb:*:*:table/monotonix-state"
     }
   ]
@@ -324,6 +324,47 @@ aws ecr create-repository --repository-name your-repo/your-app --region ap-north
 # PR repository
 aws ecr create-repository --repository-name your-repo-pr/your-app --region ap-northeast-1
 ```
+
+## Extensible Job Types
+
+Monotonix is designed to be extensible beyond Docker builds. You can define any custom job type by:
+
+1. **Adding a config key** in your `monotonix.yaml`:
+
+   ```yaml
+   jobs:
+     my_custom_job:
+       on:
+         pull_request:
+       configs:
+         my_job_type: # Any key you choose
+           # Your custom configuration
+   ```
+
+2. **Creating a corresponding GitHub Actions job** that processes the job type:
+   ```yaml
+   my-custom-workflow:
+     needs: filter-jobs-by-dynamodb-state
+     if: fromJson(needs.filter-jobs-by-dynamodb-state.outputs.jobs).my_job_type != null
+     strategy:
+       matrix:
+         job: ${{ fromJson(needs.filter-jobs-by-dynamodb-state.outputs.jobs).my_job_type }}
+     # ... your custom steps
+   ```
+
+### Examples of Custom Job Types
+
+- **Go Testing**: `go_test` with Go setup and test execution
+- **Linting**: `lint` with ESLint, Prettier, or language-specific linters
+- **Security Scanning**: `security_scan` with vulnerability scanners
+- **Database Migrations**: `migrate` with database migration scripts
+- **Terraform**: `terraform` with infrastructure as code deployment
+
+The framework automatically handles:
+
+- Job filtering by changed files
+- State tracking in DynamoDB
+- Deduplication across environments
 
 ## Configuration Reference
 
