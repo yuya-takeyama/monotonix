@@ -1,3 +1,6 @@
 {
-  "cSpell.words": ["luxon", "monotonix"]
+  "cSpell.words": ["luxon", "monotonix"],
+  "[yaml]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  }
 }
