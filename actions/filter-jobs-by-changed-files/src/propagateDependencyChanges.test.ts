@@ -1,7 +1,11 @@
 import { propagateDependencyChanges } from './propagateDependencyChanges';
 import { Job } from '@monotonix/schema';
 
-const createMockJob = (appName: string, dependsOn?: string[], jobKey = 'build'): Job => ({
+const createMockJob = (
+  appName: string,
+  dependsOn?: string[],
+  jobKey = 'build',
+): Job => ({
   app: {
     name: appName,
     depends_on: dependsOn,
@@ -28,10 +32,7 @@ const createMockJob = (appName: string, dependsOn?: string[], jobKey = 'build'):
 
 describe('propagateDependencyChanges', () => {
   it('should return original jobs when no dependencies exist', () => {
-    const jobs = [
-      createMockJob('app-a'),
-      createMockJob('app-b'),
-    ];
+    const jobs = [createMockJob('app-a'), createMockJob('app-b')];
     const changedJobs = [createMockJob('app-a')];
 
     const result = propagateDependencyChanges(jobs, changedJobs);
