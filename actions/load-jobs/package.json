@@ -13,7 +13,7 @@
     "glob": "11.0.3",
     "js-yaml": "^4.1.0",
     "minimatch": "10.0.3",
-    "zod": "3.25.51"
+    "zod": "3.25.63"
   },
   "devDependencies": {
     "@types/jest": "^29.5.14",
