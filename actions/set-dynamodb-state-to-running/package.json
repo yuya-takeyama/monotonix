@@ -15,7 +15,7 @@
     "@monotonix/dynamodb-common": "*"
   },
   "devDependencies": {
-    "@types/jest": "^29.5.14",
+    "@types/jest": "^30.0.0",
     "@types/node": "^22.10.2",
     "jest": "30.0.0",
     "prettier": "^3.4.2",
