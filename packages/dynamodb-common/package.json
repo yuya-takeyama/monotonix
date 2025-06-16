@@ -11,7 +11,7 @@
     "test": "jest --passWithNoTests"
   },
   "dependencies": {
-    "zod": "3.25.63"
+    "zod": "3.25.65"
   },
   "devDependencies": {
     "typescript": "5.8.3"
