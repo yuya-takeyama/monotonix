@@ -11,6 +11,7 @@ import { globSync } from 'glob';
 import { join, dirname } from 'node:path';
 import { CommitInfo, getLastCommit } from './getLastCommit';
 import { Event } from './schema';
+import { calculateEffectiveTimestamps } from './calculateEffectiveTimestamp';
 
 type loadJobsFromLocalConfigFilesParams = {
   rootDir: string;
@@ -57,9 +58,11 @@ export const loadJobsFromLocalConfigFiles = async ({
     }),
   );
 
-  return jobs
+  const flatJobs = jobs
     .flat()
     .filter(job => requiredConfigKeys.every(key => key in job.configs));
+
+  return calculateEffectiveTimestamps(flatJobs);
 };
 
 type createJobParams = {

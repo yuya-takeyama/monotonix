@@ -8,6 +8,7 @@ export type GlobalConfig = z.infer<typeof GlobalConfigSchema>;
 
 const AppSchema = z.object({
   name: z.string(),
+  depends_on: z.array(z.string()).optional(),
 });
 
 const ContextSchema = z.object({
