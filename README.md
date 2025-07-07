@@ -7,6 +7,7 @@ Monotonix is an extensible, composable set of building blocks for CI/CD pipeline
 ## Key Features
 
 - **Monotonic Deployment**: Only build and deploy changed applications, preventing duplicate work
+- **Application Dependencies**: Define inter-application dependencies with automatic change propagation
 - **State Tracking**: Uses DynamoDB to track job execution state with automatic cleanup
 - **Multi-Environment Support**: Configure different environments (production, staging, PR) with separate AWS accounts and IAM roles
 - **Docker Build Integration**: Seamless AWS ECR integration with multi-platform builds
@@ -76,6 +77,9 @@ Create `monotonix.yaml` in each app directory:
 ```yaml
 app:
   name: your-app
+  depends_on: # Optional: when these apps change, this app is also considered changed
+    - shared-lib
+    - database-migrations
 
 jobs:
   # Production build on main branch
@@ -380,6 +384,23 @@ The Monotonix actions automatically handle:
 - Deduplication across environments
 
 ## Configuration Reference
+
+### Application Dependencies
+
+Applications can specify dependencies using the `depends_on` field:
+
+```yaml
+app:
+  name: api-server
+  depends_on:
+    - shared-lib # When shared-lib changes, api-server is also considered changed
+    - auth-service # When auth-service changes, api-server is also considered changed
+```
+
+- **Change Propagation**: When a dependency changes, all dependent applications are automatically included in the build
+- **Transitive Dependencies**: Changes propagate through the entire dependency chain (A depends on B, B depends on C → C changes triggers A and B)
+- **Matrix Execution**: Dependencies don't affect execution order - all jobs run in parallel as usual
+- **Smart Filtering**: Only applications with actual dependencies are affected by changes
 
 ### Tagging Strategies
 
