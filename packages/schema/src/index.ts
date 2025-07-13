@@ -70,10 +70,7 @@ const LocalConfigJobSchema = z.object({
 export type LocalConfigJob = z.infer<typeof LocalConfigJobSchema>;
 
 export const LocalConfigSchema = z.object({
-  app: z.object({
-    name: z.string(),
-    depends_on: z.array(z.string()).optional().default([]),
-  }),
+  app: AppSchema,
   jobs: z.record(z.string(), LocalConfigJobSchema),
 });
 

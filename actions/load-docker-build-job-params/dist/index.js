@@ -41885,10 +41885,7 @@ const LocalConfigJobSchema = zod_1.z.object({
     configs: exports.JobConfigsSchema,
 });
 exports.LocalConfigSchema = zod_1.z.object({
-    app: zod_1.z.object({
-        name: zod_1.z.string(),
-        depends_on: zod_1.z.array(zod_1.z.string()).optional().default([]),
-    }),
+    app: AppSchema,
     jobs: zod_1.z.record(zod_1.z.string(), LocalConfigJobSchema),
 });
 const JobParamsSchema = zod_1.z.object({}).catchall(zod_1.z.object({}).catchall(zod_1.z.any()));
