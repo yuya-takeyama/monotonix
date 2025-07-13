@@ -119,4 +119,30 @@ describe('propagateDependencyChanges', () => {
     expect(result.map(job => job.app.name)).toContain('shared-lib');
     expect(result.map(job => job.app.name)).toContain('api-server');
   });
+
+  it('should handle playground scenario: foo changes triggers foo/cmd/api-server', () => {
+    const jobs = [
+      // foo app with go_test job
+      createMockJob('foo', undefined, 'go_test'),
+      // foo/cmd/api-server with multiple jobs and depends on foo
+      createMockJob('foo/cmd/api-server', ['foo'], 'build_prd'),
+      createMockJob('foo/cmd/api-server', ['foo'], 'build_dev_main'),
+      createMockJob('foo/cmd/api-server', ['foo'], 'build_dev_pr'),
+    ];
+    // Only foo's job is initially changed (from file path filter)
+    const changedJobs = [createMockJob('foo', undefined, 'go_test')];
+
+    const result = propagateDependencyChanges(jobs, changedJobs);
+
+    expect(result).toHaveLength(4); // 1 foo job + 3 foo/cmd/api-server jobs
+    expect(result.map(job => job.app.name)).toContain('foo');
+    expect(result.map(job => job.app.name)).toContain('foo/cmd/api-server');
+    
+    // Should include all foo/cmd/api-server jobs
+    const apiServerJobs = result.filter(job => job.app.name === 'foo/cmd/api-server');
+    expect(apiServerJobs).toHaveLength(3);
+    expect(apiServerJobs.map(job => job.context.job_key)).toContain('build_prd');
+    expect(apiServerJobs.map(job => job.context.job_key)).toContain('build_dev_main');
+    expect(apiServerJobs.map(job => job.context.job_key)).toContain('build_dev_pr');
+  });
 });
