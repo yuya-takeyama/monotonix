@@ -1,6 +1,6 @@
+import { Context } from '@actions/github/lib/context';
 import { run } from './run';
 import { DockerBuildGlobalConfig, InputJob, OutputJob } from './schema';
-import { Context } from '@actions/github/lib/context';
 
 describe('run', () => {
   const stubGlobalConfig: DockerBuildGlobalConfig = {
@@ -63,14 +63,14 @@ describe('run', () => {
     params: {},
   };
 
-  const stubContext: Context = {
+  const stubContext = {
     ref: 'refs/heads/main',
     payload: {
       head_commit: {
         timestamp: '2023-10-10T10:00:00Z',
       },
     },
-  } as any;
+  } as unknown as Context;
 
   it('returns build parameters for docker build', () => {
     const result = run({

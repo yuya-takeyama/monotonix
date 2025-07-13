@@ -1,7 +1,7 @@
 import { Context } from '@actions/github/lib/context';
-import { DockerBuildGlobalConfig, InputJob } from './schema';
-import { join } from 'path';
 import { DateTime } from 'luxon';
+import { join } from 'path';
+import { DockerBuildGlobalConfig, InputJob } from './schema';
 
 type generateTagsType = {
   context: Context;
@@ -32,7 +32,7 @@ export const generateImageReferences = ({
       case 'always_latest':
         return [`${join(repository.base_url, inputJob.app.name)}:latest`];
 
-      case 'semver_datetime':
+      case 'semver_datetime': {
         const timestamp = getCommittedAt(context);
         return [
           `${join(
@@ -40,6 +40,7 @@ export const generateImageReferences = ({
             inputJob.app.name,
           )}:${generateSemverDatetimeTag(timestamp, timezone)}`,
         ];
+      }
 
       case 'pull_request':
         if (!context.payload.pull_request) {
@@ -75,7 +76,7 @@ export const generateSemverDatetimeTag = (
 };
 
 export function getCommittedAt(context: Context): number {
-  if (context.payload.head_commit && context.payload.head_commit.timestamp) {
+  if (context.payload.head_commit?.timestamp) {
     return DateTime.fromISO(context.payload.head_commit.timestamp).toSeconds();
   }
 

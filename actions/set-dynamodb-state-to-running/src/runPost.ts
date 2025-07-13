@@ -1,15 +1,15 @@
-import { Job } from '@monotonix/schema';
+import { notice } from '@actions/core';
 import {
   ConditionalCheckFailedException,
   DynamoDBClient,
 } from '@aws-sdk/client-dynamodb';
 import {
+  DeleteCommand,
   DynamoDBDocumentClient,
   PutCommand,
-  DeleteCommand,
 } from '@aws-sdk/lib-dynamodb';
-import { notice } from '@actions/core';
 import { StateItem } from '@monotonix/dynamodb-common';
+import { Job } from '@monotonix/schema';
 
 type runPostParam = {
   job: Job;
@@ -57,7 +57,7 @@ export const runPost = async ({
         notice(`${job.context.label}: A newer commit is already running`);
         // No need to let it fail
       } else {
-        throw err;
+        console.error(`Failed to delete running state: ${err}`);
       }
     }
   }

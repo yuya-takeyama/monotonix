@@ -1,9 +1,9 @@
-import { Jobs } from '@monotonix/schema';
+import { info, warning } from '@actions/core';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, QueryCommand } from '@aws-sdk/lib-dynamodb';
-import { info, warning } from '@actions/core';
+import { StateItem, StateItemSchema } from '@monotonix/dynamodb-common';
+import { Jobs } from '@monotonix/schema';
 import { z } from 'zod';
-import { StateItemSchema, StateItem } from '@monotonix/dynamodb-common';
 
 type runParam = {
   jobs: Jobs;
@@ -91,7 +91,7 @@ const AppJobStatusSchema = z.object({
 const AppJobStatusesSchema = z.record(z.string(), AppJobStatusSchema);
 type AppJobStatuses = z.infer<typeof AppJobStatusesSchema>;
 
-const transofrmItems = (items: Record<string, any>[]): AppJobStatuses => {
+const transofrmItems = (items: unknown[]): AppJobStatuses => {
   const appJobStatuses: AppJobStatuses = {};
 
   for (const item of items) {

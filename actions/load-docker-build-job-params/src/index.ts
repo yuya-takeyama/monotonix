@@ -1,9 +1,9 @@
-import { getInput, setFailed, setOutput, exportVariable } from '@actions/core';
+import { exportVariable, getInput, setFailed, setOutput } from '@actions/core';
 import { context } from '@actions/github';
+import { DateTime } from 'luxon';
 import { loadGlobalConfig } from './config';
 import { run } from './run';
 import { InputJobsSchema } from './schema';
-import { DateTime } from 'luxon';
 
 try {
   const globalConfigFilePath =

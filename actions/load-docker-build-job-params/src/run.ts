@@ -1,11 +1,11 @@
-import {
-  InputJobs,
-  OutputJobs,
-  OutputJob,
-  DockerBuildGlobalConfig,
-} from './schema';
 import { Context } from '@actions/github/lib/context';
 import { generateImageReferences } from './generateImageReferences';
+import {
+  DockerBuildGlobalConfig,
+  InputJobs,
+  OutputJob,
+  OutputJobs,
+} from './schema';
 
 type runParams = {
   globalConfig: DockerBuildGlobalConfig;

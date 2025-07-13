@@ -1,6 +1,6 @@
-import { Jobs, Job } from '@monotonix/schema';
-import { getOctokit, context } from '@actions/github';
 import { join } from 'node:path';
+import { context, getOctokit } from '@actions/github';
+import { Job, Jobs } from '@monotonix/schema';
 import { statSync } from 'fs';
 
 export const matchesDependency = (

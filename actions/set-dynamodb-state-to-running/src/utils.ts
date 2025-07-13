@@ -1,13 +1,14 @@
-import { saveState, getState } from '@actions/core';
+import { getState, saveState } from '@actions/core';
 
 export const parseDuration = (duration: string): number => {
   const regex = /(\d+)(\D+)/g;
-  let matches;
+  let matches: RegExpExecArray | null;
   let totalSeconds = 0;
   let lastIndex = 0;
 
-  while ((matches = regex.exec(duration)) !== null) {
-    if (matches[1] && matches[2]) {
+  do {
+    matches = regex.exec(duration);
+    if (matches?.[1] && matches[2]) {
       const value = Number(matches[1]);
       const unit = matches[2];
 
@@ -29,7 +30,7 @@ export const parseDuration = (duration: string): number => {
       }
       lastIndex = regex.lastIndex;
     }
-  }
+  } while (matches !== null);
 
   if (lastIndex !== duration.length) {
     throw new Error(`Invalid format: ${duration}`);
@@ -73,6 +74,7 @@ export const getAwsCredentialsFromState = () => {
   };
 };
 
+// biome-ignore lint/suspicious/noExplicitAny: Generic function wrapper requires any for type flexibility
 export const wrapFunctionWithEnv = <T extends (...args: any[]) => any>(
   originalFunction: T,
   tempEnv: Record<string, string | undefined>,

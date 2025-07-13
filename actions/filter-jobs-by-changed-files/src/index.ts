@@ -1,6 +1,6 @@
 import { exportVariable, getInput, setFailed, setOutput } from '@actions/core';
-import { run } from './run';
 import { JobsSchema } from '@monotonix/schema';
+import { run } from './run';
 
 (async () => {
   try {
