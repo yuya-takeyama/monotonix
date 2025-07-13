@@ -1,6 +1,6 @@
 import { Context } from '@actions/github/lib/context';
 import { DateTime } from 'luxon';
-import { join, basename } from 'path';
+import { join } from 'path';
 import { DockerBuildGlobalConfig, InputJob } from './schema';
 
 export const extractAppLabel = (appPath: string, rootDir: string): string => {

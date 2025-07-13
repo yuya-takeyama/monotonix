@@ -1,6 +1,6 @@
 import {
-  generateSemverDatetimeTag,
   extractAppLabel,
+  generateSemverDatetimeTag,
 } from './generateImageReferences';
 
 describe('extractAppLabel', () => {
