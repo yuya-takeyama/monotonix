@@ -34128,8 +34128,11 @@ const loadAllAppConfigs = (rootDir = 'apps') => {
         try {
             const appPath = (0, node_path_1.dirname)(configPath);
             const configContent = (0, node_fs_1.readFileSync)(configPath, 'utf-8');
-            const config = schema_1.LocalConfigSchema.parse((0, js_yaml_1.load)(configContent));
-            console.log('🔍 [DEBUG] raw config.app:', config.app);
+            const rawYaml = (0, js_yaml_1.load)(configContent);
+            console.log('🔍 [DEBUG] configPath:', configPath);
+            console.log('🔍 [DEBUG] raw YAML app:', rawYaml.app);
+            const config = schema_1.LocalConfigSchema.parse(rawYaml);
+            console.log('🔍 [DEBUG] parsed config.app:', config.app);
             console.log('🔍 [DEBUG] config.app.depends_on:', config.app.depends_on);
             console.log('🔍 [DEBUG] typeof depends_on:', typeof config.app.depends_on);
             const appInfo = {

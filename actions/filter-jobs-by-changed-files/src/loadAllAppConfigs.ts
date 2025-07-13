@@ -29,9 +29,13 @@ export const loadAllAppConfigs = (rootDir: string = 'apps'): AppInfo[] => {
     try {
       const appPath = dirname(configPath);
       const configContent = readFileSync(configPath, 'utf-8');
-      const config = LocalConfigSchema.parse(load(configContent));
+      const rawYaml = load(configContent);
+      console.log('🔍 [DEBUG] configPath:', configPath);
+      console.log('🔍 [DEBUG] raw YAML app:', (rawYaml as any).app);
       
-      console.log('🔍 [DEBUG] raw config.app:', config.app);
+      const config = LocalConfigSchema.parse(rawYaml);
+      
+      console.log('🔍 [DEBUG] parsed config.app:', config.app);
       console.log('🔍 [DEBUG] config.app.depends_on:', (config.app as any).depends_on);
       console.log('🔍 [DEBUG] typeof depends_on:', typeof (config.app as any).depends_on);
       
