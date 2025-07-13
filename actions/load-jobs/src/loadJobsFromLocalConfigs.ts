@@ -126,20 +126,22 @@ export const calculateEffectiveTimestamp = async (
     if (dep === appPath) {
       continue;
     }
-    
+
     const depPath = join(rootDir, dep);
     if (!existsSync(depPath)) {
       throw new Error(`Dependency path does not exist: ${depPath}`);
     }
-    
+
     const depCommit = await getLastCommit(depPath);
     timestamps.push(depCommit.timestamp);
     commitInfos.push(depCommit);
   }
 
   const maxTimestamp = Math.max(...timestamps);
-  const maxCommitInfo = commitInfos.find(commit => commit.timestamp === maxTimestamp);
-  
+  const maxCommitInfo = commitInfos.find(
+    commit => commit.timestamp === maxTimestamp,
+  );
+
   return maxCommitInfo || appCommit;
 };
 
@@ -149,15 +151,19 @@ const validateDependencies = (
 ): void => {
   for (const [appPath, config] of allConfigs) {
     const dependencies = config.app.depends_on || [];
-    
+
     for (const dep of dependencies) {
       if (dep === appPath) {
-        throw new Error(`Self-dependency detected: ${config.app.name} depends on itself`);
+        throw new Error(
+          `Self-dependency detected: ${config.app.name} depends on itself`,
+        );
       }
-      
+
       const depPath = join(rootDir, dep);
       if (!existsSync(depPath)) {
-        throw new Error(`Dependency path does not exist: ${depPath} (required by ${config.app.name})`);
+        throw new Error(
+          `Dependency path does not exist: ${depPath} (required by ${config.app.name})`,
+        );
       }
     }
   }
@@ -173,8 +179,18 @@ const detectCircularDependencies = (
   const recursionStack = new Set<string>();
 
   for (const [appPath, config] of allConfigs) {
-    if (hasCircularDependency(appPath, allConfigs, rootDir, visited, recursionStack)) {
-      throw new Error(`Circular dependency detected involving: ${config.app.name}`);
+    if (
+      hasCircularDependency(
+        appPath,
+        allConfigs,
+        rootDir,
+        visited,
+        recursionStack,
+      )
+    ) {
+      throw new Error(
+        `Circular dependency detected involving: ${config.app.name}`,
+      );
     }
   }
 };
@@ -189,7 +205,7 @@ const hasCircularDependency = (
   if (recursionStack.has(appPath)) {
     return true;
   }
-  
+
   if (visited.has(appPath)) {
     return false;
   }
@@ -200,10 +216,18 @@ const hasCircularDependency = (
   const config = allConfigs.get(appPath);
   if (config) {
     const dependencies = config.app.depends_on || [];
-    
+
     for (const dep of dependencies) {
       const depPath = join(rootDir, dep);
-      if (hasCircularDependency(depPath, allConfigs, rootDir, visited, recursionStack)) {
+      if (
+        hasCircularDependency(
+          depPath,
+          allConfigs,
+          rootDir,
+          visited,
+          recursionStack,
+        )
+      ) {
         return true;
       }
     }

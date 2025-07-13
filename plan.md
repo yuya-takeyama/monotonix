@@ -12,6 +12,7 @@ Currently, Monotonix uses directory-based change detection. If files in `apps/fo
 2. **File dependencies**: `server` depends on `apps/foo/go.mod` and `apps/foo/go.sum`
 
 ### Example Scenario
+
 ```
 apps/foo/
 ├── cmd/
@@ -23,6 +24,7 @@ apps/foo/
 ```
 
 #### Current Limitations:
+
 - ✅ Changes in `pkg/logger/` can trigger builds if `depends_on: [foo]`
 - ❌ But this also triggers unnecessary builds when `worker` changes
 - ❌ Cannot depend on specific files like `go.mod` or `go.sum`
@@ -32,7 +34,7 @@ apps/foo/
 
 ### Workflow Step Analysis
 
-1. **load-jobs**: 
+1. **load-jobs**:
    - Scans for `monotonix.yaml` files using globSync
    - Calls `getLastCommit(appPath)` to get timestamp for each app
    - Creates Job objects with `context.last_commit.timestamp`
@@ -74,13 +76,13 @@ app:
   name: foo/cmd/server
   depends_on:
     # Directory dependencies (no trailing slash required)
-    - foo/pkg           # depends on apps/foo/pkg/ directory
-    - shared/utils      # depends on apps/shared/utils/ directory
-    
+    - foo/pkg # depends on apps/foo/pkg/ directory
+    - shared/utils # depends on apps/shared/utils/ directory
+
     # File dependencies
-    - foo/go.mod        # depends on apps/foo/go.mod file
-    - foo/go.sum        # depends on apps/foo/go.sum file
-    
+    - foo/go.mod # depends on apps/foo/go.mod file
+    - foo/go.sum # depends on apps/foo/go.sum file
+
     # Glob patterns (future enhancement)
     # - foo/*.{mod,sum}  # all .mod and .sum files in foo/
 jobs:
@@ -93,6 +95,7 @@ jobs:
 ```
 
 **Dependency Resolution Rules:**
+
 - Dependencies are relative to the root directory (`apps/`)
 - Both directories and files can be specified
 - **Automatic detection**: The system automatically determines if a dependency is a file or directory
@@ -101,6 +104,7 @@ jobs:
 - Non-existent paths cause validation errors
 
 **Automatic File/Directory Detection:**
+
 - No need to add trailing `/` for directories
 - The system uses `fs.stat()` to determine the type at runtime
 - If a path doesn't exist, it's treated as a file dependency
@@ -109,65 +113,68 @@ jobs:
 ### Common Use Cases
 
 #### Go Applications
+
 ```yaml
 app:
   name: web-app/cmd/api-server
   depends_on:
-    - web-app/pkg          # Shared Go packages (directory)
-    - web-app/go.mod       # Module dependencies (file)
-    - web-app/go.sum       # Dependency lock file (file)
+    - web-app/pkg # Shared Go packages (directory)
+    - web-app/go.mod # Module dependencies (file)
+    - web-app/go.sum # Dependency lock file (file)
 ```
 
 #### Node.js Applications
+
 ```yaml
 app:
   name: frontend/apps/dashboard
   depends_on:
-    - frontend/packages/ui      # Shared UI components (directory)
-    - frontend/package.json     # Root package.json (file)
-    - frontend/yarn.lock        # Yarn lock file (file)
+    - frontend/packages/ui # Shared UI components (directory)
+    - frontend/package.json # Root package.json (file)
+    - frontend/yarn.lock # Yarn lock file (file)
 ```
 
 #### Python Applications
+
 ```yaml
 app:
   name: services/ml-worker
   depends_on:
-    - services/common           # Shared Python modules (directory)
+    - services/common # Shared Python modules (directory)
     - services/requirements.txt # Pip dependencies (file)
-    - services/pyproject.toml   # Poetry config (file)
+    - services/pyproject.toml # Poetry config (file)
 ```
 
 ### Core Algorithm: Effective Timestamp Calculation
 
 ```typescript
 const calculateEffectiveTimestamp = async (
-  appPath: string, 
-  dependencies: string[], 
-  rootDir: string
+  appPath: string,
+  dependencies: string[],
+  rootDir: string,
 ): Promise<CommitInfo> => {
   const appCommit = await getLastCommit(appPath);
   const timestamps = [appCommit.timestamp];
-  
+
   for (const dep of dependencies) {
     const depPath = path.join(rootDir, dep);
-    
+
     // Check if dependency exists
-    if (!await pathExists(depPath)) {
+    if (!(await pathExists(depPath))) {
       throw new Error(`Dependency path does not exist: ${depPath}`);
     }
-    
+
     // Get last commit for both files and directories
     const depCommit = await getLastCommit(depPath);
     timestamps.push(depCommit.timestamp);
   }
-  
+
   const maxTimestamp = Math.max(...timestamps);
-  
+
   // Return the commit info corresponding to the max timestamp
   // If max is from dependency, we need to get that commit's hash
-  return maxTimestamp === appCommit.timestamp 
-    ? appCommit 
+  return maxTimestamp === appCommit.timestamp
+    ? appCommit
     : await getCommitInfoByTimestamp(maxTimestamp, dependencies);
 };
 
@@ -211,6 +218,7 @@ const AppSchema = z.object({
 #### Changes Required:
 
 1. **Parse dependencies from config**:
+
 ```typescript
 const dependencies = localConfig.app.depends_on || [];
 ```
@@ -221,15 +229,16 @@ const dependencies = localConfig.app.depends_on || [];
    - Prevent self-dependencies
 
 3. **Replace getLastCommit call**:
+
 ```typescript
 // Old:
 const lastCommit = await getLastCommit(appPath);
 
 // New:
 const lastCommit = await calculateEffectiveTimestamp(
-  appPath, 
-  dependencies, 
-  rootDir
+  appPath,
+  dependencies,
+  rootDir,
 );
 ```
 
@@ -237,9 +246,9 @@ const lastCommit = await calculateEffectiveTimestamp(
 
 ```typescript
 const validateDependencies = (
-  appPath: string, 
-  dependencies: string[], 
-  rootDir: string
+  appPath: string,
+  dependencies: string[],
+  rootDir: string,
 ): void => {
   // Circular dependency detection
   // Path existence validation
@@ -247,9 +256,9 @@ const validateDependencies = (
 };
 
 const calculateEffectiveTimestamp = async (
-  appPath: string, 
-  dependencies: string[], 
-  rootDir: string
+  appPath: string,
+  dependencies: string[],
+  rootDir: string,
 ): Promise<CommitInfo> => {
   // Implementation as described above
 };
@@ -275,18 +284,18 @@ return jobs.filter(job => {
 return jobs.filter(job => {
   const appPath = job.context.app_path;
   const dependencies = job.app.depends_on || [];
-  
+
   return files
     .map(file => file.filename)
     .some(file => {
       // Check if file is in app path
       if (file.startsWith(appPath)) return true;
-      
+
       // Check if file is in any dependency path
       return dependencies.some(dep => {
         const depPath = path.join(rootDir, dep);
         const isDirectory = fs.statSync(depPath).isDirectory();
-        
+
         if (isDirectory) {
           // For directories, check if file is within
           return file.startsWith(depPath);
@@ -304,15 +313,18 @@ return jobs.filter(job => {
 ### 4. Error Handling and Validation
 
 #### Circular Dependency Detection:
+
 ```typescript
 const detectCircularDependencies = (
-  configs: Map<string, LocalConfig>
+  configs: Map<string, LocalConfig>,
 ): void => {
   const visited = new Set<string>();
   const recursionStack = new Set<string>();
-  
+
   for (const [appName, config] of configs) {
-    if (hasCircularDependency(appName, config, configs, visited, recursionStack)) {
+    if (
+      hasCircularDependency(appName, config, configs, visited, recursionStack)
+    ) {
       throw new Error(`Circular dependency detected involving: ${appName}`);
     }
   }
@@ -320,10 +332,11 @@ const detectCircularDependencies = (
 ```
 
 #### Dependency Path Validation:
+
 ```typescript
 const validateDependencyPaths = (
-  dependencies: string[], 
-  rootDir: string
+  dependencies: string[],
+  rootDir: string,
 ): void => {
   for (const dep of dependencies) {
     const depPath = path.join(rootDir, dep);
@@ -344,7 +357,7 @@ The `filter-jobs-by-changed-files` action will need a new parameter:
 # In workflow
 - uses: yuya-takeyama/monotonix/actions/filter-jobs-by-changed-files@add-depends-on
   with:
-    root-dir: apps  # Add this parameter
+    root-dir: apps # Add this parameter
 ```
 
 ### Backward Compatibility
@@ -374,7 +387,6 @@ The `filter-jobs-by-changed-files` action will need a new parameter:
    - Test directory dependency changes
    - Test file dependency changes (go.mod, go.sum)
    - Test changes in non-dependent paths
-   
 4. **Path Validation**:
    - Test with non-existent file paths
    - Test with non-existent directory paths
@@ -395,14 +407,17 @@ The `filter-jobs-by-changed-files` action will need a new parameter:
 
 ### Git Command Optimization
 
-Current `getLastCommit` makes one git call per app. With file-level dependencies, this could become `O(apps × (directories + files))`. 
+Current `getLastCommit` makes one git call per app. With file-level dependencies, this could become `O(apps × (directories + files))`.
 
 **Optimization Strategies**:
 
 1. **Batch Git Operations**:
+
 ```typescript
 // Get all commits in a single git command
-const getAllLastCommits = async (paths: string[]): Promise<Map<string, CommitInfo>> => {
+const getAllLastCommits = async (
+  paths: string[],
+): Promise<Map<string, CommitInfo>> => {
   // Use git log with multiple paths
   const cmd = `git log -1 --format=%H,%ct -- ${paths.join(' ')}`;
   // Parse and return results
@@ -410,10 +425,11 @@ const getAllLastCommits = async (paths: string[]): Promise<Map<string, CommitInf
 ```
 
 2. **Intelligent Caching**:
+
 ```typescript
 class CommitCache {
   private cache = new Map<string, CommitInfo>();
-  
+
   async getLastCommit(path: string): Promise<CommitInfo> {
     if (this.cache.has(path)) {
       return this.cache.get(path)!;
@@ -439,16 +455,19 @@ class CommitCache {
 ## Migration Path
 
 ### Phase 1: Schema and Core Logic
+
 1. Update schema to support `depends_on`
 2. Implement `calculateEffectiveTimestamp`
 3. Add validation logic
 
 ### Phase 2: Action Updates
+
 1. Update `load-jobs` action
 2. Update `filter-jobs-by-changed-files` action
 3. Add comprehensive error handling
 
 ### Phase 3: Testing and Documentation
+
 1. Comprehensive unit and integration tests
 2. Update documentation and examples
 3. Create migration guide for existing projects
@@ -486,12 +505,14 @@ class CommitCache {
 The proposed dependency feature leverages Monotonix's existing timestamp-based architecture effectively. By calculating effective timestamps as the maximum across an app and its dependencies, we can trigger dependent jobs when dependencies change without major architectural changes.
 
 The key improvements:
+
 - **Clear semantics**: `depends_on` unambiguously refers to file system paths
 - **Fine-grained control**: Support for both directory and file-level dependencies
 - **Language agnostic**: Works with any monorepo structure (Go, Node.js, Python, etc.)
 - **Minimal breaking changes**: Existing workflows need only minor updates
 
 The implementation focuses on:
+
 - Minimal breaking changes to existing workflows
 - Robust validation and error handling
 - Performance optimization through caching and batching

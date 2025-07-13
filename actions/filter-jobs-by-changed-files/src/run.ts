@@ -3,7 +3,11 @@ import { getOctokit, context } from '@actions/github';
 import { join } from 'node:path';
 import { statSync } from 'fs';
 
-export const matchesDependency = (filePath: string, depPath: string, isDirectory: boolean): boolean => {
+export const matchesDependency = (
+  filePath: string,
+  depPath: string,
+  isDirectory: boolean,
+): boolean => {
   if (isDirectory) {
     // For directories, check if the file is within the directory
     return filePath.startsWith(depPath.endsWith('/') ? depPath : depPath + '/');
@@ -22,7 +26,7 @@ export type PathInfo = {
 export const resolveDependencyPaths = (
   dependencies: string[],
   rootDir: string,
-  getPathInfo: (path: string) => PathInfo
+  getPathInfo: (path: string) => PathInfo,
 ): PathInfo[] => {
   return dependencies.map(dep => {
     const depPath = join(rootDir, dep);
@@ -34,15 +38,15 @@ export const jobMatchesChangedFiles = (
   job: Job,
   changedFiles: string[],
   rootDir: string,
-  dependencyPathInfos: PathInfo[]
+  dependencyPathInfos: PathInfo[],
 ): boolean => {
   const appPath = job.context.app_path;
   const dependencies = job.app.depends_on || [];
-  
+
   return changedFiles.some(file => {
     // Check if file is within the app path
     if (file.startsWith(appPath)) return true;
-    
+
     // Check dependencies
     return dependencyPathInfos.some((pathInfo, index) => {
       if (index >= dependencies.length) return false;
@@ -67,7 +71,11 @@ type runParams = {
   jobs: Jobs;
   rootDir: string;
 };
-export const run = async ({ githubToken, jobs, rootDir }: runParams): Promise<Jobs> => {
+export const run = async ({
+  githubToken,
+  jobs,
+  rootDir,
+}: runParams): Promise<Jobs> => {
   const octokit = getOctokit(githubToken);
 
   switch (context.eventName) {
@@ -82,8 +90,17 @@ export const run = async ({ githubToken, jobs, rootDir }: runParams): Promise<Jo
       const changedFiles = files.map(file => file.filename);
       return jobs.filter(job => {
         const dependencies = job.app.depends_on || [];
-        const dependencyPathInfos = resolveDependencyPaths(dependencies, rootDir, getPathInfo);
-        return jobMatchesChangedFiles(job, changedFiles, rootDir, dependencyPathInfos);
+        const dependencyPathInfos = resolveDependencyPaths(
+          dependencies,
+          rootDir,
+          getPathInfo,
+        );
+        return jobMatchesChangedFiles(
+          job,
+          changedFiles,
+          rootDir,
+          dependencyPathInfos,
+        );
       });
     }
 
@@ -97,8 +114,17 @@ export const run = async ({ githubToken, jobs, rootDir }: runParams): Promise<Jo
       const changedFiles = (commits.files || []).map(file => file.filename);
       return jobs.filter(job => {
         const dependencies = job.app.depends_on || [];
-        const dependencyPathInfos = resolveDependencyPaths(dependencies, rootDir, getPathInfo);
-        return jobMatchesChangedFiles(job, changedFiles, rootDir, dependencyPathInfos);
+        const dependencyPathInfos = resolveDependencyPaths(
+          dependencies,
+          rootDir,
+          getPathInfo,
+        );
+        return jobMatchesChangedFiles(
+          job,
+          changedFiles,
+          rootDir,
+          dependencyPathInfos,
+        );
       });
     }
   }
