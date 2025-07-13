@@ -1,6 +1,6 @@
 import { Jobs } from '@monotonix/schema';
 import { getOctokit, context } from '@actions/github';
-import { propagateDependencyChanges } from './propagateDependencyChanges';
+import { filterJobsByAppDependencies } from './propagateAppDependencies';
 
 type runParams = {
   githubToken: string;
@@ -18,13 +18,8 @@ export const run = async ({ githubToken, jobs }: runParams): Promise<Jobs> => {
         pull_number: context.issue.number,
       });
 
-      const prChangedJobs = jobs.filter(job => {
-        return files
-          .map(file => file.filename)
-          .some(file => file.startsWith(job.context.app_path));
-      });
-
-      return propagateDependencyChanges(jobs, prChangedJobs);
+      const prChangedFiles = files.map(file => file.filename);
+      return filterJobsByAppDependencies(prChangedFiles, jobs);
 
     default:
       const { data: commits } = await octokit.rest.repos.getCommit({
@@ -33,12 +28,7 @@ export const run = async ({ githubToken, jobs }: runParams): Promise<Jobs> => {
         ref: context.sha,
       });
 
-      const pushChangedJobs = jobs.filter(job => {
-        return (commits.files || [])
-          .map(file => file.filename)
-          .some(file => file.startsWith(job.context.app_path));
-      });
-
-      return propagateDependencyChanges(jobs, pushChangedJobs);
+      const pushChangedFiles = (commits.files || []).map(file => file.filename);
+      return filterJobsByAppDependencies(pushChangedFiles, jobs);
   }
 };

@@ -29995,52 +29995,72 @@ exports.JobsSchema = zod_1.z.array(exports.JobSchema);
 
 /***/ }),
 
-/***/ 5915:
+/***/ 6411:
 /***/ ((__unused_webpack_module, exports) => {
 
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.propagateDependencyChanges = void 0;
-const propagateDependencyChanges = (jobs, changedJobs) => {
-    // Create a map of app name to all jobs for that app
-    const appNameToAllJobs = new Map();
-    for (const job of jobs) {
-        const appName = job.app.name;
-        if (!appNameToAllJobs.has(appName)) {
-            appNameToAllJobs.set(appName, []);
+exports.filterJobsByAppDependencies = exports.propagateAppDependencies = exports.getAffectedAppsFromChangedFiles = void 0;
+/**
+ * ファイル変更から影響を受けるアプリを特定
+ */
+const getAffectedAppsFromChangedFiles = (changedFiles, jobs) => {
+    // app_pathからアプリ名へのマッピングを作成（パス長順でソート、長い方が優先）
+    const appPathEntries = Array.from(new Map(jobs.map(job => [job.context.app_path, job.app.name])).entries()).sort(([a], [b]) => b.length - a.length);
+    // 変更ファイルから影響を受けるアプリを特定（最長一致）
+    const affectedApps = new Set();
+    for (const file of changedFiles) {
+        for (const [appPath, appName] of appPathEntries) {
+            if (file.startsWith(appPath + '/') || file === appPath) {
+                affectedApps.add(appName);
+                break; // 最初にマッチしたもの（最も長いパス）を使用
+            }
         }
-        appNameToAllJobs.get(appName).push(job);
     }
-    // Get set of initially changed app names
-    const changedAppNames = new Set();
-    for (const job of changedJobs) {
-        changedAppNames.add(job.app.name);
+    return Array.from(affectedApps);
+};
+exports.getAffectedAppsFromChangedFiles = getAffectedAppsFromChangedFiles;
+/**
+ * アプリベースの依存関係伝播
+ */
+const propagateAppDependencies = (affectedApps, jobs) => {
+    // アプリ名から依存関係マップを作成
+    const appDependencies = new Map();
+    for (const job of jobs) {
+        const depends = job.app.depends_on || [];
+        if (depends.length > 0) {
+            appDependencies.set(job.app.name, depends);
+        }
     }
-    // Find all apps that should be considered changed (including transitive dependencies)
-    const allChangedAppNames = new Set(changedAppNames);
+    // 推移的に依存関係を解決
+    const allAffectedApps = new Set(affectedApps);
     let changed = true;
     while (changed) {
         changed = false;
-        for (const job of jobs) {
-            const dependsOn = job.app.depends_on || [];
-            // Check if any of this job's dependencies are in the changed apps
-            const hasDependencyChanges = dependsOn.some(depAppName => allChangedAppNames.has(depAppName));
-            if (hasDependencyChanges && !allChangedAppNames.has(job.app.name)) {
-                allChangedAppNames.add(job.app.name);
+        for (const [appName, dependencies] of appDependencies.entries()) {
+            const hasDependencyChanges = dependencies.some(dep => allAffectedApps.has(dep));
+            if (hasDependencyChanges && !allAffectedApps.has(appName)) {
+                allAffectedApps.add(appName);
                 changed = true;
             }
         }
     }
-    // Collect all jobs for all changed apps
-    const allChangedJobs = [];
-    for (const appName of allChangedAppNames) {
-        const appJobs = appNameToAllJobs.get(appName) || [];
-        allChangedJobs.push(...appJobs);
-    }
-    return allChangedJobs;
+    return Array.from(allAffectedApps);
 };
-exports.propagateDependencyChanges = propagateDependencyChanges;
+exports.propagateAppDependencies = propagateAppDependencies;
+/**
+ * ファイル変更からアプリ依存関係を考慮したジョブフィルタリング
+ */
+const filterJobsByAppDependencies = (changedFiles, jobs) => {
+    // 1. ファイル変更からアプリを特定
+    const directlyAffectedApps = (0, exports.getAffectedAppsFromChangedFiles)(changedFiles, jobs);
+    // 2. 依存関係を考慮してアプリリストを拡張
+    const allAffectedApps = (0, exports.propagateAppDependencies)(directlyAffectedApps, jobs);
+    // 3. 影響を受けるアプリのジョブのみフィルタ
+    return jobs.filter(job => allAffectedApps.includes(job.app.name));
+};
+exports.filterJobsByAppDependencies = filterJobsByAppDependencies;
 
 
 /***/ }),
@@ -30053,7 +30073,7 @@ exports.propagateDependencyChanges = propagateDependencyChanges;
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.run = void 0;
 const github_1 = __nccwpck_require__(5683);
-const propagateDependencyChanges_1 = __nccwpck_require__(5915);
+const propagateAppDependencies_1 = __nccwpck_require__(6411);
 const run = async ({ githubToken, jobs }) => {
     const octokit = (0, github_1.getOctokit)(githubToken);
     switch (github_1.context.eventName) {
@@ -30064,24 +30084,16 @@ const run = async ({ githubToken, jobs }) => {
                 repo: github_1.context.repo.repo,
                 pull_number: github_1.context.issue.number,
             });
-            const prChangedJobs = jobs.filter(job => {
-                return files
-                    .map(file => file.filename)
-                    .some(file => file.startsWith(job.context.app_path));
-            });
-            return (0, propagateDependencyChanges_1.propagateDependencyChanges)(jobs, prChangedJobs);
+            const prChangedFiles = files.map(file => file.filename);
+            return (0, propagateAppDependencies_1.filterJobsByAppDependencies)(prChangedFiles, jobs);
         default:
             const { data: commits } = await octokit.rest.repos.getCommit({
                 owner: github_1.context.repo.owner,
                 repo: github_1.context.repo.repo,
                 ref: github_1.context.sha,
             });
-            const pushChangedJobs = jobs.filter(job => {
-                return (commits.files || [])
-                    .map(file => file.filename)
-                    .some(file => file.startsWith(job.context.app_path));
-            });
-            return (0, propagateDependencyChanges_1.propagateDependencyChanges)(jobs, pushChangedJobs);
+            const pushChangedFiles = (commits.files || []).map(file => file.filename);
+            return (0, propagateAppDependencies_1.filterJobsByAppDependencies)(pushChangedFiles, jobs);
     }
 };
 exports.run = run;
