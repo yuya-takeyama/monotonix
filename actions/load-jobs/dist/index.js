@@ -34104,13 +34104,14 @@ exports.JobsSchema = zod_1.z.array(exports.JobSchema);
 /***/ }),
 
 /***/ 8737:
-/***/ ((__unused_webpack_module, exports) => {
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.calculateEffectiveTimestamps = void 0;
-const calculateEffectiveTimestamps = (jobs) => {
+const getLastCommit_1 = __nccwpck_require__(4815);
+const calculateEffectiveTimestamps = async (jobs, appNameToPath) => {
     // Create maps for quick lookup
     const appNameToJobs = new Map();
     const appNameToMaxTimestamp = new Map();
@@ -34129,7 +34130,7 @@ const calculateEffectiveTimestamps = (jobs) => {
     const effectiveTimestamps = new Map();
     const visited = new Set();
     const visiting = new Set();
-    const calculateEffectiveTimestamp = (appName) => {
+    const calculateEffectiveTimestamp = async (appName) => {
         if (effectiveTimestamps.has(appName)) {
             return effectiveTimestamps.get(appName);
         }
@@ -34139,6 +34140,22 @@ const calculateEffectiveTimestamps = (jobs) => {
         visiting.add(appName);
         const appJobs = appNameToJobs.get(appName);
         if (!appJobs || appJobs.length === 0) {
+            // If app has no jobs in current workflow, but path is known, get its commit info
+            const appPath = appNameToPath.get(appName);
+            if (appPath) {
+                console.log(`🔍 [DEBUG] Fetching commit info for dependency app '${appName}' at path '${appPath}'`);
+                try {
+                    const commitInfo = await (0, getLastCommit_1.getLastCommit)(appPath);
+                    const timestamp = commitInfo.timestamp;
+                    effectiveTimestamps.set(appName, timestamp);
+                    visiting.delete(appName);
+                    visited.add(appName);
+                    return timestamp;
+                }
+                catch (err) {
+                    console.warn(`⚠️  Failed to get commit info for dependency app '${appName}': ${err}`);
+                }
+            }
             visiting.delete(appName);
             visited.add(appName);
             return 0;
@@ -34148,10 +34165,7 @@ const calculateEffectiveTimestamps = (jobs) => {
         // Check dependencies
         const dependsOn = appJobs[0]?.app.depends_on || [];
         for (const depAppName of dependsOn) {
-            if (!appNameToJobs.has(depAppName)) {
-                throw new Error(`Dependency app '${depAppName}' not found for app '${appName}'`);
-            }
-            const depTimestamp = calculateEffectiveTimestamp(depAppName);
+            const depTimestamp = await calculateEffectiveTimestamp(depAppName);
             maxTimestamp = Math.max(maxTimestamp, depTimestamp);
         }
         effectiveTimestamps.set(appName, maxTimestamp);
@@ -34161,7 +34175,7 @@ const calculateEffectiveTimestamps = (jobs) => {
     };
     // Calculate effective timestamps for all apps
     for (const appName of appNameToJobs.keys()) {
-        calculateEffectiveTimestamp(appName);
+        await calculateEffectiveTimestamp(appName);
     }
     // Update jobs with effective timestamps
     return jobs.map(job => {
@@ -34332,10 +34346,15 @@ const loadJobsFromLocalConfigFiles = async ({ rootDir, dedupeKey, requiredConfig
             throw new Error(`Failed to load local config: ${localConfigPath}: ${err}`);
         }
     }));
-    const flatJobs = jobs
-        .flat()
-        .filter(job => requiredConfigKeys.every(key => key in job.configs));
-    return (0, calculateEffectiveTimestamp_1.calculateEffectiveTimestamps)(flatJobs);
+    const flatJobs = jobs.flat();
+    // Create app name to path mapping for all apps (before filtering)
+    const appNameToPath = new Map();
+    for (const job of flatJobs) {
+        appNameToPath.set(job.app.name, job.context.app_path);
+    }
+    // Filter jobs by required config keys
+    const filteredJobs = flatJobs.filter(job => requiredConfigKeys.every(key => key in job.configs));
+    return await (0, calculateEffectiveTimestamp_1.calculateEffectiveTimestamps)(filteredJobs, appNameToPath);
 };
 exports.loadJobsFromLocalConfigFiles = loadJobsFromLocalConfigFiles;
 const createJob = ({ localConfig, dedupeKey, appPath, lastCommit, jobKey, job, event, }) => ({

@@ -29995,17 +29995,26 @@ exports.JobsSchema = zod_1.z.array(exports.JobSchema);
 
 /***/ }),
 
-/***/ 6411:
-/***/ ((__unused_webpack_module, exports) => {
+/***/ 4795:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.filterJobsByAppDependencies = exports.propagateAppDependencies = exports.getAffectedAppsFromChangedFiles = void 0;
+exports.run = void 0;
+const github_1 = __nccwpck_require__(5683);
 /**
- * ファイル変更から影響を受けるアプリを特定
+ * ファイル変更に基づいてジョブをフィルタリング
+ * 依存関係の考慮は load-jobs の effective timestamp で行われる
  */
-const getAffectedAppsFromChangedFiles = (changedFiles, jobs) => {
+const filterJobsByChangedFiles = (changedFiles, jobs) => {
+    console.log('🔍 [DEBUG] filterJobsByChangedFiles starting');
+    console.log('🔍 [DEBUG] changedFiles:', changedFiles);
+    console.log('🔍 [DEBUG] available jobs:', jobs.map(j => ({
+        name: j.app.name,
+        path: j.context.app_path,
+        job_key: j.context.job_key
+    })));
     // app_pathからアプリ名へのマッピングを作成（パス長順でソート、長い方が優先）
     const appPathEntries = Array.from(new Map(jobs.map(job => [job.context.app_path, job.app.name])).entries()).sort(([a], [b]) => b.length - a.length);
     // 変更ファイルから影響を受けるアプリを特定（最長一致）
@@ -30018,77 +30027,15 @@ const getAffectedAppsFromChangedFiles = (changedFiles, jobs) => {
             }
         }
     }
-    return Array.from(affectedApps);
-};
-exports.getAffectedAppsFromChangedFiles = getAffectedAppsFromChangedFiles;
-/**
- * アプリベースの依存関係伝播
- */
-const propagateAppDependencies = (affectedApps, jobs) => {
-    // アプリ名から依存関係マップを作成
-    const appDependencies = new Map();
-    for (const job of jobs) {
-        const depends = job.app.depends_on || [];
-        if (depends.length > 0) {
-            appDependencies.set(job.app.name, depends);
-        }
-    }
-    // 推移的に依存関係を解決
-    const allAffectedApps = new Set(affectedApps);
-    let changed = true;
-    while (changed) {
-        changed = false;
-        for (const [appName, dependencies] of appDependencies.entries()) {
-            const hasDependencyChanges = dependencies.some(dep => allAffectedApps.has(dep));
-            if (hasDependencyChanges && !allAffectedApps.has(appName)) {
-                allAffectedApps.add(appName);
-                changed = true;
-            }
-        }
-    }
-    return Array.from(allAffectedApps);
-};
-exports.propagateAppDependencies = propagateAppDependencies;
-/**
- * ファイル変更からアプリ依存関係を考慮したジョブフィルタリング
- */
-const filterJobsByAppDependencies = (changedFiles, jobs) => {
-    console.log('🔍 [DEBUG] filterJobsByAppDependencies starting');
-    console.log('🔍 [DEBUG] changedFiles:', changedFiles);
-    console.log('🔍 [DEBUG] available jobs:', jobs.map(j => ({
-        name: j.app.name,
-        path: j.context.app_path,
-        depends_on: j.app.depends_on,
-        job_key: j.context.job_key
-    })));
-    // 1. ファイル変更からアプリを特定
-    const directlyAffectedApps = (0, exports.getAffectedAppsFromChangedFiles)(changedFiles, jobs);
-    console.log('🔍 [DEBUG] directlyAffectedApps:', directlyAffectedApps);
-    // 2. 依存関係を考慮してアプリリストを拡張
-    const allAffectedApps = (0, exports.propagateAppDependencies)(directlyAffectedApps, jobs);
-    console.log('🔍 [DEBUG] allAffectedApps after propagation:', allAffectedApps);
-    // 3. 影響を受けるアプリのジョブのみフィルタ
-    const filteredJobs = jobs.filter(job => allAffectedApps.includes(job.app.name));
+    console.log('🔍 [DEBUG] affectedApps:', Array.from(affectedApps));
+    // 影響を受けるアプリのジョブのみフィルタ
+    const filteredJobs = jobs.filter(job => affectedApps.has(job.app.name));
     console.log('🔍 [DEBUG] filteredJobs:', filteredJobs.map(j => ({
         name: j.app.name,
         job_key: j.context.job_key
     })));
     return filteredJobs;
 };
-exports.filterJobsByAppDependencies = filterJobsByAppDependencies;
-
-
-/***/ }),
-
-/***/ 4795:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.run = void 0;
-const github_1 = __nccwpck_require__(5683);
-const propagateAppDependencies_1 = __nccwpck_require__(6411);
 const run = async ({ githubToken, jobs }) => {
     const octokit = (0, github_1.getOctokit)(githubToken);
     switch (github_1.context.eventName) {
@@ -30100,7 +30047,7 @@ const run = async ({ githubToken, jobs }) => {
                 pull_number: github_1.context.issue.number,
             });
             const prChangedFiles = files.map(file => file.filename);
-            return (0, propagateAppDependencies_1.filterJobsByAppDependencies)(prChangedFiles, jobs);
+            return filterJobsByChangedFiles(prChangedFiles, jobs);
         default:
             const { data: commits } = await octokit.rest.repos.getCommit({
                 owner: github_1.context.repo.owner,
@@ -30108,7 +30055,7 @@ const run = async ({ githubToken, jobs }) => {
                 ref: github_1.context.sha,
             });
             const pushChangedFiles = (commits.files || []).map(file => file.filename);
-            return (0, propagateAppDependencies_1.filterJobsByAppDependencies)(pushChangedFiles, jobs);
+            return filterJobsByChangedFiles(pushChangedFiles, jobs);
     }
 };
 exports.run = run;

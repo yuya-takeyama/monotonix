@@ -58,11 +58,20 @@ export const loadJobsFromLocalConfigFiles = async ({
     }),
   );
 
-  const flatJobs = jobs
-    .flat()
-    .filter(job => requiredConfigKeys.every(key => key in job.configs));
+  const flatJobs = jobs.flat();
+  
+  // Create app name to path mapping for all apps (before filtering)
+  const appNameToPath = new Map<string, string>();
+  for (const job of flatJobs) {
+    appNameToPath.set(job.app.name, job.context.app_path);
+  }
 
-  return calculateEffectiveTimestamps(flatJobs);
+  // Filter jobs by required config keys
+  const filteredJobs = flatJobs.filter(job => 
+    requiredConfigKeys.every(key => key in job.configs)
+  );
+
+  return await calculateEffectiveTimestamps(filteredJobs, appNameToPath);
 };
 
 type createJobParams = {

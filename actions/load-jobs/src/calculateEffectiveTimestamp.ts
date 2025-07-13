@@ -1,6 +1,10 @@
 import { Jobs } from '@monotonix/schema';
+import { getLastCommit } from './getLastCommit';
 
-export const calculateEffectiveTimestamps = (jobs: Jobs): Jobs => {
+export const calculateEffectiveTimestamps = async (
+  jobs: Jobs,
+  appNameToPath: Map<string, string>
+): Promise<Jobs> => {
   // Create maps for quick lookup
   const appNameToJobs = new Map<string, typeof jobs>();
   const appNameToMaxTimestamp = new Map<string, number>();
@@ -24,7 +28,7 @@ export const calculateEffectiveTimestamps = (jobs: Jobs): Jobs => {
   const visited = new Set<string>();
   const visiting = new Set<string>();
 
-  const calculateEffectiveTimestamp = (appName: string): number => {
+  const calculateEffectiveTimestamp = async (appName: string): Promise<number> => {
     if (effectiveTimestamps.has(appName)) {
       return effectiveTimestamps.get(appName)!;
     }
@@ -37,6 +41,21 @@ export const calculateEffectiveTimestamps = (jobs: Jobs): Jobs => {
 
     const appJobs = appNameToJobs.get(appName);
     if (!appJobs || appJobs.length === 0) {
+      // If app has no jobs in current workflow, but path is known, get its commit info
+      const appPath = appNameToPath.get(appName);
+      if (appPath) {
+        console.log(`🔍 [DEBUG] Fetching commit info for dependency app '${appName}' at path '${appPath}'`);
+        try {
+          const commitInfo = await getLastCommit(appPath);
+          const timestamp = commitInfo.timestamp;
+          effectiveTimestamps.set(appName, timestamp);
+          visiting.delete(appName);
+          visited.add(appName);
+          return timestamp;
+        } catch (err) {
+          console.warn(`⚠️  Failed to get commit info for dependency app '${appName}': ${err}`);
+        }
+      }
       visiting.delete(appName);
       visited.add(appName);
       return 0;
@@ -48,12 +67,7 @@ export const calculateEffectiveTimestamps = (jobs: Jobs): Jobs => {
     // Check dependencies
     const dependsOn = appJobs[0]?.app.depends_on || [];
     for (const depAppName of dependsOn) {
-      if (!appNameToJobs.has(depAppName)) {
-        throw new Error(
-          `Dependency app '${depAppName}' not found for app '${appName}'`,
-        );
-      }
-      const depTimestamp = calculateEffectiveTimestamp(depAppName);
+      const depTimestamp = await calculateEffectiveTimestamp(depAppName);
       maxTimestamp = Math.max(maxTimestamp, depTimestamp);
     }
 
@@ -66,7 +80,7 @@ export const calculateEffectiveTimestamps = (jobs: Jobs): Jobs => {
 
   // Calculate effective timestamps for all apps
   for (const appName of appNameToJobs.keys()) {
-    calculateEffectiveTimestamp(appName);
+    await calculateEffectiveTimestamp(appName);
   }
 
   // Update jobs with effective timestamps

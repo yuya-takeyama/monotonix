@@ -32,10 +32,19 @@ const createMockJob = (
 });
 
 describe('calculateEffectiveTimestamps', () => {
-  it('should keep original timestamp when no dependencies', () => {
-    const jobs = [createMockJob('app-a', 100), createMockJob('app-b', 200)];
+  const createAppNameToPath = (jobs: Job[]): Map<string, string> => {
+    const map = new Map<string, string>();
+    for (const job of jobs) {
+      map.set(job.app.name, job.context.app_path);
+    }
+    return map;
+  };
 
-    const result = calculateEffectiveTimestamps(jobs);
+  it('should keep original timestamp when no dependencies', async () => {
+    const jobs = [createMockJob('app-a', 100), createMockJob('app-b', 200)];
+    const appNameToPath = createAppNameToPath(jobs);
+
+    const result = await calculateEffectiveTimestamps(jobs, appNameToPath);
 
     const appAJob = result.find(job => job.app.name === 'app-a')!;
     const appBJob = result.find(job => job.app.name === 'app-b')!;
@@ -44,13 +53,14 @@ describe('calculateEffectiveTimestamps', () => {
     expect(appBJob.context.last_commit.timestamp).toBe(200);
   });
 
-  it('should use dependency timestamp when newer', () => {
+  it('should use dependency timestamp when newer', async () => {
     const jobs = [
       createMockJob('shared-lib', 200),
       createMockJob('api-server', 100, ['shared-lib']),
     ];
+    const appNameToPath = createAppNameToPath(jobs);
 
-    const result = calculateEffectiveTimestamps(jobs);
+    const result = await calculateEffectiveTimestamps(jobs, appNameToPath);
 
     const sharedLibJob = result.find(job => job.app.name === 'shared-lib')!;
     const apiServerJob = result.find(job => job.app.name === 'api-server')!;
@@ -59,26 +69,28 @@ describe('calculateEffectiveTimestamps', () => {
     expect(apiServerJob.context.last_commit.timestamp).toBe(200); // Updated from dependency
   });
 
-  it('should keep own timestamp when newer than dependencies', () => {
+  it('should keep own timestamp when newer than dependencies', async () => {
     const jobs = [
       createMockJob('shared-lib', 100),
       createMockJob('api-server', 200, ['shared-lib']),
     ];
+    const appNameToPath = createAppNameToPath(jobs);
 
-    const result = calculateEffectiveTimestamps(jobs);
+    const result = await calculateEffectiveTimestamps(jobs, appNameToPath);
 
     const apiServerJob = result.find(job => job.app.name === 'api-server')!;
     expect(apiServerJob.context.last_commit.timestamp).toBe(200); // Keeps own newer timestamp
   });
 
-  it('should handle transitive dependencies', () => {
+  it('should handle transitive dependencies', async () => {
     const jobs = [
       createMockJob('core-lib', 300),
       createMockJob('shared-lib', 100, ['core-lib']),
       createMockJob('api-server', 50, ['shared-lib']),
     ];
+    const appNameToPath = createAppNameToPath(jobs);
 
-    const result = calculateEffectiveTimestamps(jobs);
+    const result = await calculateEffectiveTimestamps(jobs, appNameToPath);
 
     const coreLibJob = result.find(job => job.app.name === 'core-lib')!;
     const sharedLibJob = result.find(job => job.app.name === 'shared-lib')!;
@@ -89,28 +101,30 @@ describe('calculateEffectiveTimestamps', () => {
     expect(apiServerJob.context.last_commit.timestamp).toBe(300); // From transitive dependency
   });
 
-  it('should handle multiple dependencies', () => {
+  it('should handle multiple dependencies', async () => {
     const jobs = [
       createMockJob('auth-service', 150),
       createMockJob('shared-lib', 200),
       createMockJob('api-server', 100, ['shared-lib', 'auth-service']),
     ];
+    const appNameToPath = createAppNameToPath(jobs);
 
-    const result = calculateEffectiveTimestamps(jobs);
+    const result = await calculateEffectiveTimestamps(jobs, appNameToPath);
 
     const apiServerJob = result.find(job => job.app.name === 'api-server')!;
     expect(apiServerJob.context.last_commit.timestamp).toBe(200); // Max of dependencies
   });
 
-  it('should handle multiple jobs per app', () => {
+  it('should handle multiple jobs per app', async () => {
     const jobs = [
       createMockJob('shared-lib', 200, undefined, 'build'),
       createMockJob('shared-lib', 180, undefined, 'test'),
       createMockJob('api-server', 100, ['shared-lib'], 'build'),
       createMockJob('api-server', 120, ['shared-lib'], 'test'),
     ];
+    const appNameToPath = createAppNameToPath(jobs);
 
-    const result = calculateEffectiveTimestamps(jobs);
+    const result = await calculateEffectiveTimestamps(jobs, appNameToPath);
 
     // All api-server jobs should have the same effective timestamp (200)
     const apiServerJobs = result.filter(job => job.app.name === 'api-server');
@@ -123,22 +137,27 @@ describe('calculateEffectiveTimestamps', () => {
     expect(apiServerTestJob.context.last_commit.timestamp).toBe(200);
   });
 
-  it('should throw error for circular dependencies', () => {
+  it('should throw error for circular dependencies', async () => {
     const jobs = [
       createMockJob('app-a', 100, ['app-b']),
       createMockJob('app-b', 200, ['app-a']),
     ];
+    const appNameToPath = createAppNameToPath(jobs);
 
-    expect(() => calculateEffectiveTimestamps(jobs)).toThrow(
+    await expect(calculateEffectiveTimestamps(jobs, appNameToPath)).rejects.toThrow(
       'Circular dependency detected',
     );
   });
 
-  it('should throw error for missing dependency', () => {
+  it('should handle missing dependency gracefully when path not known', async () => {
     const jobs = [createMockJob('api-server', 100, ['missing-app'])];
+    const appNameToPath = createAppNameToPath(jobs);
+    // Don't add missing-app to appNameToPath
 
-    expect(() => calculateEffectiveTimestamps(jobs)).toThrow(
-      "Dependency app 'missing-app' not found",
-    );
+    const result = await calculateEffectiveTimestamps(jobs, appNameToPath);
+    
+    // Should not throw error and use timestamp 0 for missing dependency
+    const apiServerJob = result.find(job => job.app.name === 'api-server')!;
+    expect(apiServerJob.context.last_commit.timestamp).toBe(100); // Keeps own timestamp
   });
 });
