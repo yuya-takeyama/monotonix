@@ -8,18 +8,18 @@ VERSION="${1:-}"
 
 # Validate version argument
 if [[ -z "$VERSION" ]]; then
-    echo "Error: Version number required"
-    echo "Usage: $0 <version>"
-    echo "Example: $0 1.2.3"
-    exit 1
+  echo "Error: Version number required"
+  echo "Usage: $0 <version>"
+  echo "Example: $0 1.2.3"
+  exit 1
 fi
 
 # Validate version format (semantic versioning)
 if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?(\+[a-zA-Z0-9.-]+)?$ ]]; then
-    echo "Error: Invalid version format"
-    echo "Expected format: MAJOR.MINOR.PATCH (e.g., 1.2.3, 2.0.0-beta.1)"
-    echo "Got: $VERSION"
-    exit 1
+  echo "Error: Invalid version format"
+  echo "Expected format: MAJOR.MINOR.PATCH (e.g., 1.2.3, 2.0.0-beta.1)"
+  echo "Got: $VERSION"
+  exit 1
 fi
 
 echo "=== Publishing release v${VERSION} ==="
@@ -34,8 +34,8 @@ echo "→ Using commit from origin/main: ${MAIN_SHA:0:7}"
 
 # Check if tag already exists
 if git rev-parse "v${VERSION}" >/dev/null 2>&1; then
-    echo "Error: Tag v${VERSION} already exists"
-    exit 1
+  echo "Error: Tag v${VERSION} already exists"
+  exit 1
 fi
 
 # Extract release notes from CHANGELOG.md on remote main
@@ -45,24 +45,24 @@ echo "→ Extracting release notes from CHANGELOG.md..."
 CHANGELOG_CONTENT=$(git show origin/main:CHANGELOG.md 2>/dev/null || echo "")
 
 if [[ -z "$CHANGELOG_CONTENT" ]]; then
-    echo "Error: CHANGELOG.md not found in origin/main"
-    exit 1
+  echo "Error: CHANGELOG.md not found in origin/main"
+  exit 1
 fi
 
 # Extract the section for this version
 RELEASE_NOTES=$(echo "$CHANGELOG_CONTENT" | awk -v version="$VERSION" '
-    /^## \[/ {
-        if (found) exit
-        if ($2 == "["version"]") found = 1
-    }
-    found && /^## \[/ && $2 != "["version"]" { exit }
-    found && !/^## \[/ { print }
+  /^## \[/ {
+    if (found) exit
+    if ($2 == "["version"]") found = 1
+  }
+  found && /^## \[/ && $2 != "["version"]" { exit }
+  found && !/^## \[/ { print }
 ')
 
 if [[ -z "$RELEASE_NOTES" ]]; then
-    echo "Error: No release notes found for version $VERSION in CHANGELOG.md"
-    echo "Make sure CHANGELOG.md contains a section: ## [$VERSION] - YYYY-MM-DD"
-    exit 1
+  echo "Error: No release notes found for version $VERSION in CHANGELOG.md"
+  echo "Make sure CHANGELOG.md contains a section: ## [$VERSION] - YYYY-MM-DD"
+  exit 1
 fi
 
 # Create git tag from origin/main
@@ -76,9 +76,9 @@ git push origin "v${VERSION}"
 # Create GitHub release
 echo "→ Creating GitHub release..."
 gh release create "v${VERSION}" \
-    --title "v${VERSION}" \
-    --notes "$RELEASE_NOTES" \
-    --verify-tag
+  --title "v${VERSION}" \
+  --notes "$RELEASE_NOTES" \
+  --verify-tag
 
 echo ""
 echo "=== Release published successfully! ==="
