@@ -66,7 +66,7 @@ Defines jobs for a specific application:
 
 ```yaml
 app:
-  name: app-name
+  depends_on: [] # Optional: specify dependencies
 jobs:
   job_name:
     on: # GitHub event triggers

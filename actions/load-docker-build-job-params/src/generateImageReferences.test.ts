@@ -1,4 +1,30 @@
-import { generateSemverDatetimeTag } from './generateImageReferences';
+import {
+  generateSemverDatetimeTag,
+  extractAppLabel,
+} from './generateImageReferences';
+
+describe('extractAppLabel', () => {
+  it('removes root directory from app path', () => {
+    expect(extractAppLabel('apps/my-app', 'apps')).toBe('my-app');
+    expect(extractAppLabel('apps/backend/api', 'apps')).toBe('backend/api');
+  });
+
+  it('handles root directory with trailing slash', () => {
+    expect(extractAppLabel('apps/my-app', 'apps/')).toBe('my-app');
+  });
+
+  it('returns full path when not starting with root directory', () => {
+    expect(extractAppLabel('other/my-app', 'apps')).toBe('other/my-app');
+  });
+
+  it('handles empty root directory', () => {
+    expect(extractAppLabel('apps/my-app', '')).toBe('apps/my-app');
+  });
+
+  it('handles exact match of root directory', () => {
+    expect(extractAppLabel('apps', 'apps')).toBe('');
+  });
+});
 
 describe('generateSemverDatetimeTag', () => {
   const timestamp = 1704067200; // 2024-01-01 00:00:00 UTC

@@ -12,6 +12,14 @@ import { load } from 'js-yaml';
 import { CommitInfo, getLastCommit } from './getLastCommit';
 import { Event } from './schema';
 
+export const extractAppLabel = (appPath: string, rootDir: string): string => {
+  if (appPath.startsWith(rootDir)) {
+    const relative = appPath.slice(rootDir.length);
+    return relative.startsWith('/') ? relative.slice(1) : relative;
+  }
+  return appPath;
+};
+
 type loadJobsFromLocalConfigFilesParams = {
   rootDir: string;
   dedupeKey: string;
@@ -63,6 +71,7 @@ export const loadJobsFromLocalConfigFiles = async ({
               jobKey,
               job,
               event,
+              rootDir,
             }),
         );
       } catch (err) {
@@ -86,6 +95,7 @@ type createJobParams = {
   jobKey: string;
   job: LocalConfigJob;
   event: Event;
+  rootDir: string;
 };
 export const createJob = ({
   localConfig,
@@ -95,6 +105,7 @@ export const createJob = ({
   jobKey,
   job,
   event,
+  rootDir,
 }: createJobParams): Job => ({
   ...job,
   app: localConfig.app,
@@ -102,9 +113,10 @@ export const createJob = ({
     dedupe_key: dedupeKey,
     github_ref: event.ref,
     app_path: appPath,
+    root_dir: rootDir,
     job_key: jobKey,
     last_commit: lastCommit,
-    label: `${localConfig.app.name} / ${jobKey}`,
+    label: `${extractAppLabel(appPath, rootDir)} / ${jobKey}`,
   },
   params: {},
 });
@@ -151,14 +163,14 @@ const validateDependencies = (
     for (const dep of dependencies) {
       if (dep === appPath) {
         throw new Error(
-          `Self-dependency detected: ${config.app.name} depends on itself`,
+          `Self-dependency detected: ${extractAppLabel(appPath, rootDir)} depends on itself`,
         );
       }
 
       const depPath = join(rootDir, dep);
       if (!existsSync(depPath)) {
         throw new Error(
-          `Dependency path does not exist: ${depPath} (required by ${config.app.name})`,
+          `Dependency path does not exist: ${depPath} (required by ${extractAppLabel(appPath, rootDir)})`,
         );
       }
     }
@@ -174,7 +186,7 @@ const detectCircularDependencies = (
   const visited = new Set<string>();
   const recursionStack = new Set<string>();
 
-  for (const [appPath, config] of allConfigs) {
+  for (const [appPath] of allConfigs) {
     if (
       hasCircularDependency(
         appPath,
@@ -185,7 +197,7 @@ const detectCircularDependencies = (
       )
     ) {
       throw new Error(
-        `Circular dependency detected involving: ${config.app.name}`,
+        `Circular dependency detected involving: ${extractAppLabel(appPath, rootDir)}`,
       );
     }
   }

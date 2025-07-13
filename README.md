@@ -75,7 +75,7 @@ Create `monotonix.yaml` in each app directory:
 
 ```yaml
 app:
-  name: your-app
+  depends_on: [] # Optional: specify dependencies
 
 jobs:
   # Production build on main branch

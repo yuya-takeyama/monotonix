@@ -7,7 +7,6 @@ export const GlobalConfigSchema = z.object({
 export type GlobalConfig = z.infer<typeof GlobalConfigSchema>;
 
 const AppSchema = z.object({
-  name: z.string(),
   depends_on: z.array(z.string()).optional().default([]),
 });
 
@@ -15,6 +14,7 @@ const ContextSchema = z.object({
   dedupe_key: z.string(),
   github_ref: z.string(),
   app_path: z.string(),
+  root_dir: z.string(),
   last_commit: z.object({
     hash: z.string(),
     timestamp: z.number(),

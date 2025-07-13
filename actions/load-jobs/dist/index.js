@@ -34036,13 +34036,13 @@ exports.GlobalConfigSchema = zod_1.z.object({
     job_types: zod_1.z.record(zod_1.z.string(), zod_1.z.object({}).passthrough()),
 });
 const AppSchema = zod_1.z.object({
-    name: zod_1.z.string(),
     depends_on: zod_1.z.array(zod_1.z.string()).optional().default([]),
 });
 const ContextSchema = zod_1.z.object({
     dedupe_key: zod_1.z.string(),
     github_ref: zod_1.z.string(),
     app_path: zod_1.z.string(),
+    root_dir: zod_1.z.string(),
     last_commit: zod_1.z.object({
         hash: zod_1.z.string(),
         timestamp: zod_1.z.number(),
@@ -34217,13 +34217,21 @@ exports.getLastCommit = getLastCommit;
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.calculateEffectiveTimestamp = exports.createJob = exports.loadJobsFromLocalConfigFiles = void 0;
+exports.calculateEffectiveTimestamp = exports.createJob = exports.loadJobsFromLocalConfigFiles = exports.extractAppLabel = void 0;
 const node_fs_1 = __nccwpck_require__(3024);
 const node_path_1 = __nccwpck_require__(6760);
 const schema_1 = __nccwpck_require__(67);
 const glob_1 = __nccwpck_require__(447);
 const js_yaml_1 = __nccwpck_require__(677);
 const getLastCommit_1 = __nccwpck_require__(4815);
+const extractAppLabel = (appPath, rootDir) => {
+    if (appPath.startsWith(rootDir)) {
+        const relative = appPath.slice(rootDir.length);
+        return relative.startsWith('/') ? relative.slice(1) : relative;
+    }
+    return appPath;
+};
+exports.extractAppLabel = extractAppLabel;
 const loadJobsFromLocalConfigFiles = async ({ rootDir, dedupeKey, requiredConfigKeys, localConfigFileName, event, }) => {
     const pattern = (0, node_path_1.join)(rootDir, '**', localConfigFileName);
     const localConfigPaths = (0, glob_1.globSync)(pattern);
@@ -34250,6 +34258,7 @@ const loadJobsFromLocalConfigFiles = async ({ rootDir, dedupeKey, requiredConfig
                 jobKey,
                 job,
                 event,
+                rootDir,
             }));
         }
         catch (err) {
@@ -34261,16 +34270,17 @@ const loadJobsFromLocalConfigFiles = async ({ rootDir, dedupeKey, requiredConfig
         .filter(job => requiredConfigKeys.every(key => key in job.configs));
 };
 exports.loadJobsFromLocalConfigFiles = loadJobsFromLocalConfigFiles;
-const createJob = ({ localConfig, dedupeKey, appPath, lastCommit, jobKey, job, event, }) => ({
+const createJob = ({ localConfig, dedupeKey, appPath, lastCommit, jobKey, job, event, rootDir, }) => ({
     ...job,
     app: localConfig.app,
     context: {
         dedupe_key: dedupeKey,
         github_ref: event.ref,
         app_path: appPath,
+        root_dir: rootDir,
         job_key: jobKey,
         last_commit: lastCommit,
-        label: `${localConfig.app.name} / ${jobKey}`,
+        label: `${(0, exports.extractAppLabel)(appPath, rootDir)} / ${jobKey}`,
     },
     params: {},
 });
@@ -34301,11 +34311,11 @@ const validateDependencies = (allConfigs, rootDir) => {
         const dependencies = config.app.depends_on;
         for (const dep of dependencies) {
             if (dep === appPath) {
-                throw new Error(`Self-dependency detected: ${config.app.name} depends on itself`);
+                throw new Error(`Self-dependency detected: ${(0, exports.extractAppLabel)(appPath, rootDir)} depends on itself`);
             }
             const depPath = (0, node_path_1.join)(rootDir, dep);
             if (!(0, node_fs_1.existsSync)(depPath)) {
-                throw new Error(`Dependency path does not exist: ${depPath} (required by ${config.app.name})`);
+                throw new Error(`Dependency path does not exist: ${depPath} (required by ${(0, exports.extractAppLabel)(appPath, rootDir)})`);
             }
         }
     }
@@ -34314,9 +34324,9 @@ const validateDependencies = (allConfigs, rootDir) => {
 const detectCircularDependencies = (allConfigs, rootDir) => {
     const visited = new Set();
     const recursionStack = new Set();
-    for (const [appPath, config] of allConfigs) {
+    for (const [appPath] of allConfigs) {
         if (hasCircularDependency(appPath, allConfigs, rootDir, visited, recursionStack)) {
-            throw new Error(`Circular dependency detected involving: ${config.app.name}`);
+            throw new Error(`Circular dependency detected involving: ${(0, exports.extractAppLabel)(appPath, rootDir)}`);
         }
     }
 };

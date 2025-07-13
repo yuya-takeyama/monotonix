@@ -1,6 +1,29 @@
 import { Job, LocalConfig, LocalConfigJob } from '@monotonix/schema';
-import { createJob } from './loadJobsFromLocalConfigs';
+import { createJob, extractAppLabel } from './loadJobsFromLocalConfigs';
 import { Event } from './schema';
+
+describe('extractAppLabel', () => {
+  it('removes root directory from app path', () => {
+    expect(extractAppLabel('apps/my-app', 'apps')).toBe('my-app');
+    expect(extractAppLabel('apps/backend/api', 'apps')).toBe('backend/api');
+  });
+
+  it('handles root directory with trailing slash', () => {
+    expect(extractAppLabel('apps/my-app', 'apps/')).toBe('my-app');
+  });
+
+  it('returns full path when not starting with root directory', () => {
+    expect(extractAppLabel('other/my-app', 'apps')).toBe('other/my-app');
+  });
+
+  it('handles empty root directory', () => {
+    expect(extractAppLabel('apps/my-app', '')).toBe('apps/my-app');
+  });
+
+  it('handles exact match of root directory', () => {
+    expect(extractAppLabel('apps', 'apps')).toBe('');
+  });
+});
 
 describe('createJob', () => {
   const stubEvent: Pick<Event, 'ref'> = {
@@ -22,7 +45,6 @@ describe('createJob', () => {
 
   const stubLocalConfig: LocalConfig = {
     app: {
-      name: 'test-app',
       depends_on: [],
     },
     jobs: {
@@ -36,7 +58,8 @@ describe('createJob', () => {
   };
 
   it('creates a job config with the correct structure', () => {
-    const appPath = '/root/subdir';
+    const appPath = 'apps/test-app';
+    const rootDir = 'apps';
     const jobKey = 'job1';
 
     const result = createJob({
@@ -46,19 +69,19 @@ describe('createJob', () => {
       lastCommit: stubCommitInfo,
       jobKey,
       job: stubJob,
-      // @ts-expect-error
-      event: stubEvent,
+      event: stubEvent as Event,
+      rootDir,
     });
 
     const expected: Job = {
       app: {
-        name: 'test-app',
         depends_on: [],
       },
       context: {
         dedupe_key: stubEvent.ref,
         github_ref: stubEvent.ref,
         app_path: appPath,
+        root_dir: rootDir,
         job_key: jobKey,
         last_commit: stubCommitInfo,
         label: 'test-app / job1',
@@ -80,7 +103,8 @@ describe('createJob', () => {
   });
 
   it('handles different job configurations', () => {
-    const appPath = '/root/subdir';
+    const appPath = 'apps/test-app';
+    const rootDir = 'apps';
     const jobKey = 'job2';
     const differentJob: LocalConfigJob = {
       on: {
@@ -100,19 +124,19 @@ describe('createJob', () => {
       lastCommit: stubCommitInfo,
       jobKey,
       job: differentJob,
-      // @ts-expect-error
-      event: stubEvent,
+      event: stubEvent as Event,
+      rootDir,
     });
 
     const expected: Job = {
       app: {
-        name: 'test-app',
         depends_on: [],
       },
       context: {
         dedupe_key: stubEvent.ref,
         github_ref: stubEvent.ref,
         app_path: appPath,
+        root_dir: rootDir,
         job_key: jobKey,
         last_commit: stubCommitInfo,
         label: 'test-app / job2',

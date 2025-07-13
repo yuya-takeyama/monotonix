@@ -137,13 +137,13 @@ describe('jobMatchesChangedFiles', () => {
     dependencies: string[] = [],
   ): Job => ({
     app: {
-      name: 'test-app',
       depends_on: dependencies,
     },
     context: {
       dedupe_key: 'test',
       github_ref: 'refs/heads/main',
       app_path: appPath,
+      root_dir: 'apps',
       job_key: 'build',
       last_commit: { hash: 'abc123', timestamp: 123456 },
       label: 'test-app / build',

@@ -28,13 +28,13 @@ describe('run', () => {
 
   const stubJob: InputJob = {
     app: {
-      name: 'hello-world',
       depends_on: [],
     },
     context: {
       dedupe_key: 'refs/heads/main',
       github_ref: 'refs/heads/main',
-      app_path: '/apps/hello-world',
+      app_path: 'apps/hello-world',
+      root_dir: 'apps',
       job_key: 'job1',
       last_commit: {
         hash: '0000000000000000000000000000000000000000',
@@ -96,7 +96,7 @@ describe('run', () => {
                 },
               },
             },
-            context: '/apps/hello-world',
+            context: 'apps/hello-world',
             tags: 'some-repository-base/hello-world:latest',
             platforms: 'linux/amd64,linux/arm64',
           },

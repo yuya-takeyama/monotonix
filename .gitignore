@@ -142,3 +142,6 @@ out
 
 # Claude Code
 **/.claude/settings.local.json
+
+# Temporary planning files
+plans/
