@@ -91,7 +91,7 @@ const AppJobStatusSchema = z.object({
 const AppJobStatusesSchema = z.record(z.string(), AppJobStatusSchema);
 type AppJobStatuses = z.infer<typeof AppJobStatusesSchema>;
 
-const transofrmItems = (items: Record<string, any>[]): AppJobStatuses => {
+const transofrmItems = (items: unknown[]): AppJobStatuses => {
   const appJobStatuses: AppJobStatuses = {};
 
   for (const item of items) {

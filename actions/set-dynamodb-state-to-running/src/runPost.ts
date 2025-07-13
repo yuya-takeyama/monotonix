@@ -57,7 +57,7 @@ export const runPost = async ({
         notice(`${job.context.label}: A newer commit is already running`);
         // No need to let it fail
       } else {
-        throw err;
+        console.error(`Failed to delete running state: ${err}`);
       }
     }
   }

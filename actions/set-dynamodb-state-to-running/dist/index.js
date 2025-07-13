@@ -54831,8 +54831,9 @@ const parseDuration = (duration) => {
     let matches;
     let totalSeconds = 0;
     let lastIndex = 0;
-    while ((matches = regex.exec(duration)) !== null) {
-        if (matches[1] && matches[2]) {
+    do {
+        matches = regex.exec(duration);
+        if (matches !== null && matches[1] && matches[2]) {
             const value = Number(matches[1]);
             const unit = matches[2];
             switch (unit) {
@@ -54853,7 +54854,7 @@ const parseDuration = (duration) => {
             }
             lastIndex = regex.lastIndex;
         }
-    }
+    } while (matches !== null);
     if (lastIndex !== duration.length) {
         throw new Error(`Invalid format: ${duration}`);
     }
