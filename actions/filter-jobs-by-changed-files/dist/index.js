@@ -30026,8 +30026,9 @@ const jobMatchesChangedFiles = (job, changedFiles, dependencyPathInfos) => {
     const dependencies = job.app.depends_on;
     return changedFiles.some(file => {
         // Check if file is within the app path
-        if (file.startsWith(appPath.endsWith('/') ? appPath : appPath + '/'))
+        if (file.startsWith(appPath.endsWith('/') ? appPath : appPath + '/')) {
             return true;
+        }
         // Check dependencies
         return dependencyPathInfos.some((pathInfo, index) => {
             if (index >= dependencies.length)
