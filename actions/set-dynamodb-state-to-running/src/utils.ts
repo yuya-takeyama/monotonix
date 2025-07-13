@@ -8,7 +8,7 @@ export const parseDuration = (duration: string): number => {
 
   do {
     matches = regex.exec(duration);
-    if (matches !== null && matches[1] && matches[2]) {
+    if (matches?.[1] && matches[2]) {
       const value = Number(matches[1]);
       const unit = matches[2];
 
