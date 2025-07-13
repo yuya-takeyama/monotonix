@@ -1,11 +1,13 @@
 import { Jobs } from '@monotonix/schema';
 import { getOctokit, context } from '@actions/github';
+import { join } from 'node:path';
 
 type runParams = {
   githubToken: string;
   jobs: Jobs;
+  rootDir: string;
 };
-export const run = async ({ githubToken, jobs }: runParams): Promise<Jobs> => {
+export const run = async ({ githubToken, jobs, rootDir }: runParams): Promise<Jobs> => {
   const octokit = getOctokit(githubToken);
 
   switch (context.eventName) {
@@ -18,9 +20,19 @@ export const run = async ({ githubToken, jobs }: runParams): Promise<Jobs> => {
       });
 
       return jobs.filter(job => {
+        const appPath = job.context.app_path;
+        const dependencies = job.app.depends_on || [];
+        
         return files
           .map(file => file.filename)
-          .some(file => file.startsWith(job.context.app_path));
+          .some(file => {
+            if (file.startsWith(appPath)) return true;
+            
+            return dependencies.some(dep => {
+              const depPath = join(rootDir, dep);
+              return file.startsWith(depPath);
+            });
+          });
       });
 
     default:
@@ -31,9 +43,19 @@ export const run = async ({ githubToken, jobs }: runParams): Promise<Jobs> => {
       });
 
       return jobs.filter(job => {
+        const appPath = job.context.app_path;
+        const dependencies = job.app.depends_on || [];
+        
         return (commits.files || [])
           .map(file => file.filename)
-          .some(file => file.startsWith(job.context.app_path));
+          .some(file => {
+            if (file.startsWith(appPath)) return true;
+            
+            return dependencies.some(dep => {
+              const depPath = join(rootDir, dep);
+              return file.startsWith(depPath);
+            });
+          });
       });
   }
 };
