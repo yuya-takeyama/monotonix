@@ -11,6 +11,13 @@ allowed-tools:
 description: Create release branch, update CHANGELOG, and open a pull request
 ---
 
+## Command Usage
+
+This command expects a semantic version number as the argument.
+
+**Format**: `/open-release-pr <MAJOR.MINOR.PATCH>`
+**Example**: `/open-release-pr 1.2.3` or `/open-release-pr 2.0.0-beta.1`
+
 ## Context
 
 - Script output: !`./scripts/prepare-release-branch.sh $ARGUMENTS`
