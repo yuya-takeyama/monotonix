@@ -31,6 +31,10 @@ export const loadAllAppConfigs = (rootDir: string = 'apps'): AppInfo[] => {
       const configContent = readFileSync(configPath, 'utf-8');
       const config = LocalConfigSchema.parse(load(configContent));
       
+      console.log('🔍 [DEBUG] raw config.app:', config.app);
+      console.log('🔍 [DEBUG] config.app.depends_on:', (config.app as any).depends_on);
+      console.log('🔍 [DEBUG] typeof depends_on:', typeof (config.app as any).depends_on);
+      
       const appInfo: AppInfo = {
         name: config.app.name,
         appPath,
