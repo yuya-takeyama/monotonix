@@ -54882,6 +54882,7 @@ const getAwsCredentialsFromState = () => {
     };
 };
 exports.getAwsCredentialsFromState = getAwsCredentialsFromState;
+// biome-ignore lint/suspicious/noExplicitAny: Generic function wrapper requires any for type flexibility
 const wrapFunctionWithEnv = (originalFunction, tempEnv) => {
     return (...args) => {
         const originalEnv = {};
