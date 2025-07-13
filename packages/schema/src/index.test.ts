@@ -36,7 +36,7 @@ describe('GlobalConfigSchema', () => {
         },
       };
       expect(() => GlobalConfigSchema.parse(input)).toThrow(
-        /Expected object, received string/,
+        /expected object, received string/i,
       );
     });
   });
@@ -89,7 +89,7 @@ describe('GlobalConfigSchema', () => {
 
     it('rejects non-object at top level', () => {
       const input = 'not-an-object';
-      expect(() => JobConfigsSchema.parse(input)).toThrow(/Expected object/);
+      expect(() => JobConfigsSchema.parse(input)).toThrow(/expected object/i);
     });
 
     it('allows null at first nested level', () => {
@@ -104,7 +104,7 @@ describe('GlobalConfigSchema', () => {
       const input = {
         config: 'not-an-object',
       };
-      expect(() => JobConfigsSchema.parse(input)).toThrow(/Expected object/);
+      expect(() => JobConfigsSchema.parse(input)).toThrow(/expected object/i);
     });
   });
 });
