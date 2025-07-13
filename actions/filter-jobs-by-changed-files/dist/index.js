@@ -30002,53 +30002,86 @@ exports.JobsSchema = zod_1.z.array(exports.JobSchema);
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.run = void 0;
+exports.run = exports.getPathInfo = exports.jobMatchesChangedFiles = exports.resolveDependencyPaths = exports.matchesDependency = void 0;
 const github_1 = __nccwpck_require__(5683);
 const node_path_1 = __nccwpck_require__(6760);
+const fs_1 = __nccwpck_require__(9896);
+const matchesDependency = (filePath, depPath, isDirectory) => {
+    if (isDirectory) {
+        // For directories, check if the file is within the directory
+        return filePath.startsWith(depPath.endsWith('/') ? depPath : depPath + '/');
+    }
+    else {
+        // For files, check exact match
+        return filePath === depPath;
+    }
+};
+exports.matchesDependency = matchesDependency;
+const resolveDependencyPaths = (dependencies, rootDir, getPathInfo) => {
+    return dependencies.map(dep => {
+        const depPath = (0, node_path_1.join)(rootDir, dep);
+        return getPathInfo(depPath);
+    });
+};
+exports.resolveDependencyPaths = resolveDependencyPaths;
+const jobMatchesChangedFiles = (job, changedFiles, rootDir, dependencyPathInfos) => {
+    const appPath = job.context.app_path;
+    const dependencies = job.app.depends_on || [];
+    return changedFiles.some(file => {
+        // Check if file is within the app path
+        if (file.startsWith(appPath))
+            return true;
+        // Check dependencies
+        return dependencyPathInfos.some((pathInfo, index) => {
+            if (index >= dependencies.length)
+                return false;
+            return (0, exports.matchesDependency)(file, pathInfo.path, pathInfo.isDirectory);
+        });
+    });
+};
+exports.jobMatchesChangedFiles = jobMatchesChangedFiles;
+// Helper function for actual file system access
+const getPathInfo = (path) => {
+    try {
+        const stat = (0, fs_1.statSync)(path);
+        return { path, isDirectory: stat.isDirectory() };
+    }
+    catch {
+        // If path doesn't exist, assume it's a file
+        return { path, isDirectory: false };
+    }
+};
+exports.getPathInfo = getPathInfo;
 const run = async ({ githubToken, jobs, rootDir }) => {
     const octokit = (0, github_1.getOctokit)(githubToken);
     switch (github_1.context.eventName) {
         case 'pull_request':
-        case 'pull_request_target':
+        case 'pull_request_target': {
             const { data: files } = await octokit.rest.pulls.listFiles({
                 owner: github_1.context.repo.owner,
                 repo: github_1.context.repo.repo,
                 pull_number: github_1.context.issue.number,
             });
+            const changedFiles = files.map(file => file.filename);
             return jobs.filter(job => {
-                const appPath = job.context.app_path;
                 const dependencies = job.app.depends_on || [];
-                return files
-                    .map(file => file.filename)
-                    .some(file => {
-                    if (file.startsWith(appPath))
-                        return true;
-                    return dependencies.some(dep => {
-                        const depPath = (0, node_path_1.join)(rootDir, dep);
-                        return file.startsWith(depPath);
-                    });
-                });
+                const dependencyPathInfos = (0, exports.resolveDependencyPaths)(dependencies, rootDir, exports.getPathInfo);
+                return (0, exports.jobMatchesChangedFiles)(job, changedFiles, rootDir, dependencyPathInfos);
             });
-        default:
+        }
+        default: {
             const { data: commits } = await octokit.rest.repos.getCommit({
                 owner: github_1.context.repo.owner,
                 repo: github_1.context.repo.repo,
                 ref: github_1.context.sha,
             });
+            const changedFiles = (commits.files || []).map(file => file.filename);
             return jobs.filter(job => {
-                const appPath = job.context.app_path;
                 const dependencies = job.app.depends_on || [];
-                return (commits.files || [])
-                    .map(file => file.filename)
-                    .some(file => {
-                    if (file.startsWith(appPath))
-                        return true;
-                    return dependencies.some(dep => {
-                        const depPath = (0, node_path_1.join)(rootDir, dep);
-                        return file.startsWith(depPath);
-                    });
-                });
+                const dependencyPathInfos = (0, exports.resolveDependencyPaths)(dependencies, rootDir, exports.getPathInfo);
+                return (0, exports.jobMatchesChangedFiles)(job, changedFiles, rootDir, dependencyPathInfos);
             });
+        }
     }
 };
 exports.run = run;
