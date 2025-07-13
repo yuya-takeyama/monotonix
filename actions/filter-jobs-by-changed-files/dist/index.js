@@ -30052,7 +30052,7 @@ const getPathInfo = (path) => {
     }
 };
 exports.getPathInfo = getPathInfo;
-const run = async ({ githubToken, jobs, rootDir }) => {
+const run = async ({ githubToken, jobs, rootDir, }) => {
     const octokit = (0, github_1.getOctokit)(githubToken);
     switch (github_1.context.eventName) {
         case 'pull_request':
