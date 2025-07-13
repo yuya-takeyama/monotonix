@@ -98,8 +98,8 @@ describe('matchesDependency', () => {
 });
 
 describe('resolveDependencyPaths', () => {
-  const mockGetPathInfo = (path: string): PathInfo => {
-    // Mock implementation based on path patterns
+  const stubGetPathInfo = (path: string): PathInfo => {
+    // Stub implementation based on path patterns
     if (
       path.endsWith('.mod') ||
       path.endsWith('.json') ||
@@ -115,7 +115,7 @@ describe('resolveDependencyPaths', () => {
     const result = resolveDependencyPaths(
       dependencies,
       'apps',
-      mockGetPathInfo,
+      stubGetPathInfo,
     );
 
     expect(result).toEqual([
@@ -126,7 +126,7 @@ describe('resolveDependencyPaths', () => {
   });
 
   it('handles empty dependencies', () => {
-    const result = resolveDependencyPaths([], 'apps', mockGetPathInfo);
+    const result = resolveDependencyPaths([], 'apps', stubGetPathInfo);
     expect(result).toEqual([]);
   });
 });
