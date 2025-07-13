@@ -44,8 +44,10 @@ npm run build          # Build all actions using Turbo
 ### Testing
 
 ```bash
-npm run test           # Run tests for all actions
+npm run test           # Run tests for all actions (automatically runs build first)
 ```
+
+**Note**: Running `npm run test` automatically executes `npm run build` first due to Turbo's task dependency configuration in `turbo.json`.
 
 ### Development Workflow
 

@@ -34241,11 +34241,8 @@ const loadJobsFromLocalConfigFiles = async ({ rootDir, dedupeKey, requiredConfig
         }
     }
     validateDependencies(allConfigs, rootDir);
-    const jobs = await Promise.all(localConfigPaths.map(async (localConfigPath) => {
-        const appPath = (0, node_path_1.dirname)(localConfigPath);
+    const jobs = await Promise.all(Array.from(allConfigs.entries()).map(async ([appPath, localConfig]) => {
         try {
-            const localConfigContent = (0, node_fs_1.readFileSync)(localConfigPath, 'utf-8');
-            const localConfig = schema_1.LocalConfigSchema.parse((0, js_yaml_1.load)(localConfigContent));
             const lastCommit = await (0, exports.calculateEffectiveTimestamp)(appPath, localConfig.app.depends_on, rootDir);
             return Object.entries(localConfig.jobs).map(([jobKey, job]) => (0, exports.createJob)({
                 localConfig,
@@ -34258,7 +34255,7 @@ const loadJobsFromLocalConfigFiles = async ({ rootDir, dedupeKey, requiredConfig
             }));
         }
         catch (err) {
-            throw new Error(`Failed to load local config: ${localConfigPath}: ${err}`);
+            throw new Error(`Failed to load local config: ${(0, node_path_1.join)(appPath, localConfigFileName)}: ${err}`);
         }
     }));
     return jobs

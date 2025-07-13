@@ -5,15 +5,16 @@ import { statSync } from 'fs';
 
 export const matchesDependency = (
   filePath: string,
-  depPath: string,
-  isDirectory: boolean,
+  pathInfo: PathInfo,
 ): boolean => {
-  if (isDirectory) {
+  if (pathInfo.isDirectory) {
     // For directories, check if the file is within the directory
-    return filePath.startsWith(depPath.endsWith('/') ? depPath : depPath + '/');
+    return filePath.startsWith(
+      pathInfo.path.endsWith('/') ? pathInfo.path : pathInfo.path + '/',
+    );
   } else {
     // For files, check exact match
-    return filePath === depPath;
+    return filePath === pathInfo.path;
   }
 };
 
@@ -50,7 +51,7 @@ export const jobMatchesChangedFiles = (
     // Check dependencies
     return dependencyPathInfos.some((pathInfo, index) => {
       if (index >= dependencies.length) return false;
-      return matchesDependency(file, pathInfo.path, pathInfo.isDirectory);
+      return matchesDependency(file, pathInfo);
     });
   });
 };

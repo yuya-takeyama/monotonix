@@ -30003,14 +30003,14 @@ exports.run = exports.getPathInfo = exports.jobMatchesChangedFiles = exports.res
 const github_1 = __nccwpck_require__(5683);
 const node_path_1 = __nccwpck_require__(6760);
 const fs_1 = __nccwpck_require__(9896);
-const matchesDependency = (filePath, depPath, isDirectory) => {
-    if (isDirectory) {
+const matchesDependency = (filePath, pathInfo) => {
+    if (pathInfo.isDirectory) {
         // For directories, check if the file is within the directory
-        return filePath.startsWith(depPath.endsWith('/') ? depPath : depPath + '/');
+        return filePath.startsWith(pathInfo.path.endsWith('/') ? pathInfo.path : pathInfo.path + '/');
     }
     else {
         // For files, check exact match
-        return filePath === depPath;
+        return filePath === pathInfo.path;
     }
 };
 exports.matchesDependency = matchesDependency;
@@ -30032,7 +30032,7 @@ const jobMatchesChangedFiles = (job, changedFiles, rootDir, dependencyPathInfos)
         return dependencyPathInfos.some((pathInfo, index) => {
             if (index >= dependencies.length)
                 return false;
-            return (0, exports.matchesDependency)(file, pathInfo.path, pathInfo.isDirectory);
+            return (0, exports.matchesDependency)(file, pathInfo);
         });
     });
 };

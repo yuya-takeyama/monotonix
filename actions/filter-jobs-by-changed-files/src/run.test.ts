@@ -9,64 +9,89 @@ import { Job } from '@monotonix/schema';
 describe('matchesDependency', () => {
   describe('directory dependencies', () => {
     it('matches files within the directory', () => {
-      expect(matchesDependency('apps/foo/src/main.go', 'apps/foo/', true)).toBe(
-        true,
-      );
       expect(
-        matchesDependency('apps/foo/pkg/utils/helper.go', 'apps/foo/', true),
+        matchesDependency('apps/foo/src/main.go', {
+          path: 'apps/foo/',
+          isDirectory: true,
+        }),
+      ).toBe(true);
+      expect(
+        matchesDependency('apps/foo/pkg/utils/helper.go', {
+          path: 'apps/foo/',
+          isDirectory: true,
+        }),
       ).toBe(true);
     });
 
     it('does not match files outside the directory', () => {
-      expect(matchesDependency('apps/bar/src/main.go', 'apps/foo/', true)).toBe(
-        false,
-      );
-      expect(matchesDependency('apps/foobar/main.go', 'apps/foo/', true)).toBe(
-        false,
-      );
+      expect(
+        matchesDependency('apps/bar/src/main.go', {
+          path: 'apps/foo/',
+          isDirectory: true,
+        }),
+      ).toBe(false);
+      expect(
+        matchesDependency('apps/foobar/main.go', {
+          path: 'apps/foo/',
+          isDirectory: true,
+        }),
+      ).toBe(false);
     });
 
     it('handles directories without trailing slash', () => {
-      expect(matchesDependency('apps/foo/main.go', 'apps/foo', true)).toBe(
-        true,
-      );
-      expect(matchesDependency('apps/foo/src/main.go', 'apps/foo', true)).toBe(
-        true,
-      );
+      expect(
+        matchesDependency('apps/foo/main.go', {
+          path: 'apps/foo',
+          isDirectory: true,
+        }),
+      ).toBe(true);
+      expect(
+        matchesDependency('apps/foo/src/main.go', {
+          path: 'apps/foo',
+          isDirectory: true,
+        }),
+      ).toBe(true);
     });
   });
 
   describe('file dependencies', () => {
     it('matches exact file path', () => {
       expect(
-        matchesDependency('apps/foo/go.mod', 'apps/foo/go.mod', false),
+        matchesDependency('apps/foo/go.mod', {
+          path: 'apps/foo/go.mod',
+          isDirectory: false,
+        }),
       ).toBe(true);
       expect(
-        matchesDependency(
-          'apps/foo/package.json',
-          'apps/foo/package.json',
-          false,
-        ),
+        matchesDependency('apps/foo/package.json', {
+          path: 'apps/foo/package.json',
+          isDirectory: false,
+        }),
       ).toBe(true);
     });
 
     it('does not match similar but different files', () => {
       expect(
-        matchesDependency('apps/foo/go.mod.backup', 'apps/foo/go.mod', false),
+        matchesDependency('apps/foo/go.mod.backup', {
+          path: 'apps/foo/go.mod',
+          isDirectory: false,
+        }),
       ).toBe(false);
       expect(
-        matchesDependency('apps/foo/go.module', 'apps/foo/go.mod', false),
+        matchesDependency('apps/foo/go.module', {
+          path: 'apps/foo/go.mod',
+          isDirectory: false,
+        }),
       ).toBe(false);
     });
 
     it('does not match files within a directory with the same name', () => {
       // Files should only match exactly
       expect(
-        matchesDependency(
-          'apps/foo/go.mod/nested.txt',
-          'apps/foo/go.mod',
-          false,
-        ),
+        matchesDependency('apps/foo/go.mod/nested.txt', {
+          path: 'apps/foo/go.mod',
+          isDirectory: false,
+        }),
       ).toBe(false);
     });
   });

@@ -46,11 +46,8 @@ export const loadJobsFromLocalConfigFiles = async ({
   validateDependencies(allConfigs, rootDir);
 
   const jobs = await Promise.all(
-    localConfigPaths.map(async localConfigPath => {
-      const appPath = dirname(localConfigPath);
+    Array.from(allConfigs.entries()).map(async ([appPath, localConfig]) => {
       try {
-        const localConfigContent = readFileSync(localConfigPath, 'utf-8');
-        const localConfig = LocalConfigSchema.parse(load(localConfigContent));
         const lastCommit = await calculateEffectiveTimestamp(
           appPath,
           localConfig.app.depends_on,
@@ -71,7 +68,7 @@ export const loadJobsFromLocalConfigFiles = async ({
         );
       } catch (err) {
         throw new Error(
-          `Failed to load local config: ${localConfigPath}: ${err}`,
+          `Failed to load local config: ${join(appPath, localConfigFileName)}: ${err}`,
         );
       }
     }),
