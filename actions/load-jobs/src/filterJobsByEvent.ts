@@ -48,9 +48,7 @@ export const filterJobsByEvent = ({
 
         case 'pull_request_target':
           if ('pull_request_target' in job.on) {
-            if (
-              job.on.pull_request_target?.branches
-            ) {
+            if (job.on.pull_request_target?.branches) {
               const result = job.on.pull_request_target.branches.some(branch =>
                 minimatch(event.payload.pull_request.base.ref, branch),
               );
