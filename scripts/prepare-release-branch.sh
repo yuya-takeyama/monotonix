@@ -8,18 +8,18 @@ VERSION="${1:-}"
 
 # Validate version argument
 if [[ -z "$VERSION" ]]; then
-    echo "Error: Version number required"
-    echo "Usage: $0 <version>"
-    echo "Example: $0 1.2.3"
-    exit 1
+  echo "Error: Version number required"
+  echo "Usage: $0 <version>"
+  echo "Example: $0 1.2.3"
+  exit 1
 fi
 
 # Validate version format (semantic versioning)
 if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?(\+[a-zA-Z0-9.-]+)?$ ]]; then
-    echo "Error: Invalid version format"
-    echo "Expected format: MAJOR.MINOR.PATCH (e.g., 1.2.3, 2.0.0-beta.1)"
-    echo "Got: $VERSION"
-    exit 1
+  echo "Error: Invalid version format"
+  echo "Expected format: MAJOR.MINOR.PATCH (e.g., 1.2.3, 2.0.0-beta.1)"
+  echo "Got: $VERSION"
+  exit 1
 fi
 
 RELEASE_BRANCH="release/v${VERSION}"
@@ -28,10 +28,10 @@ echo "=== Preparing release v${VERSION} ==="
 
 # Check if we have uncommitted changes
 if ! git diff --quiet || ! git diff --staged --quiet; then
-    echo "Error: You have uncommitted changes"
-    echo "Please commit or stash your changes before creating a release"
-    git status --short
-    exit 1
+  echo "Error: You have uncommitted changes"
+  echo "Please commit or stash your changes before creating a release"
+  git status --short
+  exit 1
 fi
 
 # Install dependencies and run build/test
@@ -58,13 +58,13 @@ echo "→ Creating release branch: ${RELEASE_BRANCH}"
 git checkout -B "${RELEASE_BRANCH}"
 
 # Get latest tag
-LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+LATEST_TAG=$(git describe --tags --abbrev=0 2> /dev/null || echo "")
 if [[ -z "$LATEST_TAG" ]]; then
-    echo "→ No previous tags found, using first commit"
-    COMMIT_RANGE="$(git rev-list --max-parents=0 HEAD)..HEAD"
+  echo "→ No previous tags found, using first commit"
+  COMMIT_RANGE="$(git rev-list --max-parents=0 HEAD)..HEAD"
 else
-    echo "→ Latest tag: ${LATEST_TAG}"
-    COMMIT_RANGE="${LATEST_TAG}..HEAD"
+  echo "→ Latest tag: ${LATEST_TAG}"
+  COMMIT_RANGE="${LATEST_TAG}..HEAD"
 fi
 
 # Output commit history for changelog generation
