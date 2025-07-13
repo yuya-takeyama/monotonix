@@ -30050,7 +30050,10 @@ const getPathInfo = (path) => {
     }
 };
 exports.getPathInfo = getPathInfo;
-const run = async ({ githubToken, jobs, rootDir, }) => {
+const run = async ({ githubToken, jobs }) => {
+    if (jobs.length === 0) {
+        return [];
+    }
     const octokit = (0, github_1.getOctokit)(githubToken);
     switch (github_1.context.eventName) {
         case 'pull_request':
@@ -30063,7 +30066,7 @@ const run = async ({ githubToken, jobs, rootDir, }) => {
             const changedFiles = files.map(file => file.filename);
             return jobs.filter(job => {
                 const dependencies = job.app.depends_on;
-                const dependencyPathInfos = (0, exports.resolveDependencyPaths)(dependencies, rootDir, exports.getPathInfo);
+                const dependencyPathInfos = (0, exports.resolveDependencyPaths)(dependencies, job.context.root_dir, exports.getPathInfo);
                 return (0, exports.jobMatchesChangedFiles)(job, changedFiles, dependencyPathInfos);
             });
         }
@@ -30076,7 +30079,7 @@ const run = async ({ githubToken, jobs, rootDir, }) => {
             const changedFiles = (commits.files || []).map(file => file.filename);
             return jobs.filter(job => {
                 const dependencies = job.app.depends_on;
-                const dependencyPathInfos = (0, exports.resolveDependencyPaths)(dependencies, rootDir, exports.getPathInfo);
+                const dependencyPathInfos = (0, exports.resolveDependencyPaths)(dependencies, job.context.root_dir, exports.getPathInfo);
                 return (0, exports.jobMatchesChangedFiles)(job, changedFiles, dependencyPathInfos);
             });
         }
@@ -45340,15 +45343,10 @@ const run_1 = __nccwpck_require__(4795);
         if (!jobsJson) {
             throw new Error('Input job or env $MONOTONIX_JOBS is required');
         }
-        const rootDir = (0, core_1.getInput)('root-dir');
-        if (!rootDir) {
-            throw new Error('Input root-dir is required');
-        }
         const jobs = schema_1.JobsSchema.parse(JSON.parse(jobsJson));
         const result = await (0, run_1.run)({
             githubToken,
             jobs,
-            rootDir,
         });
         (0, core_1.setOutput)('result', result);
         (0, core_1.exportVariable)('MONOTONIX_JOBS', result);

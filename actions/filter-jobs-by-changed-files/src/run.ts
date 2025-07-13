@@ -71,13 +71,12 @@ export const getPathInfo = (path: string): PathInfo => {
 type runParams = {
   githubToken: string;
   jobs: Jobs;
-  rootDir: string;
 };
-export const run = async ({
-  githubToken,
-  jobs,
-  rootDir,
-}: runParams): Promise<Jobs> => {
+export const run = async ({ githubToken, jobs }: runParams): Promise<Jobs> => {
+  if (jobs.length === 0) {
+    return [];
+  }
+
   const octokit = getOctokit(githubToken);
 
   switch (context.eventName) {
@@ -94,7 +93,7 @@ export const run = async ({
         const dependencies = job.app.depends_on;
         const dependencyPathInfos = resolveDependencyPaths(
           dependencies,
-          rootDir,
+          job.context.root_dir,
           getPathInfo,
         );
         return jobMatchesChangedFiles(job, changedFiles, dependencyPathInfos);
@@ -113,7 +112,7 @@ export const run = async ({
         const dependencies = job.app.depends_on;
         const dependencyPathInfos = resolveDependencyPaths(
           dependencies,
-          rootDir,
+          job.context.root_dir,
           getPathInfo,
         );
         return jobMatchesChangedFiles(job, changedFiles, dependencyPathInfos);

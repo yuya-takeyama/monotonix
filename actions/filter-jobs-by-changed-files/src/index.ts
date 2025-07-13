@@ -12,16 +12,11 @@ import { run } from './run';
     if (!jobsJson) {
       throw new Error('Input job or env $MONOTONIX_JOBS is required');
     }
-    const rootDir = getInput('root-dir');
-    if (!rootDir) {
-      throw new Error('Input root-dir is required');
-    }
     const jobs = JobsSchema.parse(JSON.parse(jobsJson));
 
     const result = await run({
       githubToken,
       jobs,
-      rootDir,
     });
 
     setOutput('result', result);
