@@ -38,15 +38,16 @@ export const resolveDependencyPaths = (
 export const jobMatchesChangedFiles = (
   job: Job,
   changedFiles: string[],
-  rootDir: string,
   dependencyPathInfos: PathInfo[],
 ): boolean => {
   const appPath = job.context.app_path;
-  const dependencies = job.app.depends_on || [];
+  const dependencies = job.app.depends_on;
 
   return changedFiles.some(file => {
     // Check if file is within the app path
-    if (file.startsWith(appPath)) return true;
+    if (file.startsWith(appPath.endsWith('/') ? appPath : appPath + '/')) {
+      return true;
+    }
 
     // Check dependencies
     return dependencyPathInfos.some((pathInfo, index) => {
@@ -90,18 +91,13 @@ export const run = async ({
 
       const changedFiles = files.map(file => file.filename);
       return jobs.filter(job => {
-        const dependencies = job.app.depends_on || [];
+        const dependencies = job.app.depends_on;
         const dependencyPathInfos = resolveDependencyPaths(
           dependencies,
           rootDir,
           getPathInfo,
         );
-        return jobMatchesChangedFiles(
-          job,
-          changedFiles,
-          rootDir,
-          dependencyPathInfos,
-        );
+        return jobMatchesChangedFiles(job, changedFiles, dependencyPathInfos);
       });
     }
 
@@ -114,18 +110,13 @@ export const run = async ({
 
       const changedFiles = (commits.files || []).map(file => file.filename);
       return jobs.filter(job => {
-        const dependencies = job.app.depends_on || [];
+        const dependencies = job.app.depends_on;
         const dependencyPathInfos = resolveDependencyPaths(
           dependencies,
           rootDir,
           getPathInfo,
         );
-        return jobMatchesChangedFiles(
-          job,
-          changedFiles,
-          rootDir,
-          dependencyPathInfos,
-        );
+        return jobMatchesChangedFiles(job, changedFiles, dependencyPathInfos);
       });
     }
   }

@@ -158,9 +158,19 @@ describe('jobMatchesChangedFiles', () => {
     const changedFiles = ['apps/foo/main.go', 'apps/bar/main.go'];
     const dependencyPathInfos: PathInfo[] = [];
 
-    expect(
-      jobMatchesChangedFiles(job, changedFiles, 'apps', dependencyPathInfos),
-    ).toBe(true);
+    expect(jobMatchesChangedFiles(job, changedFiles, dependencyPathInfos)).toBe(
+      true,
+    );
+  });
+
+  it('does not match files in similarly named directories', () => {
+    const job = createTestJob('apps/foo');
+    const changedFiles = ['apps/foobar/main.go', 'apps/foo-other/main.go'];
+    const dependencyPathInfos: PathInfo[] = [];
+
+    expect(jobMatchesChangedFiles(job, changedFiles, dependencyPathInfos)).toBe(
+      false,
+    );
   });
 
   it('matches when dependency files change', () => {
@@ -171,9 +181,9 @@ describe('jobMatchesChangedFiles', () => {
       { path: 'apps/go.mod', isDirectory: false },
     ];
 
-    expect(
-      jobMatchesChangedFiles(job, changedFiles, 'apps', dependencyPathInfos),
-    ).toBe(true);
+    expect(jobMatchesChangedFiles(job, changedFiles, dependencyPathInfos)).toBe(
+      true,
+    );
   });
 
   it('does not match when no relevant files change', () => {
@@ -183,9 +193,9 @@ describe('jobMatchesChangedFiles', () => {
       { path: 'apps/shared', isDirectory: true },
     ];
 
-    expect(
-      jobMatchesChangedFiles(job, changedFiles, 'apps', dependencyPathInfos),
-    ).toBe(false);
+    expect(jobMatchesChangedFiles(job, changedFiles, dependencyPathInfos)).toBe(
+      false,
+    );
   });
 
   it('matches exact file dependencies', () => {
@@ -199,9 +209,9 @@ describe('jobMatchesChangedFiles', () => {
       { path: 'apps/web-app/go.sum', isDirectory: false },
     ];
 
-    expect(
-      jobMatchesChangedFiles(job, changedFiles, 'apps', dependencyPathInfos),
-    ).toBe(true);
+    expect(jobMatchesChangedFiles(job, changedFiles, dependencyPathInfos)).toBe(
+      true,
+    );
   });
 
   it('does not match partial file paths', () => {
@@ -213,8 +223,8 @@ describe('jobMatchesChangedFiles', () => {
       { path: 'apps/web-app/go.mod', isDirectory: false },
     ];
 
-    expect(
-      jobMatchesChangedFiles(job, changedFiles, 'apps', dependencyPathInfos),
-    ).toBe(false);
+    expect(jobMatchesChangedFiles(job, changedFiles, dependencyPathInfos)).toBe(
+      false,
+    );
   });
 });

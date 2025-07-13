@@ -30021,12 +30021,12 @@ const resolveDependencyPaths = (dependencies, rootDir, getPathInfo) => {
     });
 };
 exports.resolveDependencyPaths = resolveDependencyPaths;
-const jobMatchesChangedFiles = (job, changedFiles, rootDir, dependencyPathInfos) => {
+const jobMatchesChangedFiles = (job, changedFiles, dependencyPathInfos) => {
     const appPath = job.context.app_path;
-    const dependencies = job.app.depends_on || [];
+    const dependencies = job.app.depends_on;
     return changedFiles.some(file => {
         // Check if file is within the app path
-        if (file.startsWith(appPath))
+        if (file.startsWith(appPath.endsWith('/') ? appPath : appPath + '/'))
             return true;
         // Check dependencies
         return dependencyPathInfos.some((pathInfo, index) => {
@@ -30061,9 +30061,9 @@ const run = async ({ githubToken, jobs, rootDir, }) => {
             });
             const changedFiles = files.map(file => file.filename);
             return jobs.filter(job => {
-                const dependencies = job.app.depends_on || [];
+                const dependencies = job.app.depends_on;
                 const dependencyPathInfos = (0, exports.resolveDependencyPaths)(dependencies, rootDir, exports.getPathInfo);
-                return (0, exports.jobMatchesChangedFiles)(job, changedFiles, rootDir, dependencyPathInfos);
+                return (0, exports.jobMatchesChangedFiles)(job, changedFiles, dependencyPathInfos);
             });
         }
         default: {
@@ -30074,9 +30074,9 @@ const run = async ({ githubToken, jobs, rootDir, }) => {
             });
             const changedFiles = (commits.files || []).map(file => file.filename);
             return jobs.filter(job => {
-                const dependencies = job.app.depends_on || [];
+                const dependencies = job.app.depends_on;
                 const dependencyPathInfos = (0, exports.resolveDependencyPaths)(dependencies, rootDir, exports.getPathInfo);
-                return (0, exports.jobMatchesChangedFiles)(job, changedFiles, rootDir, dependencyPathInfos);
+                return (0, exports.jobMatchesChangedFiles)(job, changedFiles, dependencyPathInfos);
             });
         }
     }
