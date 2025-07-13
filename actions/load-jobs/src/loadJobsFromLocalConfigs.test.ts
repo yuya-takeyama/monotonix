@@ -1,5 +1,5 @@
-import { createJob } from './loadJobsFromLocalConfigs';
 import { Job, LocalConfig, LocalConfigJob } from '@monotonix/schema';
+import { createJob } from './loadJobsFromLocalConfigs';
 import { Event } from './schema';
 
 describe('createJob', () => {

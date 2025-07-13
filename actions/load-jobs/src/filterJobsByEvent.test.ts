@@ -1,5 +1,5 @@
-import { filterJobsByEvent } from './filterJobsByEvent';
 import { Job } from '@monotonix/schema';
+import { filterJobsByEvent } from './filterJobsByEvent';
 import { Event } from './schema';
 
 describe('filterJobsByGitHubContext', () => {

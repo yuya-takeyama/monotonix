@@ -1,5 +1,5 @@
 import { warning } from '@actions/core';
-import { exec, ExecOptions } from '@actions/exec';
+import { ExecOptions, exec } from '@actions/exec';
 
 export type CommitInfo = {
   hash: string;

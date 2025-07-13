@@ -1,12 +1,12 @@
-import { Job } from '@monotonix/schema';
+import { warning } from '@actions/core';
 import {
   ConditionalCheckFailedException,
   DynamoDBClient,
 } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, PutCommand } from '@aws-sdk/lib-dynamodb';
-import { warning } from '@actions/core';
-import { saveAwsCredentialsIntoState } from './utils';
 import { StateItem } from '@monotonix/dynamodb-common';
+import { Job } from '@monotonix/schema';
+import { saveAwsCredentialsIntoState } from './utils';
 
 type runParam = {
   job: Job;

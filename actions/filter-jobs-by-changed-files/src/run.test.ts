@@ -1,10 +1,10 @@
-import {
-  matchesDependency,
-  resolveDependencyPaths,
-  jobMatchesChangedFiles,
-  PathInfo,
-} from './run';
 import { Job } from '@monotonix/schema';
+import {
+  jobMatchesChangedFiles,
+  matchesDependency,
+  PathInfo,
+  resolveDependencyPaths,
+} from './run';
 
 describe('matchesDependency', () => {
   describe('directory dependencies', () => {

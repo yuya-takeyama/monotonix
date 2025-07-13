@@ -1,4 +1,4 @@
-import { getInput, setFailed, setOutput, exportVariable } from '@actions/core';
+import { exportVariable, getInput, setFailed, setOutput } from '@actions/core';
 import { context } from '@actions/github';
 import { run } from './run';
 import { EventSchema } from './schema';

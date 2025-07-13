@@ -8,10 +8,15 @@
   ],
   "scripts": {
     "build": "turbo run build",
-    "test": "turbo run test"
+    "test": "turbo run test",
+    "lint": "biome check .",
+    "format": "prettier . --write",
+    "format:check": "prettier . --check"
   },
   "packageManager": "npm@11.4.2",
   "devDependencies": {
-    "turbo": "^2.3.3"
+    "@biomejs/biome": "2.1.1",
+    "prettier": "3.6.2",
+    "turbo": "2.5.4"
   }
 }

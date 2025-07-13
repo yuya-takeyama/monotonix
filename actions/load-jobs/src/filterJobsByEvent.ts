@@ -15,7 +15,7 @@ export const filterJobsByEvent = ({
       switch (event.eventName) {
         case 'push':
           if ('push' in job.on) {
-            if (job.on.push && job.on.push.branches) {
+            if (job.on.push?.branches) {
               const branchName = event.ref.replace(/^refs\/heads\//, '');
               const result = job.on.push.branches.some(branch =>
                 minimatch(branchName, branch),
@@ -32,7 +32,7 @@ export const filterJobsByEvent = ({
 
         case 'pull_request':
           if ('pull_request' in job.on) {
-            if (job.on.pull_request && job.on.pull_request.branches) {
+            if (job.on.pull_request?.branches) {
               const result = job.on.pull_request.branches.some(branch =>
                 minimatch(event.payload.pull_request.base.ref, branch),
               );
@@ -49,8 +49,7 @@ export const filterJobsByEvent = ({
         case 'pull_request_target':
           if ('pull_request_target' in job.on) {
             if (
-              job.on.pull_request_target &&
-              job.on.pull_request_target.branches
+              job.on.pull_request_target?.branches
             ) {
               const result = job.on.pull_request_target.branches.some(branch =>
                 minimatch(event.payload.pull_request.base.ref, branch),

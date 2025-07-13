@@ -1,6 +1,6 @@
+import { Context } from '@actions/github/lib/context';
 import { run } from './run';
 import { DockerBuildGlobalConfig, InputJob, OutputJob } from './schema';
-import { Context } from '@actions/github/lib/context';
 
 describe('run', () => {
   const stubGlobalConfig: DockerBuildGlobalConfig = {

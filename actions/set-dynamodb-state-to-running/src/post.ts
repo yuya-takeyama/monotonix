@@ -1,6 +1,6 @@
 import { getInput, setFailed } from '@actions/core';
-import { runPost } from './runPost';
 import { JobSchema } from '@monotonix/schema';
+import { runPost } from './runPost';
 import {
   getAwsCredentialsFromState,
   parseDuration,

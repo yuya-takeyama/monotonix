@@ -1,0 +1,35 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.1.1/schema.json",
+  "files": {
+    "ignoreUnknown": true,
+    "maxSize": 10485760
+  },
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "correctness": {
+        "recommended": true
+      },
+      "suspicious": {
+        "recommended": true
+      },
+      "performance": {
+        "recommended": true
+      },
+      "style": {
+        "recommended": false
+      },
+      "nursery": {
+        "recommended": false
+      }
+    }
+  },
+  "formatter": {
+    "enabled": false
+  }
+}

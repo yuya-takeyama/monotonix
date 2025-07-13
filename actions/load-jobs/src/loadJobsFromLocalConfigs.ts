@@ -1,17 +1,16 @@
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import {
-  LocalConfigSchema,
   Job,
   Jobs,
   LocalConfig,
   LocalConfigJob,
+  LocalConfigSchema,
 } from '@monotonix/schema';
-import { load } from 'js-yaml';
-import { readFileSync } from 'node:fs';
 import { globSync } from 'glob';
-import { join, dirname } from 'node:path';
+import { load } from 'js-yaml';
 import { CommitInfo, getLastCommit } from './getLastCommit';
 import { Event } from './schema';
-import { existsSync } from 'node:fs';
 
 type loadJobsFromLocalConfigFilesParams = {
   rootDir: string;

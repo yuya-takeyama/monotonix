@@ -1,6 +1,6 @@
 import { getInput, setFailed } from '@actions/core';
-import { run } from './run';
 import { JobSchema } from '@monotonix/schema';
+import { run } from './run';
 import { parseDuration } from './utils';
 
 try {

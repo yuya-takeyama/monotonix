@@ -1,4 +1,4 @@
-import { saveState, getState } from '@actions/core';
+import { getState, saveState } from '@actions/core';
 
 export const parseDuration = (duration: string): number => {
   const regex = /(\d+)(\D+)/g;
