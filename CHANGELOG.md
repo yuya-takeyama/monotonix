@@ -1,5 +1,29 @@
 # Change Log
 
+## [0.0.3] - 2025-07-13
+
+### Added
+
+- `/open-release-pr` slash command for Claude Code [#129](https://github.com/yuya-takeyama/monotonix/pull/129)
+- Biome and prettier for code quality and formatting [#128](https://github.com/yuya-takeyama/monotonix/pull/128)
+- App dependency support for dependency-based job triggering [#123](https://github.com/yuya-takeyama/monotonix/pull/123)
+- Claude Code GitHub Workflow [#124](https://github.com/yuya-takeyama/monotonix/pull/124)
+- Claude PR Assistant workflow [#92](https://github.com/yuya-takeyama/monotonix/pull/92)
+- CLAUDE.md [#91](https://github.com/yuya-takeyama/monotonix/pull/91)
+- Aqua configuration and VS Code YAML formatter [#94](https://github.com/yuya-takeyama/monotonix/pull/94)
+- Comprehensive usage guide to README [#95](https://github.com/yuya-takeyama/monotonix/pull/95)
+- .claude directory to .gitignore [#96](https://github.com/yuya-takeyama/monotonix/pull/96)
+
+### Fixed
+
+- Schema: update test assertions for zod v4 error message format [#127](https://github.com/yuya-takeyama/monotonix/pull/127)
+
+### Changed
+
+- Restrict claude-code-action to yuya-takeyama only [#93](https://github.com/yuya-takeyama/monotonix/pull/93)
+- Update GitHub Actions dependencies [#126](https://github.com/yuya-takeyama/monotonix/pull/126)
+- Update various dependencies (Node.js, @types/node, aws-sdk, zod, jest, luxon, prettier, minimatch, ts-jest, glob, npm, turbo, typescript, etc.)
+
 ## [0.0.2] - 2025-03-09
 
 - Fix required-config-keys to check key existence [#59](https://github.com/yuya-takeyama/monotonix/pull/59)
