@@ -69,15 +69,32 @@ export const filterJobsByAppDependencies = (
   changedFiles: string[],
   jobs: Jobs,
 ): Jobs => {
+  console.log('🔍 [DEBUG] filterJobsByAppDependencies starting');
+  console.log('🔍 [DEBUG] changedFiles:', changedFiles);
+  console.log('🔍 [DEBUG] available jobs:', jobs.map(j => ({ 
+    name: j.app.name, 
+    path: j.context.app_path, 
+    depends_on: j.app.depends_on,
+    job_key: j.context.job_key
+  })));
+
   // 1. ファイル変更からアプリを特定
   const directlyAffectedApps = getAffectedAppsFromChangedFiles(
     changedFiles,
     jobs,
   );
+  console.log('🔍 [DEBUG] directlyAffectedApps:', directlyAffectedApps);
 
   // 2. 依存関係を考慮してアプリリストを拡張
   const allAffectedApps = propagateAppDependencies(directlyAffectedApps, jobs);
+  console.log('🔍 [DEBUG] allAffectedApps after propagation:', allAffectedApps);
 
   // 3. 影響を受けるアプリのジョブのみフィルタ
-  return jobs.filter(job => allAffectedApps.includes(job.app.name));
+  const filteredJobs = jobs.filter(job => allAffectedApps.includes(job.app.name));
+  console.log('🔍 [DEBUG] filteredJobs:', filteredJobs.map(j => ({ 
+    name: j.app.name, 
+    job_key: j.context.job_key 
+  })));
+
+  return filteredJobs;
 };
