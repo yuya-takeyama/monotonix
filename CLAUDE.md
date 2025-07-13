@@ -33,27 +33,28 @@ The actions work together in a specific sequence:
 
 ## Development Commands
 
+**Important**: Always run build and test commands from the root directory to ensure all dependencies are properly built and tested. Turbo handles caching and parallel execution efficiently, so full builds are fast.
+
 ### Building
 
 ```bash
 npm run build          # Build all actions using Turbo
-turbo run build        # Alternative
 ```
 
 ### Testing
 
 ```bash
 npm run test           # Run tests for all actions
-turbo run test         # Alternative
 ```
 
-### Individual Action Development
+### Development Workflow
 
-```bash
-cd actions/ACTION_NAME
-npm run build         # Build specific action
-npm run test          # Test specific action
-```
+1. Make your changes to any action or package
+2. Run `npm run build` from the root directory
+3. Run `npm run test` from the root directory
+4. Commit your changes including the built `dist/` files
+
+Do not filter or skip any packages during build/test - the full suite ensures everything works together correctly.
 
 ## Configuration Files
 
