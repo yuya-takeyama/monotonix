@@ -8,6 +8,11 @@
             "type": "command",
             "command": ".claude/scripts/format-prettier.sh",
             "timeout": 30
+          },
+          {
+            "type": "command",
+            "command": ".claude/scripts/format-shfmt.sh",
+            "timeout": 30
           }
         ]
       }

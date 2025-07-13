@@ -33,7 +33,7 @@ MAIN_SHA=$(git rev-parse origin/main)
 echo "→ Using commit from origin/main: ${MAIN_SHA:0:7}"
 
 # Check if tag already exists
-if git rev-parse "v${VERSION}" >/dev/null 2>&1; then
+if git rev-parse "v${VERSION}" > /dev/null 2>&1; then
   echo "Error: Tag v${VERSION} already exists"
   exit 1
 fi
@@ -42,7 +42,7 @@ fi
 echo "→ Extracting release notes from CHANGELOG.md..."
 
 # Get CHANGELOG.md content from origin/main
-CHANGELOG_CONTENT=$(git show origin/main:CHANGELOG.md 2>/dev/null || echo "")
+CHANGELOG_CONTENT=$(git show origin/main:CHANGELOG.md 2> /dev/null || echo "")
 
 if [[ -z "$CHANGELOG_CONTENT" ]]; then
   echo "Error: CHANGELOG.md not found in origin/main"
