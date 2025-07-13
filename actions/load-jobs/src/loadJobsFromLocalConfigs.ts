@@ -147,7 +147,7 @@ const validateDependencies = (
   rootDir: string,
 ): void => {
   for (const [appPath, config] of allConfigs) {
-    const dependencies = config.app.depends_on || [];
+    const dependencies = config.app.depends_on;
 
     for (const dep of dependencies) {
       if (dep === appPath) {
@@ -212,7 +212,7 @@ const hasCircularDependency = (
 
   const config = allConfigs.get(appPath);
   if (config) {
-    const dependencies = config.app.depends_on || [];
+    const dependencies = config.app.depends_on;
 
     for (const dep of dependencies) {
       const depPath = join(rootDir, dep);

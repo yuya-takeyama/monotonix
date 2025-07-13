@@ -34300,7 +34300,7 @@ const calculateEffectiveTimestamp = async (appPath, dependencies, rootDir) => {
 exports.calculateEffectiveTimestamp = calculateEffectiveTimestamp;
 const validateDependencies = (allConfigs, rootDir) => {
     for (const [appPath, config] of allConfigs) {
-        const dependencies = config.app.depends_on || [];
+        const dependencies = config.app.depends_on;
         for (const dep of dependencies) {
             if (dep === appPath) {
                 throw new Error(`Self-dependency detected: ${config.app.name} depends on itself`);
@@ -34333,7 +34333,7 @@ const hasCircularDependency = (appPath, allConfigs, rootDir, visited, recursionS
     recursionStack.add(appPath);
     const config = allConfigs.get(appPath);
     if (config) {
-        const dependencies = config.app.depends_on || [];
+        const dependencies = config.app.depends_on;
         for (const dep of dependencies) {
             const depPath = (0, node_path_1.join)(rootDir, dep);
             if (hasCircularDependency(depPath, allConfigs, rootDir, visited, recursionStack)) {
