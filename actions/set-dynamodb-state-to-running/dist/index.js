@@ -54833,7 +54833,7 @@ const parseDuration = (duration) => {
     let lastIndex = 0;
     do {
         matches = regex.exec(duration);
-        if (matches !== null && matches[1] && matches[2]) {
+        if (matches?.[1] && matches[2]) {
             const value = Number(matches[1]);
             const unit = matches[2];
             switch (unit) {
