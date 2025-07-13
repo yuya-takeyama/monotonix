@@ -8,6 +8,7 @@ export type GlobalConfig = z.infer<typeof GlobalConfigSchema>;
 
 const AppSchema = z.object({
   name: z.string(),
+  depends_on: z.array(z.string()).optional().default([]),
 });
 
 const ContextSchema = z.object({
@@ -69,9 +70,7 @@ const LocalConfigJobSchema = z.object({
 export type LocalConfigJob = z.infer<typeof LocalConfigJobSchema>;
 
 export const LocalConfigSchema = z.object({
-  app: z.object({
-    name: z.string(),
-  }),
+  app: AppSchema,
   jobs: z.record(z.string(), LocalConfigJobSchema),
 });
 

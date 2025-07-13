@@ -11,6 +11,7 @@ import { globSync } from 'glob';
 import { join, dirname } from 'node:path';
 import { CommitInfo, getLastCommit } from './getLastCommit';
 import { Event } from './schema';
+import { existsSync } from 'node:fs';
 
 type loadJobsFromLocalConfigFilesParams = {
   rootDir: string;
@@ -29,13 +30,29 @@ export const loadJobsFromLocalConfigFiles = async ({
   const pattern = join(rootDir, '**', localConfigFileName);
   const localConfigPaths = globSync(pattern);
 
+  const allConfigs = new Map<string, LocalConfig>();
+  for (const localConfigPath of localConfigPaths) {
+    try {
+      const localConfigContent = readFileSync(localConfigPath, 'utf-8');
+      const localConfig = LocalConfigSchema.parse(load(localConfigContent));
+      allConfigs.set(dirname(localConfigPath), localConfig);
+    } catch (err) {
+      throw new Error(
+        `Failed to load local config: ${localConfigPath}: ${err}`,
+      );
+    }
+  }
+
+  validateDependencies(allConfigs, rootDir);
+
   const jobs = await Promise.all(
-    localConfigPaths.map(async localConfigPath => {
-      const appPath = dirname(localConfigPath);
-      const lastCommit = await getLastCommit(appPath);
+    Array.from(allConfigs.entries()).map(async ([appPath, localConfig]) => {
       try {
-        const localConfigContent = readFileSync(localConfigPath, 'utf-8');
-        const localConfig = LocalConfigSchema.parse(load(localConfigContent));
+        const lastCommit = await calculateEffectiveTimestamp(
+          appPath,
+          localConfig.app.depends_on,
+          rootDir,
+        );
 
         return Object.entries(localConfig.jobs).map(
           ([jobKey, job]): Job =>
@@ -51,7 +68,7 @@ export const loadJobsFromLocalConfigFiles = async ({
         );
       } catch (err) {
         throw new Error(
-          `Failed to load local config: ${localConfigPath}: ${err}`,
+          `Failed to load local config: ${join(appPath, localConfigFileName)}: ${err}`,
         );
       }
     }),
@@ -92,3 +109,127 @@ export const createJob = ({
   },
   params: {},
 });
+
+export const calculateEffectiveTimestamp = async (
+  appPath: string,
+  dependencies: string[],
+  rootDir: string,
+): Promise<CommitInfo> => {
+  const appCommit = await getLastCommit(appPath);
+  const timestamps: number[] = [appCommit.timestamp];
+  const commitInfos: CommitInfo[] = [appCommit];
+
+  for (const dep of dependencies) {
+    if (dep === appPath) {
+      continue;
+    }
+
+    const depPath = join(rootDir, dep);
+    if (!existsSync(depPath)) {
+      throw new Error(`Dependency path does not exist: ${depPath}`);
+    }
+
+    const depCommit = await getLastCommit(depPath);
+    timestamps.push(depCommit.timestamp);
+    commitInfos.push(depCommit);
+  }
+
+  const maxTimestamp = Math.max(...timestamps);
+  const maxCommitInfo = commitInfos.find(
+    commit => commit.timestamp === maxTimestamp,
+  );
+
+  return maxCommitInfo || appCommit;
+};
+
+const validateDependencies = (
+  allConfigs: Map<string, LocalConfig>,
+  rootDir: string,
+): void => {
+  for (const [appPath, config] of allConfigs) {
+    const dependencies = config.app.depends_on;
+
+    for (const dep of dependencies) {
+      if (dep === appPath) {
+        throw new Error(
+          `Self-dependency detected: ${config.app.name} depends on itself`,
+        );
+      }
+
+      const depPath = join(rootDir, dep);
+      if (!existsSync(depPath)) {
+        throw new Error(
+          `Dependency path does not exist: ${depPath} (required by ${config.app.name})`,
+        );
+      }
+    }
+  }
+
+  detectCircularDependencies(allConfigs, rootDir);
+};
+
+const detectCircularDependencies = (
+  allConfigs: Map<string, LocalConfig>,
+  rootDir: string,
+): void => {
+  const visited = new Set<string>();
+  const recursionStack = new Set<string>();
+
+  for (const [appPath, config] of allConfigs) {
+    if (
+      hasCircularDependency(
+        appPath,
+        allConfigs,
+        rootDir,
+        visited,
+        recursionStack,
+      )
+    ) {
+      throw new Error(
+        `Circular dependency detected involving: ${config.app.name}`,
+      );
+    }
+  }
+};
+
+const hasCircularDependency = (
+  appPath: string,
+  allConfigs: Map<string, LocalConfig>,
+  rootDir: string,
+  visited: Set<string>,
+  recursionStack: Set<string>,
+): boolean => {
+  if (recursionStack.has(appPath)) {
+    return true;
+  }
+
+  if (visited.has(appPath)) {
+    return false;
+  }
+
+  visited.add(appPath);
+  recursionStack.add(appPath);
+
+  const config = allConfigs.get(appPath);
+  if (config) {
+    const dependencies = config.app.depends_on;
+
+    for (const dep of dependencies) {
+      const depPath = join(rootDir, dep);
+      if (
+        hasCircularDependency(
+          depPath,
+          allConfigs,
+          rootDir,
+          visited,
+          recursionStack,
+        )
+      ) {
+        return true;
+      }
+    }
+  }
+
+  recursionStack.delete(appPath);
+  return false;
+};

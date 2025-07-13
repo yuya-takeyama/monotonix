@@ -6,6 +6,7 @@ describe('filterJobsByGitHubContext', () => {
   const pushMainJob: Job = {
     app: {
       name: 'hello-world',
+      depends_on: [],
     },
     context: {
       dedupe_key: 'refs/heads/main',
@@ -41,6 +42,7 @@ describe('filterJobsByGitHubContext', () => {
   const pullRequestJob: Job = {
     app: {
       name: 'hello-world',
+      depends_on: [],
     },
     context: {
       dedupe_key: 'pr-1',
@@ -70,6 +72,7 @@ describe('filterJobsByGitHubContext', () => {
   const pullRequestTargetJob: Job = {
     app: {
       name: 'hello-world',
+      depends_on: [],
     },
     context: {
       dedupe_key: 'pr-1',

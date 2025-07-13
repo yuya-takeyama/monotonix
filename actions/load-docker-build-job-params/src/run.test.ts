@@ -29,6 +29,7 @@ describe('run', () => {
   const stubJob: InputJob = {
     app: {
       name: 'hello-world',
+      depends_on: [],
     },
     context: {
       dedupe_key: 'refs/heads/main',

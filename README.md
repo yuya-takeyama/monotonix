@@ -172,6 +172,8 @@ jobs:
           required-config-keys: 'docker_build'
       - if: ${{ github.event_name == 'pull_request' }}
         uses: yuya-takeyama/monotonix/actions/filter-jobs-by-changed-files@main
+        with:
+          root-dir: apps
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::YOUR-ACCOUNT:role/monotonix-state-manager
@@ -346,6 +348,8 @@ Monotonix is designed to be extensible beyond Docker builds. You can define any 
              required-config-keys: 'my_job_type' # Filter for your job type
          - if: ${{ github.event_name == 'pull_request' }}
            uses: yuya-takeyama/monotonix/actions/filter-jobs-by-changed-files@main
+           with:
+             root-dir: apps
          # ... state management steps (AWS credentials, DynamoDB filtering)
 
      execute:

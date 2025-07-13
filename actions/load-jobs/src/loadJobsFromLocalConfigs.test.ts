@@ -23,6 +23,7 @@ describe('createJob', () => {
   const stubLocalConfig: LocalConfig = {
     app: {
       name: 'test-app',
+      depends_on: [],
     },
     jobs: {
       job1: stubJob,
@@ -52,6 +53,7 @@ describe('createJob', () => {
     const expected: Job = {
       app: {
         name: 'test-app',
+        depends_on: [],
       },
       context: {
         dedupe_key: stubEvent.ref,
@@ -105,6 +107,7 @@ describe('createJob', () => {
     const expected: Job = {
       app: {
         name: 'test-app',
+        depends_on: [],
       },
       context: {
         dedupe_key: stubEvent.ref,
