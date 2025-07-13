@@ -137,4 +137,4 @@ out
 .pnp.*
 
 # Claude Code
-.claude
+**/.claude/settings.local.json
