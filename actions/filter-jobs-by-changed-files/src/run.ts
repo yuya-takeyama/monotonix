@@ -1,9 +1,13 @@
 import { Jobs } from '@monotonix/schema';
 import { getOctokit, context } from '@actions/github';
+import { 
+  loadAllAppConfigs, 
+  getAffectedAppsFromChangedFiles, 
+  propagateAppDependencies 
+} from './loadAllAppConfigs';
 
 /**
- * ファイル変更に基づいてジョブをフィルタリング
- * 依存関係の考慮は load-jobs の effective timestamp で行われる
+ * ファイル変更に基づいてジョブをフィルタリング（依存関係考慮）
  */
 const filterJobsByChangedFiles = (changedFiles: string[], jobs: Jobs): Jobs => {
   console.log('🔍 [DEBUG] filterJobsByChangedFiles starting');
@@ -14,26 +18,22 @@ const filterJobsByChangedFiles = (changedFiles: string[], jobs: Jobs): Jobs => {
     job_key: j.context.job_key
   })));
 
-  // app_pathからアプリ名へのマッピングを作成（パス長順でソート、長い方が優先）
-  const appPathEntries = Array.from(
-    new Map(jobs.map(job => [job.context.app_path, job.app.name])).entries()
-  ).sort(([a], [b]) => b.length - a.length);
+  // 1. すべてのアプリ設定を独立して読み込み
+  const allAppConfigs = loadAllAppConfigs('apps');
 
-  // 変更ファイルから影響を受けるアプリを特定（最長一致）
-  const affectedApps = new Set<string>();
-  for (const file of changedFiles) {
-    for (const [appPath, appName] of appPathEntries) {
-      if (file.startsWith(appPath + '/') || file === appPath) {
-        affectedApps.add(appName);
-        break; // 最初にマッチしたもの（最も長いパス）を使用
-      }
-    }
-  }
+  // 2. ファイル変更からアプリを特定（完全なアプリ設定を使用）
+  const directlyAffectedApps = getAffectedAppsFromChangedFiles(
+    changedFiles,
+    allAppConfigs,
+  );
+  console.log('🔍 [DEBUG] directlyAffectedApps:', directlyAffectedApps);
 
-  console.log('🔍 [DEBUG] affectedApps:', Array.from(affectedApps));
+  // 3. 依存関係を考慮してアプリリストを拡張（完全な依存関係マップを使用）
+  const allAffectedApps = propagateAppDependencies(directlyAffectedApps, allAppConfigs);
+  console.log('🔍 [DEBUG] allAffectedApps after propagation:', allAffectedApps);
 
-  // 影響を受けるアプリのジョブのみフィルタ
-  const filteredJobs = jobs.filter(job => affectedApps.has(job.app.name));
+  // 4. 影響を受けるアプリのジョブのみフィルタ（提供されたジョブの中から）
+  const filteredJobs = jobs.filter(job => allAffectedApps.includes(job.app.name));
   console.log('🔍 [DEBUG] filteredJobs:', filteredJobs.map(j => ({ 
     name: j.app.name, 
     job_key: j.context.job_key 
