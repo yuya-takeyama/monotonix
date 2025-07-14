@@ -1,5 +1,6 @@
 import { Job, LocalConfig, LocalConfigJob } from '@monotonix/schema';
-import { createJob, extractAppLabel } from './loadJobsFromLocalConfigs';
+import { extractAppLabel } from '@monotonix/utils';
+import { createJob } from './loadJobsFromLocalConfigs';
 import { Event } from './schema';
 
 describe('extractAppLabel', () => {

@@ -1,15 +1,8 @@
 import { Context } from '@actions/github/lib/context';
+import { extractAppLabel } from '@monotonix/utils';
 import { DateTime } from 'luxon';
 import { join } from 'path';
 import { DockerBuildGlobalConfig, InputJob } from './schema';
-
-export const extractAppLabel = (appPath: string, rootDir: string): string => {
-  if (appPath.startsWith(rootDir)) {
-    const relative = appPath.slice(rootDir.length);
-    return relative.startsWith('/') ? relative.slice(1) : relative;
-  }
-  return appPath;
-};
 
 type generateTagsType = {
   context: Context;

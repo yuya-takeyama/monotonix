@@ -96,6 +96,8 @@ IN THE SOFTWARE.
 @monotonix/schema
 MIT
 
+@monotonix/utils
+
 @octokit/auth-token
 MIT
 The MIT License

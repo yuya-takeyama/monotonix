@@ -41901,6 +41901,42 @@ exports.JobsSchema = zod_1.z.array(exports.JobSchema);
 
 /***/ }),
 
+/***/ 971:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.extractAppLabel = void 0;
+const extractAppLabel = (appPath, rootDir) => {
+    // Normalize rootDir to handle various input formats
+    // Convert empty string to current directory
+    const normalizedRootDir = rootDir === '' ? '.' : rootDir;
+    // Remove trailing slashes from rootDir
+    let cleanRootDir = normalizedRootDir.replace(/\/+$/, '');
+    // If rootDir is '.' or './', handle it specially
+    if (cleanRootDir === '.' || cleanRootDir === './') {
+        // appPath should be relative to current directory
+        return appPath.startsWith('./') ? appPath.slice(2) : appPath;
+    }
+    // Remove leading ./ from rootDir
+    if (cleanRootDir.startsWith('./')) {
+        cleanRootDir = cleanRootDir.slice(2);
+    }
+    // Check if appPath starts with the rootDir
+    if (appPath.startsWith(cleanRootDir)) {
+        const relative = appPath.slice(cleanRootDir.length);
+        // Remove leading slashes from the relative path
+        return relative.startsWith('/') ? relative.slice(1) : relative;
+    }
+    // If rootDir is not a prefix of appPath, return appPath as is
+    return appPath;
+};
+exports.extractAppLabel = extractAppLabel;
+//# sourceMappingURL=index.js.map
+
+/***/ }),
+
 /***/ 8374:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
@@ -41925,18 +41961,11 @@ function loadGlobalConfig(globalConfigFilePath) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.generateSemverDatetimeTag = exports.generateImageReferences = exports.extractAppLabel = void 0;
+exports.generateSemverDatetimeTag = exports.generateImageReferences = void 0;
 exports.getCommittedAt = getCommittedAt;
+const utils_1 = __nccwpck_require__(971);
 const luxon_1 = __nccwpck_require__(9888);
 const path_1 = __nccwpck_require__(6928);
-const extractAppLabel = (appPath, rootDir) => {
-    if (appPath.startsWith(rootDir)) {
-        const relative = appPath.slice(rootDir.length);
-        return relative.startsWith('/') ? relative.slice(1) : relative;
-    }
-    return appPath;
-};
-exports.extractAppLabel = extractAppLabel;
 const generateImageReferences = ({ context, globalConfig, inputJob, timezone, }) => {
     const registry = inputJob.configs.docker_build.registry;
     if (registry.type === 'aws') {
@@ -41947,12 +41976,12 @@ const generateImageReferences = ({ context, globalConfig, inputJob, timezone, })
         switch (inputJob.configs.docker_build.tagging) {
             case 'always_latest':
                 return [
-                    `${(0, path_1.join)(repository.base_url, (0, exports.extractAppLabel)(inputJob.context.app_path, inputJob.context.root_dir))}:latest`,
+                    `${(0, path_1.join)(repository.base_url, (0, utils_1.extractAppLabel)(inputJob.context.app_path, inputJob.context.root_dir))}:latest`,
                 ];
             case 'semver_datetime': {
                 const timestamp = getCommittedAt(context);
                 return [
-                    `${(0, path_1.join)(repository.base_url, (0, exports.extractAppLabel)(inputJob.context.app_path, inputJob.context.root_dir))}:${(0, exports.generateSemverDatetimeTag)(timestamp, timezone)}`,
+                    `${(0, path_1.join)(repository.base_url, (0, utils_1.extractAppLabel)(inputJob.context.app_path, inputJob.context.root_dir))}:${(0, exports.generateSemverDatetimeTag)(timestamp, timezone)}`,
                 ];
             }
             case 'pull_request':
@@ -41960,7 +41989,7 @@ const generateImageReferences = ({ context, globalConfig, inputJob, timezone, })
                     throw new Error(`Tagging strategy "pull_request" requires a pull request`);
                 }
                 return [
-                    `${(0, path_1.join)(repository.base_url, (0, exports.extractAppLabel)(inputJob.context.app_path, inputJob.context.root_dir))}:pr-${context.payload.pull_request.number}`,
+                    `${(0, path_1.join)(repository.base_url, (0, utils_1.extractAppLabel)(inputJob.context.app_path, inputJob.context.root_dir))}:pr-${context.payload.pull_request.number}`,
                 ];
             default:
                 throw new Error(`Unsupported tagging: ${inputJob.configs.docker_build.tagging} for environment: ${registry.type}`);

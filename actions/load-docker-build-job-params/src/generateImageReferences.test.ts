@@ -1,7 +1,5 @@
-import {
-  extractAppLabel,
-  generateSemverDatetimeTag,
-} from './generateImageReferences';
+import { extractAppLabel } from '@monotonix/utils';
+import { generateSemverDatetimeTag } from './generateImageReferences';
 
 describe('extractAppLabel', () => {
   it('removes root directory from app path', () => {

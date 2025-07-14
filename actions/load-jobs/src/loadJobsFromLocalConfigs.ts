@@ -7,18 +7,11 @@ import {
   LocalConfigJob,
   LocalConfigSchema,
 } from '@monotonix/schema';
+import { extractAppLabel } from '@monotonix/utils';
 import { globSync } from 'glob';
 import { load } from 'js-yaml';
 import { CommitInfo, getLastCommit } from './getLastCommit';
 import { Event } from './schema';
-
-export const extractAppLabel = (appPath: string, rootDir: string): string => {
-  if (appPath.startsWith(rootDir)) {
-    const relative = appPath.slice(rootDir.length);
-    return relative.startsWith('/') ? relative.slice(1) : relative;
-  }
-  return appPath;
-};
 
 type loadJobsFromLocalConfigFilesParams = {
   rootDir: string;

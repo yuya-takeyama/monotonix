@@ -34101,6 +34101,42 @@ exports.JobsSchema = zod_1.z.array(exports.JobSchema);
 
 /***/ }),
 
+/***/ 971:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.extractAppLabel = void 0;
+const extractAppLabel = (appPath, rootDir) => {
+    // Normalize rootDir to handle various input formats
+    // Convert empty string to current directory
+    const normalizedRootDir = rootDir === '' ? '.' : rootDir;
+    // Remove trailing slashes from rootDir
+    let cleanRootDir = normalizedRootDir.replace(/\/+$/, '');
+    // If rootDir is '.' or './', handle it specially
+    if (cleanRootDir === '.' || cleanRootDir === './') {
+        // appPath should be relative to current directory
+        return appPath.startsWith('./') ? appPath.slice(2) : appPath;
+    }
+    // Remove leading ./ from rootDir
+    if (cleanRootDir.startsWith('./')) {
+        cleanRootDir = cleanRootDir.slice(2);
+    }
+    // Check if appPath starts with the rootDir
+    if (appPath.startsWith(cleanRootDir)) {
+        const relative = appPath.slice(cleanRootDir.length);
+        // Remove leading slashes from the relative path
+        return relative.startsWith('/') ? relative.slice(1) : relative;
+    }
+    // If rootDir is not a prefix of appPath, return appPath as is
+    return appPath;
+};
+exports.extractAppLabel = extractAppLabel;
+//# sourceMappingURL=index.js.map
+
+/***/ }),
+
 /***/ 3935:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
@@ -34217,21 +34253,14 @@ exports.getLastCommit = getLastCommit;
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.calculateEffectiveTimestamp = exports.createJob = exports.loadJobsFromLocalConfigFiles = exports.extractAppLabel = void 0;
+exports.calculateEffectiveTimestamp = exports.createJob = exports.loadJobsFromLocalConfigFiles = void 0;
 const node_fs_1 = __nccwpck_require__(3024);
 const node_path_1 = __nccwpck_require__(6760);
 const schema_1 = __nccwpck_require__(67);
+const utils_1 = __nccwpck_require__(971);
 const glob_1 = __nccwpck_require__(447);
 const js_yaml_1 = __nccwpck_require__(677);
 const getLastCommit_1 = __nccwpck_require__(4815);
-const extractAppLabel = (appPath, rootDir) => {
-    if (appPath.startsWith(rootDir)) {
-        const relative = appPath.slice(rootDir.length);
-        return relative.startsWith('/') ? relative.slice(1) : relative;
-    }
-    return appPath;
-};
-exports.extractAppLabel = extractAppLabel;
 const loadJobsFromLocalConfigFiles = async ({ rootDir, dedupeKey, requiredConfigKeys, localConfigFileName, event, }) => {
     const pattern = (0, node_path_1.join)(rootDir, '**', localConfigFileName);
     const localConfigPaths = (0, glob_1.globSync)(pattern);
@@ -34280,7 +34309,7 @@ const createJob = ({ localConfig, dedupeKey, appPath, lastCommit, jobKey, job, e
         root_dir: rootDir,
         job_key: jobKey,
         last_commit: lastCommit,
-        label: `${(0, exports.extractAppLabel)(appPath, rootDir)} / ${jobKey}`,
+        label: `${(0, utils_1.extractAppLabel)(appPath, rootDir)} / ${jobKey}`,
     },
     params: {},
 });
@@ -34311,11 +34340,11 @@ const validateDependencies = (allConfigs, rootDir) => {
         const dependencies = config.app.depends_on;
         for (const dep of dependencies) {
             if (dep === appPath) {
-                throw new Error(`Self-dependency detected: ${(0, exports.extractAppLabel)(appPath, rootDir)} depends on itself`);
+                throw new Error(`Self-dependency detected: ${(0, utils_1.extractAppLabel)(appPath, rootDir)} depends on itself`);
             }
             // Dependencies now include root-dir
             if (!(0, node_fs_1.existsSync)(dep)) {
-                throw new Error(`Dependency path does not exist: ${dep} (required by ${(0, exports.extractAppLabel)(appPath, rootDir)})`);
+                throw new Error(`Dependency path does not exist: ${dep} (required by ${(0, utils_1.extractAppLabel)(appPath, rootDir)})`);
             }
         }
     }
@@ -34326,7 +34355,7 @@ const detectCircularDependencies = (allConfigs, rootDir) => {
     const recursionStack = new Set();
     for (const [appPath] of allConfigs) {
         if (hasCircularDependency(appPath, allConfigs, rootDir, visited, recursionStack)) {
-            throw new Error(`Circular dependency detected involving: ${(0, exports.extractAppLabel)(appPath, rootDir)}`);
+            throw new Error(`Circular dependency detected involving: ${(0, utils_1.extractAppLabel)(appPath, rootDir)}`);
         }
     }
 };
