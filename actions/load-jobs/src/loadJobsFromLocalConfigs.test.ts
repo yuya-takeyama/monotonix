@@ -1,30 +1,6 @@
 import { Job, LocalConfig, LocalConfigJob } from '@monotonix/schema';
-import { extractAppLabel } from '@monotonix/utils';
 import { createJob } from './loadJobsFromLocalConfigs';
 import { Event } from './schema';
-
-describe('extractAppLabel', () => {
-  it('removes root directory from app path', () => {
-    expect(extractAppLabel('apps/my-app', 'apps')).toBe('my-app');
-    expect(extractAppLabel('apps/backend/api', 'apps')).toBe('backend/api');
-  });
-
-  it('handles root directory with trailing slash', () => {
-    expect(extractAppLabel('apps/my-app', 'apps/')).toBe('my-app');
-  });
-
-  it('returns full path when not starting with root directory', () => {
-    expect(extractAppLabel('other/my-app', 'apps')).toBe('other/my-app');
-  });
-
-  it('handles empty root directory', () => {
-    expect(extractAppLabel('apps/my-app', '')).toBe('apps/my-app');
-  });
-
-  it('handles exact match of root directory', () => {
-    expect(extractAppLabel('apps', 'apps')).toBe('');
-  });
-});
 
 describe('createJob', () => {
   const stubEvent: Pick<Event, 'ref'> = {
