@@ -1,4 +1,5 @@
 import { Context } from '@actions/github/lib/context';
+import { extractAppLabel } from '@monotonix/utils';
 import { DateTime } from 'luxon';
 import { join } from 'path';
 import { DockerBuildGlobalConfig, InputJob } from './schema';
@@ -30,14 +31,19 @@ export const generateImageReferences = ({
 
     switch (inputJob.configs.docker_build.tagging) {
       case 'always_latest':
-        return [`${join(repository.base_url, inputJob.app.name)}:latest`];
+        return [
+          `${join(repository.base_url, extractAppLabel(inputJob.context.app_path, inputJob.context.root_dir))}:latest`,
+        ];
 
       case 'semver_datetime': {
         const timestamp = getCommittedAt(context);
         return [
           `${join(
             repository.base_url,
-            inputJob.app.name,
+            extractAppLabel(
+              inputJob.context.app_path,
+              inputJob.context.root_dir,
+            ),
           )}:${generateSemverDatetimeTag(timestamp, timezone)}`,
         ];
       }
@@ -50,7 +56,7 @@ export const generateImageReferences = ({
         }
 
         return [
-          `${join(repository.base_url, inputJob.app.name)}:pr-${context.payload.pull_request.number}`,
+          `${join(repository.base_url, extractAppLabel(inputJob.context.app_path, inputJob.context.root_dir))}:pr-${context.payload.pull_request.number}`,
         ];
 
       default:

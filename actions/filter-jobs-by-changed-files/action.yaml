@@ -7,9 +7,6 @@ inputs:
     default: ${{ github.token }}
   jobs:
     description: 'Jobs'
-  root-dir:
-    description: 'Root directory for dependency resolution'
-    required: true
 
 outputs:
   result:

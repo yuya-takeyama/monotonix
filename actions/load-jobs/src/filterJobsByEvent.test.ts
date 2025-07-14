@@ -5,13 +5,13 @@ import { Event } from './schema';
 describe('filterJobsByGitHubContext', () => {
   const pushMainJob: Job = {
     app: {
-      name: 'hello-world',
       depends_on: [],
     },
     context: {
       dedupe_key: 'refs/heads/main',
       github_ref: 'refs/heads/main',
       app_path: 'apps/hello-world',
+      root_dir: 'apps',
       job_key: 'job1',
       last_commit: {
         hash: '0000000000000000000000000000000000000000',
@@ -41,13 +41,13 @@ describe('filterJobsByGitHubContext', () => {
   };
   const pullRequestJob: Job = {
     app: {
-      name: 'hello-world',
       depends_on: [],
     },
     context: {
       dedupe_key: 'pr-1',
       github_ref: 'refs/pull/1/merge',
       app_path: 'apps/hello-world',
+      root_dir: 'apps',
       job_key: 'job1',
       last_commit: {
         hash: '0000000000000000000000000000000000000000',
@@ -71,13 +71,13 @@ describe('filterJobsByGitHubContext', () => {
   };
   const pullRequestTargetJob: Job = {
     app: {
-      name: 'hello-world',
       depends_on: [],
     },
     context: {
       dedupe_key: 'pr-1',
       github_ref: 'refs/heads/main',
       app_path: 'apps/hello-world',
+      root_dir: 'apps',
       job_key: 'job1',
       last_commit: {
         hash: '0000000000000000000000000000000000000000',

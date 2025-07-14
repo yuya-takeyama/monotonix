@@ -29928,13 +29928,13 @@ exports.GlobalConfigSchema = zod_1.z.object({
     job_types: zod_1.z.record(zod_1.z.string(), zod_1.z.object({}).passthrough()),
 });
 const AppSchema = zod_1.z.object({
-    name: zod_1.z.string(),
     depends_on: zod_1.z.array(zod_1.z.string()).optional().default([]),
 });
 const ContextSchema = zod_1.z.object({
     dedupe_key: zod_1.z.string(),
     github_ref: zod_1.z.string(),
     app_path: zod_1.z.string(),
+    root_dir: zod_1.z.string(),
     last_commit: zod_1.z.object({
         hash: zod_1.z.string(),
         timestamp: zod_1.z.number(),
@@ -29977,7 +29977,7 @@ const LocalConfigJobSchema = zod_1.z.object({
     configs: exports.JobConfigsSchema,
 });
 exports.LocalConfigSchema = zod_1.z.object({
-    app: AppSchema,
+    app: AppSchema.optional(),
     jobs: zod_1.z.record(zod_1.z.string(), LocalConfigJobSchema),
 });
 const JobParamsSchema = zod_1.z.object({}).catchall(zod_1.z.object({}).catchall(zod_1.z.any()));
@@ -30000,7 +30000,6 @@ exports.JobsSchema = zod_1.z.array(exports.JobSchema);
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.run = exports.getPathInfo = exports.jobMatchesChangedFiles = exports.resolveDependencyPaths = exports.matchesDependency = void 0;
-const node_path_1 = __nccwpck_require__(6760);
 const github_1 = __nccwpck_require__(5683);
 const fs_1 = __nccwpck_require__(9896);
 const matchesDependency = (filePath, pathInfo) => {
@@ -30014,10 +30013,11 @@ const matchesDependency = (filePath, pathInfo) => {
     }
 };
 exports.matchesDependency = matchesDependency;
-const resolveDependencyPaths = (dependencies, rootDir, getPathInfo) => {
+const resolveDependencyPaths = (dependencies, _rootDir, // No longer used - dependencies now include root-dir
+getPathInfo) => {
     return dependencies.map(dep => {
-        const depPath = (0, node_path_1.join)(rootDir, dep);
-        return getPathInfo(depPath);
+        // Dependencies now include root-dir, so use them directly
+        return getPathInfo(dep);
     });
 };
 exports.resolveDependencyPaths = resolveDependencyPaths;
@@ -30050,7 +30050,10 @@ const getPathInfo = (path) => {
     }
 };
 exports.getPathInfo = getPathInfo;
-const run = async ({ githubToken, jobs, rootDir, }) => {
+const run = async ({ githubToken, jobs }) => {
+    if (jobs.length === 0) {
+        return [];
+    }
     const octokit = (0, github_1.getOctokit)(githubToken);
     switch (github_1.context.eventName) {
         case 'pull_request':
@@ -30063,7 +30066,7 @@ const run = async ({ githubToken, jobs, rootDir, }) => {
             const changedFiles = files.map(file => file.filename);
             return jobs.filter(job => {
                 const dependencies = job.app.depends_on;
-                const dependencyPathInfos = (0, exports.resolveDependencyPaths)(dependencies, rootDir, exports.getPathInfo);
+                const dependencyPathInfos = (0, exports.resolveDependencyPaths)(dependencies, job.context.root_dir, exports.getPathInfo);
                 return (0, exports.jobMatchesChangedFiles)(job, changedFiles, dependencyPathInfos);
             });
         }
@@ -30076,7 +30079,7 @@ const run = async ({ githubToken, jobs, rootDir, }) => {
             const changedFiles = (commits.files || []).map(file => file.filename);
             return jobs.filter(job => {
                 const dependencies = job.app.depends_on;
-                const dependencyPathInfos = (0, exports.resolveDependencyPaths)(dependencies, rootDir, exports.getPathInfo);
+                const dependencyPathInfos = (0, exports.resolveDependencyPaths)(dependencies, job.context.root_dir, exports.getPathInfo);
                 return (0, exports.jobMatchesChangedFiles)(job, changedFiles, dependencyPathInfos);
             });
         }
@@ -30204,14 +30207,6 @@ module.exports = require("node:crypto");
 
 "use strict";
 module.exports = require("node:events");
-
-/***/ }),
-
-/***/ 6760:
-/***/ ((module) => {
-
-"use strict";
-module.exports = require("node:path");
 
 /***/ }),
 
@@ -45340,15 +45335,10 @@ const run_1 = __nccwpck_require__(4795);
         if (!jobsJson) {
             throw new Error('Input job or env $MONOTONIX_JOBS is required');
         }
-        const rootDir = (0, core_1.getInput)('root-dir');
-        if (!rootDir) {
-            throw new Error('Input root-dir is required');
-        }
         const jobs = schema_1.JobsSchema.parse(JSON.parse(jobsJson));
         const result = await (0, run_1.run)({
             githubToken,
             jobs,
-            rootDir,
         });
         (0, core_1.setOutput)('result', result);
         (0, core_1.exportVariable)('MONOTONIX_JOBS', result);

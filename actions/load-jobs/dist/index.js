@@ -34036,13 +34036,13 @@ exports.GlobalConfigSchema = zod_1.z.object({
     job_types: zod_1.z.record(zod_1.z.string(), zod_1.z.object({}).passthrough()),
 });
 const AppSchema = zod_1.z.object({
-    name: zod_1.z.string(),
     depends_on: zod_1.z.array(zod_1.z.string()).optional().default([]),
 });
 const ContextSchema = zod_1.z.object({
     dedupe_key: zod_1.z.string(),
     github_ref: zod_1.z.string(),
     app_path: zod_1.z.string(),
+    root_dir: zod_1.z.string(),
     last_commit: zod_1.z.object({
         hash: zod_1.z.string(),
         timestamp: zod_1.z.number(),
@@ -34085,7 +34085,7 @@ const LocalConfigJobSchema = zod_1.z.object({
     configs: exports.JobConfigsSchema,
 });
 exports.LocalConfigSchema = zod_1.z.object({
-    app: AppSchema,
+    app: AppSchema.optional(),
     jobs: zod_1.z.record(zod_1.z.string(), LocalConfigJobSchema),
 });
 const JobParamsSchema = zod_1.z.object({}).catchall(zod_1.z.object({}).catchall(zod_1.z.any()));
@@ -34097,6 +34097,33 @@ exports.JobSchema = zod_1.z.object({
     params: JobParamsSchema,
 });
 exports.JobsSchema = zod_1.z.array(exports.JobSchema);
+
+
+/***/ }),
+
+/***/ 971:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.extractAppLabel = void 0;
+const path_1 = __nccwpck_require__(6928);
+const extractAppLabel = (appPath, rootDir) => {
+    // Normalize both paths to handle various input formats
+    const normalizedRootDir = (0, path_1.normalize)(rootDir || '.');
+    const normalizedAppPath = (0, path_1.normalize)(appPath);
+    // Calculate relative path
+    const relativePath = (0, path_1.relative)(normalizedRootDir, normalizedAppPath);
+    // If the relative path starts with '..', it means appPath is outside rootDir
+    // This is likely a configuration error
+    if (relativePath.startsWith('..')) {
+        throw new Error(`appPath "${appPath}" is outside of rootDir "${rootDir}". ` +
+            `All app paths must be within the root directory.`);
+    }
+    return relativePath;
+};
+exports.extractAppLabel = extractAppLabel;
 
 
 /***/ }),
@@ -34221,10 +34248,25 @@ exports.calculateEffectiveTimestamp = exports.createJob = exports.loadJobsFromLo
 const node_fs_1 = __nccwpck_require__(3024);
 const node_path_1 = __nccwpck_require__(6760);
 const schema_1 = __nccwpck_require__(67);
+const utils_1 = __nccwpck_require__(971);
 const glob_1 = __nccwpck_require__(447);
 const js_yaml_1 = __nccwpck_require__(677);
 const getLastCommit_1 = __nccwpck_require__(4815);
 const loadJobsFromLocalConfigFiles = async ({ rootDir, dedupeKey, requiredConfigKeys, localConfigFileName, event, }) => {
+    const allConfigs = await loadAllLocalConfigs(rootDir, localConfigFileName);
+    validateDependencies(allConfigs, rootDir);
+    const jobs = await createJobsFromConfigs(allConfigs, {
+        dedupeKey,
+        event,
+        rootDir,
+        localConfigFileName,
+    });
+    return jobs
+        .flat()
+        .filter(job => requiredConfigKeys.every(key => key in job.configs));
+};
+exports.loadJobsFromLocalConfigFiles = loadJobsFromLocalConfigFiles;
+const loadAllLocalConfigs = async (rootDir, localConfigFileName) => {
     const pattern = (0, node_path_1.join)(rootDir, '**', localConfigFileName);
     const localConfigPaths = (0, glob_1.globSync)(pattern);
     const allConfigs = new Map();
@@ -34235,92 +34277,94 @@ const loadJobsFromLocalConfigFiles = async ({ rootDir, dedupeKey, requiredConfig
             allConfigs.set((0, node_path_1.dirname)(localConfigPath), localConfig);
         }
         catch (err) {
-            throw new Error(`Failed to load local config: ${localConfigPath}: ${err}`);
+            throw new Error(`Failed to parse ${localConfigPath}: ${err instanceof Error ? err.message : String(err)}`);
         }
     }
-    validateDependencies(allConfigs, rootDir);
-    const jobs = await Promise.all(Array.from(allConfigs.entries()).map(async ([appPath, localConfig]) => {
+    return allConfigs;
+};
+const createJobsFromConfigs = async (allConfigs, context) => {
+    return Promise.all(Array.from(allConfigs.entries()).map(async ([appPath, localConfig]) => {
         try {
-            const lastCommit = await (0, exports.calculateEffectiveTimestamp)(appPath, localConfig.app.depends_on, rootDir);
+            const lastCommit = await (0, exports.calculateEffectiveTimestamp)(appPath, localConfig.app?.depends_on || []);
             return Object.entries(localConfig.jobs).map(([jobKey, job]) => (0, exports.createJob)({
                 localConfig,
-                dedupeKey,
                 appPath,
                 lastCommit,
                 jobKey,
                 job,
-                event,
+                ...context,
             }));
         }
         catch (err) {
-            throw new Error(`Failed to load local config: ${(0, node_path_1.join)(appPath, localConfigFileName)}: ${err}`);
+            const configPath = (0, node_path_1.join)(appPath, context.localConfigFileName);
+            throw new Error(`Failed to process ${configPath}: ${err instanceof Error ? err.message : String(err)}`);
         }
     }));
-    return jobs
-        .flat()
-        .filter(job => requiredConfigKeys.every(key => key in job.configs));
 };
-exports.loadJobsFromLocalConfigFiles = loadJobsFromLocalConfigFiles;
-const createJob = ({ localConfig, dedupeKey, appPath, lastCommit, jobKey, job, event, }) => ({
+const createJob = ({ localConfig, dedupeKey, appPath, lastCommit, jobKey, job, event, rootDir, }) => ({
     ...job,
-    app: localConfig.app,
+    app: localConfig.app || { depends_on: [] },
     context: {
         dedupe_key: dedupeKey,
         github_ref: event.ref,
         app_path: appPath,
+        root_dir: rootDir,
         job_key: jobKey,
         last_commit: lastCommit,
-        label: `${localConfig.app.name} / ${jobKey}`,
+        label: `${(0, utils_1.extractAppLabel)(appPath, rootDir)} / ${jobKey}`,
     },
     params: {},
 });
 exports.createJob = createJob;
-const calculateEffectiveTimestamp = async (appPath, dependencies, rootDir) => {
+const calculateEffectiveTimestamp = async (appPath, dependencies) => {
     const appCommit = await (0, getLastCommit_1.getLastCommit)(appPath);
-    const timestamps = [appCommit.timestamp];
-    const commitInfos = [appCommit];
-    for (const dep of dependencies) {
-        if (dep === appPath) {
-            continue;
-        }
-        const depPath = (0, node_path_1.join)(rootDir, dep);
-        if (!(0, node_fs_1.existsSync)(depPath)) {
-            throw new Error(`Dependency path does not exist: ${depPath}`);
-        }
-        const depCommit = await (0, getLastCommit_1.getLastCommit)(depPath);
-        timestamps.push(depCommit.timestamp);
-        commitInfos.push(depCommit);
+    // Skip if no dependencies
+    if (dependencies.length === 0) {
+        return appCommit;
     }
-    const maxTimestamp = Math.max(...timestamps);
-    const maxCommitInfo = commitInfos.find(commit => commit.timestamp === maxTimestamp);
-    return maxCommitInfo || appCommit;
+    // Get commit info for all dependencies in parallel
+    const dependencyCommits = await Promise.all(dependencies
+        .filter(dep => dep !== appPath) // Skip self-dependency
+        .map(async (dep) => {
+        if (!(0, node_fs_1.existsSync)(dep)) {
+            throw new Error(`Dependency path does not exist: ${dep}`);
+        }
+        return (0, getLastCommit_1.getLastCommit)(dep);
+    }));
+    // Find the most recent commit among app and all dependencies
+    const allCommits = [appCommit, ...dependencyCommits];
+    const maxTimestamp = Math.max(...allCommits.map(c => c.timestamp));
+    return (allCommits.find(commit => commit.timestamp === maxTimestamp) || appCommit);
 };
 exports.calculateEffectiveTimestamp = calculateEffectiveTimestamp;
 const validateDependencies = (allConfigs, rootDir) => {
+    // First pass: validate individual dependencies
     for (const [appPath, config] of allConfigs) {
-        const dependencies = config.app.depends_on;
+        const appLabel = (0, utils_1.extractAppLabel)(appPath, rootDir);
+        const dependencies = config.app?.depends_on || [];
         for (const dep of dependencies) {
             if (dep === appPath) {
-                throw new Error(`Self-dependency detected: ${config.app.name} depends on itself`);
+                throw new Error(`Self-dependency detected: "${appLabel}" cannot depend on itself`);
             }
-            const depPath = (0, node_path_1.join)(rootDir, dep);
-            if (!(0, node_fs_1.existsSync)(depPath)) {
-                throw new Error(`Dependency path does not exist: ${depPath} (required by ${config.app.name})`);
+            if (!(0, node_fs_1.existsSync)(dep)) {
+                throw new Error(`Dependency "${dep}" does not exist (required by "${appLabel}")`);
             }
         }
     }
+    // Second pass: detect circular dependencies
     detectCircularDependencies(allConfigs, rootDir);
 };
 const detectCircularDependencies = (allConfigs, rootDir) => {
     const visited = new Set();
     const recursionStack = new Set();
-    for (const [appPath, config] of allConfigs) {
-        if (hasCircularDependency(appPath, allConfigs, rootDir, visited, recursionStack)) {
-            throw new Error(`Circular dependency detected involving: ${config.app.name}`);
+    for (const [appPath] of allConfigs) {
+        if (hasCircularDependency(appPath, allConfigs, visited, recursionStack)) {
+            const appLabel = (0, utils_1.extractAppLabel)(appPath, rootDir);
+            throw new Error(`Circular dependency detected involving "${appLabel}"`);
         }
     }
 };
-const hasCircularDependency = (appPath, allConfigs, rootDir, visited, recursionStack) => {
+const hasCircularDependency = (appPath, allConfigs, visited, recursionStack) => {
     if (recursionStack.has(appPath)) {
         return true;
     }
@@ -34331,10 +34375,9 @@ const hasCircularDependency = (appPath, allConfigs, rootDir, visited, recursionS
     recursionStack.add(appPath);
     const config = allConfigs.get(appPath);
     if (config) {
-        const dependencies = config.app.depends_on;
+        const dependencies = config.app?.depends_on || [];
         for (const dep of dependencies) {
-            const depPath = (0, node_path_1.join)(rootDir, dep);
-            if (hasCircularDependency(depPath, allConfigs, rootDir, visited, recursionStack)) {
+            if (hasCircularDependency(dep, allConfigs, visited, recursionStack)) {
                 return true;
             }
         }

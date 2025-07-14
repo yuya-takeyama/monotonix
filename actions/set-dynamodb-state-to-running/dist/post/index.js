@@ -54701,13 +54701,13 @@ exports.GlobalConfigSchema = zod_1.z.object({
     job_types: zod_1.z.record(zod_1.z.string(), zod_1.z.object({}).passthrough()),
 });
 const AppSchema = zod_1.z.object({
-    name: zod_1.z.string(),
     depends_on: zod_1.z.array(zod_1.z.string()).optional().default([]),
 });
 const ContextSchema = zod_1.z.object({
     dedupe_key: zod_1.z.string(),
     github_ref: zod_1.z.string(),
     app_path: zod_1.z.string(),
+    root_dir: zod_1.z.string(),
     last_commit: zod_1.z.object({
         hash: zod_1.z.string(),
         timestamp: zod_1.z.number(),
@@ -54750,7 +54750,7 @@ const LocalConfigJobSchema = zod_1.z.object({
     configs: exports.JobConfigsSchema,
 });
 exports.LocalConfigSchema = zod_1.z.object({
-    app: AppSchema,
+    app: AppSchema.optional(),
     jobs: zod_1.z.record(zod_1.z.string(), LocalConfigJobSchema),
 });
 const JobParamsSchema = zod_1.z.object({}).catchall(zod_1.z.object({}).catchall(zod_1.z.any()));

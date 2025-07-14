@@ -111,7 +111,7 @@ describe('resolveDependencyPaths', () => {
   };
 
   it('resolves dependency paths correctly', () => {
-    const dependencies = ['shared', 'go.mod', 'package.json'];
+    const dependencies = ['apps/shared', 'apps/go.mod', 'apps/package.json'];
     const result = resolveDependencyPaths(
       dependencies,
       'apps',
@@ -137,13 +137,13 @@ describe('jobMatchesChangedFiles', () => {
     dependencies: string[] = [],
   ): Job => ({
     app: {
-      name: 'test-app',
       depends_on: dependencies,
     },
     context: {
       dedupe_key: 'test',
       github_ref: 'refs/heads/main',
       app_path: appPath,
+      root_dir: 'apps',
       job_key: 'build',
       last_commit: { hash: 'abc123', timestamp: 123456 },
       label: 'test-app / build',
@@ -174,7 +174,7 @@ describe('jobMatchesChangedFiles', () => {
   });
 
   it('matches when dependency files change', () => {
-    const job = createTestJob('apps/foo', ['shared', 'go.mod']);
+    const job = createTestJob('apps/foo', ['apps/shared', 'apps/go.mod']);
     const changedFiles = ['apps/shared/utils.go', 'apps/go.mod'];
     const dependencyPathInfos: PathInfo[] = [
       { path: 'apps/shared', isDirectory: true },
@@ -187,7 +187,7 @@ describe('jobMatchesChangedFiles', () => {
   });
 
   it('does not match when no relevant files change', () => {
-    const job = createTestJob('apps/foo', ['shared']);
+    const job = createTestJob('apps/foo', ['apps/shared']);
     const changedFiles = ['apps/bar/main.go', 'README.md'];
     const dependencyPathInfos: PathInfo[] = [
       { path: 'apps/shared', isDirectory: true },
@@ -200,8 +200,8 @@ describe('jobMatchesChangedFiles', () => {
 
   it('matches exact file dependencies', () => {
     const job = createTestJob('apps/web-app/cmd/api-server', [
-      'web-app/go.mod',
-      'web-app/go.sum',
+      'apps/web-app/go.mod',
+      'apps/web-app/go.sum',
     ]);
     const changedFiles = ['apps/web-app/go.mod'];
     const dependencyPathInfos: PathInfo[] = [
@@ -216,7 +216,7 @@ describe('jobMatchesChangedFiles', () => {
 
   it('does not match partial file paths', () => {
     const job = createTestJob('apps/web-app/cmd/api-server', [
-      'web-app/go.mod',
+      'apps/web-app/go.mod',
     ]);
     const changedFiles = ['apps/web-app/go.mod.backup'];
     const dependencyPathInfos: PathInfo[] = [

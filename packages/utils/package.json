@@ -1,0 +1,17 @@
+{
+  "name": "@monotonix/utils",
+  "version": "0.1.0",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "jest"
+  },
+  "devDependencies": {
+    "@types/jest": "30.0.0",
+    "@types/node": "22.16.3",
+    "jest": "30.0.4",
+    "ts-jest": "29.4.0",
+    "typescript": "5.8.3"
+  }
+}
