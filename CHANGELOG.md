@@ -1,5 +1,16 @@
 # Change Log
 
+## [0.0.4] - 2025-07-14
+
+### Added
+
+- `/publish-release` command with remote branch support [#131](https://github.com/yuya-takeyama/monotonix/pull/131)
+- shfmt for shell script formatting [#132](https://github.com/yuya-takeyama/monotonix/pull/132)
+
+### Changed
+
+- Remove `app.name` config requirement and `root-dir` input from `filter-jobs-by-changed-files` action [#133](https://github.com/yuya-takeyama/monotonix/pull/133)
+
 ## [0.0.3] - 2025-07-13
 
 ### Added
