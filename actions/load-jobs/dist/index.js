@@ -34285,7 +34285,7 @@ const createJob = ({ localConfig, dedupeKey, appPath, lastCommit, jobKey, job, e
     params: {},
 });
 exports.createJob = createJob;
-const calculateEffectiveTimestamp = async (appPath, dependencies, rootDir) => {
+const calculateEffectiveTimestamp = async (appPath, dependencies, _rootDir) => {
     const appCommit = await (0, getLastCommit_1.getLastCommit)(appPath);
     const timestamps = [appCommit.timestamp];
     const commitInfos = [appCommit];
