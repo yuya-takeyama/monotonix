@@ -9,9 +9,12 @@ export const extractAppLabel = (appPath: string, rootDir: string): string => {
   const relativePath = relative(normalizedRootDir, normalizedAppPath);
 
   // If the relative path starts with '..', it means appPath is outside rootDir
-  // In this case, return the original appPath
+  // This is likely a configuration error
   if (relativePath.startsWith('..')) {
-    return normalizedAppPath;
+    throw new Error(
+      `appPath "${appPath}" is outside of rootDir "${rootDir}". ` +
+        `All app paths must be within the root directory.`,
+    );
   }
 
   return relativePath;

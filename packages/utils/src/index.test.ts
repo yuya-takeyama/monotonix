@@ -53,11 +53,13 @@ describe('extractAppLabel', () => {
 
   describe('when appPath does not start with rootDir', () => {
     test.each([
-      ['services', 'apps/echo', 'apps/echo'],
-      ['./services', 'apps/echo', 'apps/echo'],
-      ['apps/sub', 'apps/other/app1', 'apps/other/app1'],
-    ])('rootDir="%s", appPath="%s" -> "%s"', (rootDir, appPath, expected) => {
-      expect(extractAppLabel(appPath, rootDir)).toBe(expected);
+      ['services', 'apps/echo'],
+      ['./services', 'apps/echo'],
+      ['apps/sub', 'apps/other/app1'],
+    ])('rootDir="%s", appPath="%s" throws error', (rootDir, appPath) => {
+      expect(() => extractAppLabel(appPath, rootDir)).toThrow(
+        `appPath "${appPath}" is outside of rootDir "${rootDir}". All app paths must be within the root directory.`,
+      );
     });
   });
 });
