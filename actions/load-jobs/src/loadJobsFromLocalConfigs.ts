@@ -83,7 +83,7 @@ const createJobsFromConfigs = async (
       try {
         const lastCommit = await calculateEffectiveTimestamp(
           appPath,
-          localConfig.app.depends_on,
+          localConfig.app?.depends_on || [],
         );
 
         return Object.entries(localConfig.jobs).map(
@@ -129,7 +129,7 @@ export const createJob = ({
   rootDir,
 }: CreateJobOptions): Job => ({
   ...job,
-  app: localConfig.app,
+  app: localConfig.app || { depends_on: [] },
   context: {
     dedupe_key: dedupeKey,
     github_ref: event.ref,
@@ -181,7 +181,7 @@ const validateDependencies = (
   // First pass: validate individual dependencies
   for (const [appPath, config] of allConfigs) {
     const appLabel = extractAppLabel(appPath, rootDir);
-    const dependencies = config.app.depends_on || [];
+    const dependencies = config.app?.depends_on || [];
 
     for (const dep of dependencies) {
       if (dep === appPath) {
@@ -236,7 +236,7 @@ const hasCircularDependency = (
 
   const config = allConfigs.get(appPath);
   if (config) {
-    const dependencies = config.app.depends_on || [];
+    const dependencies = config.app?.depends_on || [];
 
     for (const dep of dependencies) {
       if (hasCircularDependency(dep, allConfigs, visited, recursionStack)) {

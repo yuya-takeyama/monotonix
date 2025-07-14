@@ -34085,7 +34085,7 @@ const LocalConfigJobSchema = zod_1.z.object({
     configs: exports.JobConfigsSchema,
 });
 exports.LocalConfigSchema = zod_1.z.object({
-    app: AppSchema,
+    app: AppSchema.optional(),
     jobs: zod_1.z.record(zod_1.z.string(), LocalConfigJobSchema),
 });
 const JobParamsSchema = zod_1.z.object({}).catchall(zod_1.z.object({}).catchall(zod_1.z.any()));
@@ -34294,7 +34294,7 @@ const loadAllLocalConfigs = async (rootDir, localConfigFileName) => {
 const createJobsFromConfigs = async (allConfigs, context) => {
     return Promise.all(Array.from(allConfigs.entries()).map(async ([appPath, localConfig]) => {
         try {
-            const lastCommit = await (0, exports.calculateEffectiveTimestamp)(appPath, localConfig.app.depends_on);
+            const lastCommit = await (0, exports.calculateEffectiveTimestamp)(appPath, localConfig.app?.depends_on || []);
             return Object.entries(localConfig.jobs).map(([jobKey, job]) => (0, exports.createJob)({
                 localConfig,
                 appPath,
@@ -34312,7 +34312,7 @@ const createJobsFromConfigs = async (allConfigs, context) => {
 };
 const createJob = ({ localConfig, dedupeKey, appPath, lastCommit, jobKey, job, event, rootDir, }) => ({
     ...job,
-    app: localConfig.app,
+    app: localConfig.app || { depends_on: [] },
     context: {
         dedupe_key: dedupeKey,
         github_ref: event.ref,
@@ -34350,7 +34350,7 @@ const validateDependencies = (allConfigs, rootDir) => {
     // First pass: validate individual dependencies
     for (const [appPath, config] of allConfigs) {
         const appLabel = (0, utils_1.extractAppLabel)(appPath, rootDir);
-        const dependencies = config.app.depends_on || [];
+        const dependencies = config.app?.depends_on || [];
         for (const dep of dependencies) {
             if (dep === appPath) {
                 throw new Error(`Self-dependency detected: "${appLabel}" cannot depend on itself`);
@@ -34384,7 +34384,7 @@ const hasCircularDependency = (appPath, allConfigs, visited, recursionStack) => 
     recursionStack.add(appPath);
     const config = allConfigs.get(appPath);
     if (config) {
-        const dependencies = config.app.depends_on || [];
+        const dependencies = config.app?.depends_on || [];
         for (const dep of dependencies) {
             if (hasCircularDependency(dep, allConfigs, visited, recursionStack)) {
                 return true;

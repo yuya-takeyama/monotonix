@@ -131,4 +131,57 @@ describe('createJob', () => {
 
     expect(result).toEqual(expected);
   });
+
+  it('handles missing app field by providing default values', () => {
+    const appPath = 'apps/test-app';
+    const rootDir = 'apps';
+    const jobKey = 'job1';
+
+    const localConfigWithoutApp: LocalConfig = {
+      // app field is omitted
+      jobs: {
+        job1: stubJob,
+      },
+    };
+
+    const result = createJob({
+      localConfig: localConfigWithoutApp,
+      dedupeKey: stubEvent.ref,
+      appPath,
+      lastCommit: stubCommitInfo,
+      jobKey,
+      job: stubJob,
+      event: stubEvent as Event,
+      rootDir,
+    });
+
+    const expected: Job = {
+      app: {
+        depends_on: [],
+      },
+      context: {
+        dedupe_key: stubEvent.ref,
+        github_ref: stubEvent.ref,
+        app_path: appPath,
+        root_dir: rootDir,
+        job_key: jobKey,
+        last_commit: stubCommitInfo,
+        label: 'test-app / job1',
+      },
+      on: {
+        push: {
+          branches: ['main'],
+        },
+      },
+      configs: {
+        generic: {
+          foo: 'FOO',
+        },
+      },
+      params: {},
+    };
+
+    expect(result).toEqual(expected);
+    expect(result.app.depends_on).toEqual([]);
+  });
 });
