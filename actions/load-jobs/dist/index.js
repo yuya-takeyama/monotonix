@@ -34293,11 +34293,11 @@ const calculateEffectiveTimestamp = async (appPath, dependencies, rootDir) => {
         if (dep === appPath) {
             continue;
         }
-        const depPath = (0, node_path_1.join)(rootDir, dep);
-        if (!(0, node_fs_1.existsSync)(depPath)) {
-            throw new Error(`Dependency path does not exist: ${depPath}`);
+        // Dependencies now include root-dir
+        if (!(0, node_fs_1.existsSync)(dep)) {
+            throw new Error(`Dependency path does not exist: ${dep}`);
         }
-        const depCommit = await (0, getLastCommit_1.getLastCommit)(depPath);
+        const depCommit = await (0, getLastCommit_1.getLastCommit)(dep);
         timestamps.push(depCommit.timestamp);
         commitInfos.push(depCommit);
     }
@@ -34313,9 +34313,9 @@ const validateDependencies = (allConfigs, rootDir) => {
             if (dep === appPath) {
                 throw new Error(`Self-dependency detected: ${(0, exports.extractAppLabel)(appPath, rootDir)} depends on itself`);
             }
-            const depPath = (0, node_path_1.join)(rootDir, dep);
-            if (!(0, node_fs_1.existsSync)(depPath)) {
-                throw new Error(`Dependency path does not exist: ${depPath} (required by ${(0, exports.extractAppLabel)(appPath, rootDir)})`);
+            // Dependencies now include root-dir
+            if (!(0, node_fs_1.existsSync)(dep)) {
+                throw new Error(`Dependency path does not exist: ${dep} (required by ${(0, exports.extractAppLabel)(appPath, rootDir)})`);
             }
         }
     }
@@ -34343,8 +34343,8 @@ const hasCircularDependency = (appPath, allConfigs, rootDir, visited, recursionS
     if (config) {
         const dependencies = config.app.depends_on;
         for (const dep of dependencies) {
-            const depPath = (0, node_path_1.join)(rootDir, dep);
-            if (hasCircularDependency(depPath, allConfigs, rootDir, visited, recursionStack)) {
+            // Dependencies now include root-dir
+            if (hasCircularDependency(dep, allConfigs, rootDir, visited, recursionStack)) {
                 return true;
             }
         }

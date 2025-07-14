@@ -67,6 +67,10 @@ Defines jobs for a specific application:
 ```yaml
 app:
   depends_on: [] # Optional: specify dependencies
+  # Example with dependencies:
+  # depends_on:
+  #   - apps/shared/lib    # Include root-dir in paths
+  #   - apps/common/utils
 jobs:
   job_name:
     on: # GitHub event triggers

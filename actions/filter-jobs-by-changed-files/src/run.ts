@@ -1,4 +1,3 @@
-import { join } from 'node:path';
 import { context, getOctokit } from '@actions/github';
 import { Job, Jobs } from '@monotonix/schema';
 import { statSync } from 'fs';
@@ -26,12 +25,12 @@ export type PathInfo = {
 
 export const resolveDependencyPaths = (
   dependencies: string[],
-  rootDir: string,
+  _rootDir: string, // No longer used - dependencies now include root-dir
   getPathInfo: (path: string) => PathInfo,
 ): PathInfo[] => {
   return dependencies.map(dep => {
-    const depPath = join(rootDir, dep);
-    return getPathInfo(depPath);
+    // Dependencies now include root-dir, so use them directly
+    return getPathInfo(dep);
   });
 };
 

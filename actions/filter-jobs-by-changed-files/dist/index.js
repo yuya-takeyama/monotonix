@@ -30000,7 +30000,6 @@ exports.JobsSchema = zod_1.z.array(exports.JobSchema);
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.run = exports.getPathInfo = exports.jobMatchesChangedFiles = exports.resolveDependencyPaths = exports.matchesDependency = void 0;
-const node_path_1 = __nccwpck_require__(6760);
 const github_1 = __nccwpck_require__(5683);
 const fs_1 = __nccwpck_require__(9896);
 const matchesDependency = (filePath, pathInfo) => {
@@ -30014,10 +30013,11 @@ const matchesDependency = (filePath, pathInfo) => {
     }
 };
 exports.matchesDependency = matchesDependency;
-const resolveDependencyPaths = (dependencies, rootDir, getPathInfo) => {
+const resolveDependencyPaths = (dependencies, _rootDir, // No longer used - dependencies now include root-dir
+getPathInfo) => {
     return dependencies.map(dep => {
-        const depPath = (0, node_path_1.join)(rootDir, dep);
-        return getPathInfo(depPath);
+        // Dependencies now include root-dir, so use them directly
+        return getPathInfo(dep);
     });
 };
 exports.resolveDependencyPaths = resolveDependencyPaths;
@@ -30207,14 +30207,6 @@ module.exports = require("node:crypto");
 
 "use strict";
 module.exports = require("node:events");
-
-/***/ }),
-
-/***/ 6760:
-/***/ ((module) => {
-
-"use strict";
-module.exports = require("node:path");
 
 /***/ }),
 

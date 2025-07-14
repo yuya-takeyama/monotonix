@@ -135,12 +135,12 @@ export const calculateEffectiveTimestamp = async (
       continue;
     }
 
-    const depPath = join(rootDir, dep);
-    if (!existsSync(depPath)) {
-      throw new Error(`Dependency path does not exist: ${depPath}`);
+    // Dependencies now include root-dir
+    if (!existsSync(dep)) {
+      throw new Error(`Dependency path does not exist: ${dep}`);
     }
 
-    const depCommit = await getLastCommit(depPath);
+    const depCommit = await getLastCommit(dep);
     timestamps.push(depCommit.timestamp);
     commitInfos.push(depCommit);
   }
@@ -167,10 +167,10 @@ const validateDependencies = (
         );
       }
 
-      const depPath = join(rootDir, dep);
-      if (!existsSync(depPath)) {
+      // Dependencies now include root-dir
+      if (!existsSync(dep)) {
         throw new Error(
-          `Dependency path does not exist: ${depPath} (required by ${extractAppLabel(appPath, rootDir)})`,
+          `Dependency path does not exist: ${dep} (required by ${extractAppLabel(appPath, rootDir)})`,
         );
       }
     }
@@ -226,15 +226,9 @@ const hasCircularDependency = (
     const dependencies = config.app.depends_on;
 
     for (const dep of dependencies) {
-      const depPath = join(rootDir, dep);
+      // Dependencies now include root-dir
       if (
-        hasCircularDependency(
-          depPath,
-          allConfigs,
-          rootDir,
-          visited,
-          recursionStack,
-        )
+        hasCircularDependency(dep, allConfigs, rootDir, visited, recursionStack)
       ) {
         return true;
       }
