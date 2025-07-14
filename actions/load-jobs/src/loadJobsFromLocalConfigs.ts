@@ -124,7 +124,7 @@ export const createJob = ({
 export const calculateEffectiveTimestamp = async (
   appPath: string,
   dependencies: string[],
-  rootDir: string,
+  _rootDir: string,
 ): Promise<CommitInfo> => {
   const appCommit = await getLastCommit(appPath);
   const timestamps: number[] = [appCommit.timestamp];
