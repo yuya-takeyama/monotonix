@@ -16,6 +16,14 @@ inputs:
     # - pull_request or pull_request_target: pr/{number}
     # - otherwise: github.ref (e.g. refs/heads/main)
     default: ${{ startsWith(github.event_name, 'pull_request') && format('pr/{0}', github.event.pull_request.number) || github.ref }}
+  local-config-file-name:
+    description: 'Local config file name'
+    required: false
+    default: 'monotonix.yaml'
+  global-config-file-path:
+    description: 'Global config file path for metadata validation schemas'
+    required: false
+    default: 'monotonix-global.yaml'
 
 outputs:
   result:
