@@ -328,6 +328,32 @@ export class MetadataValidator {
 }
 ```
 
+#### Update: `actions/load-jobs/src/config.ts`
+
+```typescript
+import { GlobalConfigSchema } from '@monotonix/schema';
+import { existsSync, readFileSync } from 'fs';
+import { load } from 'js-yaml';
+
+export function loadGlobalConfig(globalConfigFilePath: string) {
+  // If global config file doesn't exist, return minimal config for backward compatibility
+  if (!existsSync(globalConfigFilePath)) {
+    return { job_types: {} };
+  }
+
+  // If file exists, parse it and let errors propagate properly
+  // This ensures YAML syntax errors and schema validation errors are reported
+  const globalConfigContent = readFileSync(globalConfigFilePath, 'utf-8');
+  return GlobalConfigSchema.parse(load(globalConfigContent));
+}
+```
+
+**Important**: Don't suppress errors! The schema already handles backward compatibility:
+
+- `metadata_schemas` is optional - existing configs without it will validate fine
+- Only suppress missing file (for backward compatibility)
+- Report YAML syntax errors and schema validation errors properly
+
 #### Update: `actions/load-jobs/src/index.ts`
 
 ```typescript

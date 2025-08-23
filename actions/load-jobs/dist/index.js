@@ -40307,15 +40307,14 @@ const schema_1 = __nccwpck_require__(67);
 const fs_1 = __nccwpck_require__(9896);
 const js_yaml_1 = __nccwpck_require__(677);
 function loadGlobalConfig(globalConfigFilePath) {
-    try {
-        const globalConfigContent = (0, fs_1.readFileSync)(globalConfigFilePath, 'utf-8');
-        return schema_1.GlobalConfigSchema.parse((0, js_yaml_1.load)(globalConfigContent));
-    }
-    catch (_error) {
-        // If global config doesn't exist or is invalid, return minimal config
-        // This maintains backward compatibility
+    // If global config file doesn't exist, return minimal config for backward compatibility
+    if (!(0, fs_1.existsSync)(globalConfigFilePath)) {
         return { job_types: {} };
     }
+    // If file exists, parse it and let errors propagate properly
+    // This ensures YAML syntax errors and schema validation errors are reported
+    const globalConfigContent = (0, fs_1.readFileSync)(globalConfigFilePath, 'utf-8');
+    return schema_1.GlobalConfigSchema.parse((0, js_yaml_1.load)(globalConfigContent));
 }
 
 
