@@ -11,6 +11,8 @@
     "@actions/github": "6.0.1",
     "@monotonix/schema": "*",
     "@monotonix/utils": "*",
+    "ajv": "^8.12.0",
+    "ajv-formats": "^2.1.1",
     "glob": "11.0.3",
     "js-yaml": "^4.1.0",
     "minimatch": "10.0.3",

@@ -1,4 +1,8 @@
-import { GlobalConfigSchema, JobConfigsSchema } from './index';
+import {
+  GlobalConfigSchema,
+  JobConfigsSchema,
+  LocalConfigSchema,
+} from './index';
 
 describe('GlobalConfigSchema', () => {
   it('drops non-allowed keys', () => {
@@ -38,6 +42,48 @@ describe('GlobalConfigSchema', () => {
       expect(() => GlobalConfigSchema.parse(input)).toThrow(
         /expected object, received string/i,
       );
+    });
+  });
+
+  describe('metadata_schemas', () => {
+    it('accepts metadata schema definitions', () => {
+      const input = {
+        job_types: {},
+        metadata_schemas: {
+          app: {
+            type: 'object',
+            properties: {
+              team: { type: 'string' },
+              owner: { type: 'string' },
+            },
+          },
+          job: {
+            type: 'object',
+            properties: {
+              priority: { type: 'string' },
+            },
+          },
+        },
+      };
+      const result = GlobalConfigSchema.parse(input);
+      expect(result.metadata_schemas).toEqual(input.metadata_schemas);
+    });
+
+    it('accepts missing metadata_schemas', () => {
+      const input = {
+        job_types: {},
+      };
+      const result = GlobalConfigSchema.parse(input);
+      expect(result.metadata_schemas).toBeUndefined();
+    });
+
+    it('accepts empty metadata_schemas', () => {
+      const input = {
+        job_types: {},
+        metadata_schemas: {},
+      };
+      const result = GlobalConfigSchema.parse(input);
+      expect(result.metadata_schemas).toEqual({});
     });
   });
 
@@ -106,5 +152,90 @@ describe('GlobalConfigSchema', () => {
       };
       expect(() => JobConfigsSchema.parse(input)).toThrow(/expected object/i);
     });
+  });
+});
+
+describe('LocalConfigSchema - Metadata Support', () => {
+  it('accepts app metadata', () => {
+    const input = {
+      app: {
+        depends_on: [],
+        metadata: {
+          team: 'platform',
+          owner: '@yuya-takeyama',
+          tier: 1,
+          custom_field: 'any_value',
+        },
+      },
+      jobs: {},
+    };
+    const result = LocalConfigSchema.parse(input);
+    expect(result.app?.metadata).toEqual(input.app.metadata);
+  });
+
+  it('accepts job metadata', () => {
+    const input = {
+      jobs: {
+        build_prd: {
+          on: {
+            push: {
+              branches: ['main'],
+            },
+          },
+          configs: {
+            docker_build: {
+              registry: 'ecr',
+            },
+          },
+          metadata: {
+            priority: 'critical',
+            alert_on_failure: true,
+            retry_count: 3,
+          },
+        },
+      },
+    };
+    const result = LocalConfigSchema.parse(input);
+    expect(result.jobs.build_prd?.metadata).toEqual(
+      input.jobs.build_prd.metadata,
+    );
+  });
+
+  it('accepts missing metadata', () => {
+    const input = {
+      app: {
+        depends_on: [],
+      },
+      jobs: {
+        test: {
+          on: { push: { branches: ['main'] } },
+          configs: {},
+        },
+      },
+    };
+    const result = LocalConfigSchema.parse(input);
+    expect(result.app?.metadata).toBeUndefined();
+    expect(result.jobs.test?.metadata).toBeUndefined();
+  });
+
+  it('accepts any metadata structure', () => {
+    const input = {
+      app: {
+        depends_on: [],
+        metadata: {
+          nested: {
+            deeply: {
+              nested: 'value',
+            },
+          },
+          array: [1, 2, 3],
+          boolean: true,
+          number: 42,
+        },
+      },
+      jobs: {},
+    };
+    const result = LocalConfigSchema.parse(input);
+    expect(result.app?.metadata).toEqual(input.app.metadata);
   });
 });

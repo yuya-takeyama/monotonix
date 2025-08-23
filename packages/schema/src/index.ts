@@ -1,13 +1,24 @@
 import { z } from 'zod';
 
+// Metadata schema - completely flexible
+const MetadataSchema = z.record(z.string(), z.any());
+
 export const GlobalConfigSchema = z.object({
   job_types: z.record(z.string(), z.object({}).passthrough()),
+  // New: optional metadata schema definitions
+  metadata_schemas: z
+    .object({
+      app: z.record(z.string(), z.any()).optional(),
+      job: z.record(z.string(), z.any()).optional(),
+    })
+    .optional(),
 });
 
 export type GlobalConfig = z.infer<typeof GlobalConfigSchema>;
 
 const AppSchema = z.object({
   depends_on: z.array(z.string()).optional().default([]),
+  metadata: MetadataSchema.optional(), // New: optional app metadata
 });
 
 const ContextSchema = z.object({
@@ -65,6 +76,7 @@ export const JobConfigsSchema = z
 const LocalConfigJobSchema = z.object({
   on: JobEventSchema,
   configs: JobConfigsSchema,
+  metadata: MetadataSchema.optional(), // New: optional job metadata
 });
 
 export type LocalConfigJob = z.infer<typeof LocalConfigJobSchema>;
@@ -84,6 +96,7 @@ export const JobSchema = z.object({
   on: JobEventSchema,
   configs: JobConfigsSchema,
   params: JobParamsSchema,
+  metadata: MetadataSchema.optional(), // New: job metadata (from job definition)
 });
 
 export type Job = z.infer<typeof JobSchema>;
