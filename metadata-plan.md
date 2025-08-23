@@ -55,8 +55,7 @@
 ```
 actions/
 ├── load-jobs/              # メタデータの読み込みと検証を追加
-├── filter-jobs-by-*        # 既存のフィルター系action
-└── (new) filter-jobs-by-metadata/  # 新規作成予定
+└── filter-jobs-by-*        # 既存のフィルター系action
 
 packages/
 └── schema/                 # スキーマ定義の拡張
@@ -208,11 +207,11 @@ jobs:
 2. JSON Schema (AJV)による検証機能
 3. エラーハンドリングとメッセージ改善
 
-### Phase 3: Filtering Action (フィルタリング機能)
+### Phase 3: External Tool Support (外部ツール連携)
 
-1. `actions/filter-jobs-by-metadata`の新規作成
-2. JSONPathまたはlodashベースのフィルタリング
-3. 複雑なクエリのサポート
+1. メタデータを含むJobsのJSON出力
+2. 外部ツール（Ruby, Bash + jq等）での処理を想定
+3. 将来的な`monotonix-cli`への拡張性確保
 
 ### Phase 4: Testing & Documentation
 
@@ -362,111 +361,7 @@ const main = async () => {
 };
 ```
 
-### Step 3: Create Filter Action
-
-#### New Action: `actions/filter-jobs-by-metadata/`
-
-##### `action.yml`
-
-```yaml
-name: 'Filter Jobs by Metadata'
-description: 'Filter jobs based on metadata conditions'
-inputs:
-  jobs:
-    description: 'JSON string of jobs array'
-    required: true
-  filter:
-    description: 'JSON string of filter conditions'
-    required: false
-  query:
-    description: 'JSONPath query string'
-    required: false
-outputs:
-  jobs:
-    description: 'Filtered jobs as JSON string'
-runs:
-  using: 'node20'
-  main: 'dist/index.js'
-```
-
-##### `src/index.ts`
-
-```typescript
-import * as core from '@actions/core';
-import { Jobs, JobsSchema } from '@monotonix/schema';
-import { filterByMetadata } from './filterByMetadata';
-
-const main = async () => {
-  try {
-    const jobsInput = core.getInput('jobs', { required: true });
-    const filterInput = core.getInput('filter');
-    const queryInput = core.getInput('query');
-
-    const jobs = JobsSchema.parse(JSON.parse(jobsInput));
-
-    let filteredJobs: Jobs = jobs;
-
-    if (filterInput) {
-      const filter = JSON.parse(filterInput);
-      filteredJobs = filterByMetadata(jobs, filter);
-    } else if (queryInput) {
-      // JSONPath query support
-      filteredJobs = filterByQuery(jobs, queryInput);
-    }
-
-    core.setOutput('jobs', JSON.stringify(filteredJobs));
-  } catch (error) {
-    core.setFailed(`Action failed: ${error}`);
-  }
-};
-
-main();
-```
-
-##### `src/filterByMetadata.ts`
-
-```typescript
-import { Jobs } from '@monotonix/schema';
-import { get, isMatch } from 'lodash';
-
-export function filterByMetadata(
-  jobs: Jobs,
-  filter: Record<string, any>,
-): Jobs {
-  return jobs.filter(job => {
-    // Check app metadata
-    if (filter.app?.metadata) {
-      if (!job.app.metadata) return false;
-      if (!isMatch(job.app.metadata, filter.app.metadata)) return false;
-    }
-
-    // Check job metadata
-    if (filter.job?.metadata) {
-      if (!job.metadata) return false;
-      if (!isMatch(job.metadata, filter.job.metadata)) return false;
-    }
-
-    // Direct metadata check (backward compatibility)
-    if (filter.metadata) {
-      const combinedMetadata = {
-        ...job.app.metadata,
-        ...job.metadata,
-      };
-      if (!isMatch(combinedMetadata, filter.metadata)) return false;
-    }
-
-    return true;
-  });
-}
-
-export function filterByQuery(jobs: Jobs, query: string): Jobs {
-  // JSONPath implementation
-  // Example: $..[?(@.metadata.team == "platform")]
-  // Implementation details...
-}
-```
-
-### Step 4: Update Existing Actions
+### Step 3: Update Existing Actions
 
 #### `actions/load-jobs/src/loadJobsFromLocalConfigs.ts`
 
@@ -510,13 +405,7 @@ export const createJob = ({
    - Missing required fields detection
    - Additional properties handling
 
-2. **Filter Tests**
-   - Single field filtering
-   - Nested field filtering
-   - Multiple condition filtering
-   - JSONPath query tests
-
-3. **Integration Tests**
+2. **Integration Tests**
    - Full pipeline with metadata
    - Backward compatibility
    - Global config loading
@@ -550,66 +439,55 @@ describe('Metadata Schema', () => {
     expect(() => LocalConfigSchema.parse(config)).not.toThrow();
   });
 });
-
-// actions/filter-jobs-by-metadata/src/filterByMetadata.test.ts
-describe('filterByMetadata', () => {
-  it('should filter jobs by team', () => {
-    const jobs = [
-      { app: { metadata: { team: 'platform' } } },
-      { app: { metadata: { team: 'backend' } } },
-    ];
-    const filter = { app: { metadata: { team: 'platform' } } };
-    const result = filterByMetadata(jobs, filter);
-    expect(result).toHaveLength(1);
-    expect(result[0].app.metadata.team).toBe('platform');
-  });
-});
 ```
 
 ---
 
 ## 📊 Use Cases & Examples
 
-### 1. Team-based Deployment
+### 1. External Tool Integration (Ruby)
 
-```yaml
-# GitHub Actions workflow
-- uses: ./actions/filter-jobs-by-metadata
-  with:
-    jobs: ${{ steps.load.outputs.jobs }}
-    filter: |
-      {
-        "app": {
-          "metadata": {
-            "team": "platform"
-          }
-        }
-      }
+```ruby
+#!/usr/bin/env ruby
+require 'json'
+
+# Read jobs output from Monotonix
+jobs = JSON.parse(STDIN.read)
+
+# Filter by team
+platform_jobs = jobs.select do |job|
+  job.dig('app', 'metadata', 'team') == 'platform'
+end
+
+# Process filtered jobs
+platform_jobs.each do |job|
+  puts "Processing: #{job['context']['label']}"
+  # Custom automation logic here
+end
 ```
 
-### 2. Priority-based Execution
+### 2. Bash + jq Integration
 
-```yaml
-# High priority jobs only
-- uses: ./actions/filter-jobs-by-metadata
-  with:
-    jobs: ${{ steps.load.outputs.jobs }}
-    filter: |
-      {
-        "metadata": {
-          "priority": "critical"
-        }
-      }
+```bash
+#!/bin/bash
+
+# Get all jobs with high priority
+echo "$JOBS_JSON" | jq '.[] | select(.metadata.priority == "critical")'
+
+# Group by team
+echo "$JOBS_JSON" | jq 'group_by(.app.metadata.team)'
+
+# Extract specific metadata fields
+echo "$JOBS_JSON" | jq -r '.[] | "\(.context.label): \(.app.metadata.owner)"'
 ```
 
-### 3. Compliance Filtering
+### 3. Future monotonix-cli
 
-```yaml
-# PCI-DSS compliant apps
-- uses: ./actions/filter-jobs-by-metadata
-  with:
-    jobs: ${{ steps.load.outputs.jobs }}
-    query: '$..[?("pci-dss" in @.app.metadata.compliance)]'
+```bash
+# Potential future CLI tool
+monotonix jobs list --filter-team platform
+monotonix jobs list --filter-priority critical
+monotonix jobs export --format csv --metadata team,owner,cost_center
 ```
 
 ### 4. Cost Center Reporting
@@ -647,7 +525,7 @@ for (const job of jobs) {
 
 1. Deploy schema changes (no impact on existing users)
 2. Add validation logic (skipped if no schema defined)
-3. Create filter action (opt-in usage)
+3. Enable external tool integration via JSON output
 4. Document and promote usage
 
 ---
@@ -659,9 +537,7 @@ for (const job of jobs) {
 ```json
 {
   "ajv": "^8.12.0",
-  "ajv-formats": "^2.1.1",
-  "lodash": "^4.17.21",
-  "jsonpath-plus": "^7.2.0"
+  "ajv-formats": "^2.1.1"
 }
 ```
 
@@ -677,7 +553,7 @@ for (const job of jobs) {
 1. **Functional Requirements**
    - ✅ Apps and jobs can have arbitrary metadata
    - ✅ Optional schema validation via global config
-   - ✅ Metadata-based filtering capability
+   - ✅ External tool integration via JSON output
    - ✅ Complete backward compatibility
 
 2. **Non-Functional Requirements**
@@ -703,15 +579,14 @@ for (const job of jobs) {
 2. **Implementation Order**
    1. Schema package updates
    2. Load-jobs validation
-   3. Filter action creation
-   4. Testing and documentation
+   3. Testing and documentation
 
 3. **Timeline Estimate**
    - Phase 1: 2-3 hours
    - Phase 2: 3-4 hours
-   - Phase 3: 2-3 hours
+   - Phase 3: 1-2 hours (documentation only)
    - Phase 4: 2-3 hours
-   - **Total: ~10-13 hours**
+   - **Total: ~8-12 hours**
 
 ---
 
@@ -734,7 +609,7 @@ for (const job of jobs) {
 4. **段階的実装**
    - まずスキーマ拡張から始める
    - 検証ロジックは後から追加可能
-   - フィルター機能は独立して開発可能
+   - 外部ツール連携はJSONそのまま出力
 
 5. **エラーハンドリング**
    - 明確なエラーメッセージ
@@ -748,7 +623,6 @@ for (const job of jobs) {
 - [ ] `actions/load-jobs/src/validateMetadata.ts` - 新規作成
 - [ ] `actions/load-jobs/src/index.ts` - 検証呼び出し追加
 - [ ] `actions/load-jobs/src/loadJobsFromLocalConfigs.ts` - メタデータ伝播
-- [ ] `actions/filter-jobs-by-metadata/` - 新規Action作成
 - [ ] 各actionのdist/ディレクトリ - ビルド結果
 
 ### 参考コマンド
