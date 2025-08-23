@@ -40695,7 +40695,7 @@ class MetadataValidator {
             this.jobValidator = this.ajv.compile(globalConfig.metadata_schemas.job);
         }
     }
-    validateJobs(jobs) {
+    validate(jobs) {
         const errors = [];
         for (const job of jobs) {
             // Validate app metadata
@@ -66851,7 +66851,7 @@ const validateMetadata_1 = __nccwpck_require__(119);
         // Validate metadata if schemas are defined
         if (globalConfig.metadata_schemas) {
             const validator = new validateMetadata_1.MetadataValidator(globalConfig);
-            validator.validateJobs(result);
+            validator.validate(result);
         }
         (0, core_1.setOutput)('result', result);
         (0, core_1.exportVariable)('MONOTONIX_JOBS', result);

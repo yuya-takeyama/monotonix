@@ -31,7 +31,7 @@ describe('MetadataValidator', () => {
         },
       ];
 
-      expect(() => validator.validateJobs(jobs)).not.toThrow();
+      expect(() => validator.validate(jobs)).not.toThrow();
     });
   });
 
@@ -82,7 +82,7 @@ describe('MetadataValidator', () => {
         },
       ];
 
-      expect(() => validator.validateJobs(jobs)).not.toThrow();
+      expect(() => validator.validate(jobs)).not.toThrow();
     });
 
     it('throws on invalid app metadata', () => {
@@ -111,7 +111,7 @@ describe('MetadataValidator', () => {
         },
       ];
 
-      expect(() => validator.validateJobs(jobs)).toThrow(
+      expect(() => validator.validate(jobs)).toThrow(
         /Invalid app metadata for apps\/test/,
       );
     });
@@ -142,7 +142,7 @@ describe('MetadataValidator', () => {
         },
       ];
 
-      expect(() => validator.validateJobs(jobs)).toThrow(
+      expect(() => validator.validate(jobs)).toThrow(
         /Invalid app metadata for apps\/test/,
       );
     });
@@ -193,7 +193,7 @@ describe('MetadataValidator', () => {
         },
       ];
 
-      expect(() => validator.validateJobs(jobs)).not.toThrow();
+      expect(() => validator.validate(jobs)).not.toThrow();
     });
 
     it('throws on invalid job metadata', () => {
@@ -220,7 +220,7 @@ describe('MetadataValidator', () => {
         },
       ];
 
-      expect(() => validator.validateJobs(jobs)).toThrow(
+      expect(() => validator.validate(jobs)).toThrow(
         /Invalid job metadata for test \/ test/,
       );
     });
@@ -288,7 +288,7 @@ describe('MetadataValidator', () => {
         },
       ];
 
-      expect(() => validator.validateJobs(jobs)).not.toThrow();
+      expect(() => validator.validate(jobs)).not.toThrow();
     });
 
     it('collects all validation errors', () => {
@@ -335,7 +335,7 @@ describe('MetadataValidator', () => {
         },
       ];
 
-      expect(() => validator.validateJobs(jobs)).toThrow(
+      expect(() => validator.validate(jobs)).toThrow(
         /Metadata validation failed.*apps\/test1.*test1 \/ test1/s,
       );
     });

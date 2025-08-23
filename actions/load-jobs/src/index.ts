@@ -32,7 +32,7 @@ import { MetadataValidator } from './validateMetadata';
     // Validate metadata if schemas are defined
     if (globalConfig.metadata_schemas) {
       const validator = new MetadataValidator(globalConfig);
-      validator.validateJobs(result);
+      validator.validate(result);
     }
 
     setOutput('result', result);

@@ -20,7 +20,7 @@ export class MetadataValidator {
     }
   }
 
-  validateJobs(jobs: Jobs): void {
+  validate(jobs: Jobs): void {
     const errors: string[] = [];
 
     for (const job of jobs) {

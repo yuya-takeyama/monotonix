@@ -298,7 +298,7 @@ export class MetadataValidator {
     }
   }
 
-  validateJobs(jobs: Jobs): void {
+  validate(jobs: Jobs): void {
     const errors: string[] = [];
 
     for (const job of jobs) {
@@ -380,7 +380,7 @@ const main = async () => {
   // 新規追加：メタデータ検証
   if (globalConfig.metadata_schemas) {
     const validator = new MetadataValidator(globalConfig);
-    validator.validateJobs(jobs);
+    validator.validate(jobs);
   }
 
   // 既存のコード...
