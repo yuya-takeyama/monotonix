@@ -40685,18 +40685,14 @@ class MetadataValidator {
     ajv;
     appValidator;
     jobValidator;
-    appSchema;
-    jobSchema;
     constructor(globalConfig) {
         this.ajv = new ajv_1.default({ allErrors: true });
         (0, ajv_formats_1.default)(this.ajv);
         if (globalConfig.metadata_schemas?.app) {
-            this.appSchema = globalConfig.metadata_schemas.app;
-            this.appValidator = this.ajv.compile(this.appSchema);
+            this.appValidator = this.ajv.compile(globalConfig.metadata_schemas.app);
         }
         if (globalConfig.metadata_schemas?.job) {
-            this.jobSchema = globalConfig.metadata_schemas.job;
-            this.jobValidator = this.ajv.compile(this.jobSchema);
+            this.jobValidator = this.ajv.compile(globalConfig.metadata_schemas.job);
         }
     }
     validate(jobs) {
@@ -40704,37 +40700,13 @@ class MetadataValidator {
         for (const job of jobs) {
             // Validate app metadata
             if (this.appValidator && job.app.metadata) {
-                const isValid = this.appValidator(job.app.metadata);
-                // Debug log in NDJSON format
-                console.log(JSON.stringify({
-                    type: 'app',
-                    input: job.app.metadata,
-                    schema: this.appSchema,
-                    result: {
-                        valid: isValid,
-                        errors: isValid ? null : this.appValidator.errors,
-                        path: job.context.app_path,
-                    },
-                }));
-                if (!isValid) {
+                if (!this.appValidator(job.app.metadata)) {
                     errors.push(`Invalid app metadata for ${job.context.app_path}: ${this.ajv.errorsText(this.appValidator.errors)}`);
                 }
             }
             // Validate job metadata
             if (this.jobValidator && job.metadata) {
-                const isValid = this.jobValidator(job.metadata);
-                // Debug log in NDJSON format
-                console.log(JSON.stringify({
-                    type: 'job',
-                    input: job.metadata,
-                    schema: this.jobSchema,
-                    result: {
-                        valid: isValid,
-                        errors: isValid ? null : this.jobValidator.errors,
-                        label: job.context.label,
-                    },
-                }));
-                if (!isValid) {
+                if (!this.jobValidator(job.metadata)) {
                     errors.push(`Invalid job metadata for ${job.context.label}: ${this.ajv.errorsText(this.jobValidator.errors)}`);
                 }
             }
@@ -66869,13 +66841,6 @@ const validateMetadata_1 = __nccwpck_require__(119);
         // Load global config for metadata schema validation
         const globalConfigFilePath = (0, core_1.getInput)('global-config-file-path') || 'monotonix-global.yaml';
         const globalConfig = (0, config_1.loadGlobalConfig)(globalConfigFilePath);
-        // Debug: Log global config status
-        console.log(JSON.stringify({
-            debug: 'global_config_loaded',
-            path: globalConfigFilePath,
-            hasMetadataSchemas: !!globalConfig.metadata_schemas,
-            metadataSchemas: globalConfig.metadata_schemas || null,
-        }));
         const result = await (0, run_1.run)({
             rootDir,
             dedupeKey,
@@ -66883,27 +66848,10 @@ const validateMetadata_1 = __nccwpck_require__(119);
             localConfigFileName,
             event,
         });
-        // Debug: Log validation status
-        console.log(JSON.stringify({
-            debug: 'validation_check',
-            willValidate: !!globalConfig.metadata_schemas,
-            jobCount: result.length,
-        }));
         // Validate metadata if schemas are defined
         if (globalConfig.metadata_schemas) {
-            console.log(JSON.stringify({
-                debug: 'validation_started',
-                appSchema: globalConfig.metadata_schemas.app || null,
-                jobSchema: globalConfig.metadata_schemas.job || null,
-            }));
             const validator = new validateMetadata_1.MetadataValidator(globalConfig);
             validator.validate(result);
-        }
-        else {
-            console.log(JSON.stringify({
-                debug: 'validation_skipped',
-                reason: 'No metadata_schemas defined in global config',
-            }));
         }
         (0, core_1.setOutput)('result', result);
         (0, core_1.exportVariable)('MONOTONIX_JOBS', result);

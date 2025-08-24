@@ -21,16 +21,6 @@ import { MetadataValidator } from './validateMetadata';
       getInput('global-config-file-path') || 'monotonix-global.yaml';
     const globalConfig = loadGlobalConfig(globalConfigFilePath);
 
-    // Debug: Log global config status
-    console.log(
-      JSON.stringify({
-        debug: 'global_config_loaded',
-        path: globalConfigFilePath,
-        hasMetadataSchemas: !!globalConfig.metadata_schemas,
-        metadataSchemas: globalConfig.metadata_schemas || null,
-      }),
-    );
-
     const result = await run({
       rootDir,
       dedupeKey,
@@ -39,33 +29,10 @@ import { MetadataValidator } from './validateMetadata';
       event,
     });
 
-    // Debug: Log validation status
-    console.log(
-      JSON.stringify({
-        debug: 'validation_check',
-        willValidate: !!globalConfig.metadata_schemas,
-        jobCount: result.length,
-      }),
-    );
-
     // Validate metadata if schemas are defined
     if (globalConfig.metadata_schemas) {
-      console.log(
-        JSON.stringify({
-          debug: 'validation_started',
-          appSchema: globalConfig.metadata_schemas.app || null,
-          jobSchema: globalConfig.metadata_schemas.job || null,
-        }),
-      );
       const validator = new MetadataValidator(globalConfig);
       validator.validate(result);
-    } else {
-      console.log(
-        JSON.stringify({
-          debug: 'validation_skipped',
-          reason: 'No metadata_schemas defined in global config',
-        }),
-      );
     }
 
     setOutput('result', result);
