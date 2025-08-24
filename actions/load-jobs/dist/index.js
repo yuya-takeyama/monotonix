@@ -66869,6 +66869,13 @@ const validateMetadata_1 = __nccwpck_require__(119);
         // Load global config for metadata schema validation
         const globalConfigFilePath = (0, core_1.getInput)('global-config-file-path') || 'monotonix-global.yaml';
         const globalConfig = (0, config_1.loadGlobalConfig)(globalConfigFilePath);
+        // Debug: Log global config status
+        console.log(JSON.stringify({
+            debug: 'global_config_loaded',
+            path: globalConfigFilePath,
+            hasMetadataSchemas: !!globalConfig.metadata_schemas,
+            metadataSchemas: globalConfig.metadata_schemas || null,
+        }));
         const result = await (0, run_1.run)({
             rootDir,
             dedupeKey,
@@ -66876,10 +66883,27 @@ const validateMetadata_1 = __nccwpck_require__(119);
             localConfigFileName,
             event,
         });
+        // Debug: Log validation status
+        console.log(JSON.stringify({
+            debug: 'validation_check',
+            willValidate: !!globalConfig.metadata_schemas,
+            jobCount: result.length,
+        }));
         // Validate metadata if schemas are defined
         if (globalConfig.metadata_schemas) {
+            console.log(JSON.stringify({
+                debug: 'validation_started',
+                appSchema: globalConfig.metadata_schemas.app || null,
+                jobSchema: globalConfig.metadata_schemas.job || null,
+            }));
             const validator = new validateMetadata_1.MetadataValidator(globalConfig);
             validator.validate(result);
+        }
+        else {
+            console.log(JSON.stringify({
+                debug: 'validation_skipped',
+                reason: 'No metadata_schemas defined in global config',
+            }));
         }
         (0, core_1.setOutput)('result', result);
         (0, core_1.exportVariable)('MONOTONIX_JOBS', result);
