@@ -29924,11 +29924,21 @@ function wrappy (fn, cb) {
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.JobsSchema = exports.JobSchema = exports.LocalConfigSchema = exports.JobConfigsSchema = exports.GlobalConfigSchema = void 0;
 const zod_1 = __nccwpck_require__(3704);
+// Metadata schema - completely flexible
+const MetadataSchema = zod_1.z.record(zod_1.z.string(), zod_1.z.any());
 exports.GlobalConfigSchema = zod_1.z.object({
     job_types: zod_1.z.record(zod_1.z.string(), zod_1.z.object({}).passthrough()),
+    // New: optional metadata schema definitions
+    metadata_schemas: zod_1.z
+        .object({
+        app: zod_1.z.record(zod_1.z.string(), zod_1.z.any()).optional(),
+        job: zod_1.z.record(zod_1.z.string(), zod_1.z.any()).optional(),
+    })
+        .optional(),
 });
 const AppSchema = zod_1.z.object({
     depends_on: zod_1.z.array(zod_1.z.string()).optional().default([]),
+    metadata: MetadataSchema.optional(), // New: optional app metadata
 });
 const ContextSchema = zod_1.z.object({
     dedupe_key: zod_1.z.string(),
@@ -29975,6 +29985,7 @@ exports.JobConfigsSchema = zod_1.z
 const LocalConfigJobSchema = zod_1.z.object({
     on: JobEventSchema,
     configs: exports.JobConfigsSchema,
+    metadata: MetadataSchema.optional(), // New: optional job metadata
 });
 exports.LocalConfigSchema = zod_1.z.object({
     app: AppSchema.optional(),
@@ -29987,6 +29998,7 @@ exports.JobSchema = zod_1.z.object({
     on: JobEventSchema,
     configs: exports.JobConfigsSchema,
     params: JobParamsSchema,
+    metadata: MetadataSchema.optional(), // New: job metadata (from job definition)
 });
 exports.JobsSchema = zod_1.z.array(exports.JobSchema);
 

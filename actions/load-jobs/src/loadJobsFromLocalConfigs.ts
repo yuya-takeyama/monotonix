@@ -140,6 +140,7 @@ export const createJob = ({
     label: `${extractAppLabel(appPath, rootDir)} / ${jobKey}`,
   },
   params: {},
+  metadata: job.metadata, // Propagate job metadata from job definition
 });
 
 export const calculateEffectiveTimestamp = async (
