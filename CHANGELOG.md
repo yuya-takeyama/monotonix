@@ -1,5 +1,14 @@
 # Change Log
 
+## [0.0.5] - 2025-10-25
+
+### Changed
+
+- Allow scripts for release [#163](https://github.com/yuya-takeyama/monotonix/pull/163)
+- Update biome schema version and ignore patterns [#162](https://github.com/yuya-takeyama/monotonix/pull/162)
+- Skip claude-code-action for Renovate PRs [#161](https://github.com/yuya-takeyama/monotonix/pull/161)
+- Update actions/setup-node action to v6 [#157](https://github.com/yuya-takeyama/monotonix/pull/157)
+
 ## [0.0.4] - 2025-07-14
 
 ### Added
