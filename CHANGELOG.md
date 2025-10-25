@@ -2,6 +2,10 @@
 
 ## [0.0.5] - 2025-10-25
 
+### Added
+
+- Metadata support for apps and jobs with JSON Schema validation [#151](https://github.com/yuya-takeyama/monotonix/pull/151)
+
 ### Changed
 
 - Allow scripts for release [#163](https://github.com/yuya-takeyama/monotonix/pull/163)
