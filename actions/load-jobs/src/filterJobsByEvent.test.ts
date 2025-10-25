@@ -6,6 +6,7 @@ describe('filterJobsByGitHubContext', () => {
   const pushMainJob: Job = {
     app: {
       depends_on: [],
+      metadata: {},
     },
     context: {
       dedupe_key: 'refs/heads/main',
@@ -38,10 +39,12 @@ describe('filterJobsByGitHubContext', () => {
       },
     },
     params: {},
+    metadata: {},
   };
   const pullRequestJob: Job = {
     app: {
       depends_on: [],
+      metadata: {},
     },
     context: {
       dedupe_key: 'pr-1',
@@ -68,10 +71,12 @@ describe('filterJobsByGitHubContext', () => {
         foo: 'FOO',
       },
     },
+    metadata: {},
   };
   const pullRequestTargetJob: Job = {
     app: {
       depends_on: [],
+      metadata: {},
     },
     context: {
       dedupe_key: 'pr-1',
@@ -98,6 +103,7 @@ describe('filterJobsByGitHubContext', () => {
         foo: 'FOO',
       },
     },
+    metadata: {},
   };
   const stubLocalConfigs = [pushMainJob, pullRequestJob, pullRequestTargetJob];
 

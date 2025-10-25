@@ -79,6 +79,7 @@ describe('MetadataValidator', () => {
           on: {},
           configs: {},
           params: {},
+          metadata: {},
         },
       ];
 
@@ -108,6 +109,7 @@ describe('MetadataValidator', () => {
           on: {},
           configs: {},
           params: {},
+          metadata: {},
         },
       ];
 
@@ -139,6 +141,7 @@ describe('MetadataValidator', () => {
           on: {},
           configs: {},
           params: {},
+          metadata: {},
         },
       ];
 
@@ -173,7 +176,7 @@ describe('MetadataValidator', () => {
       const validator = new MetadataValidator(globalConfig);
       const jobs: Jobs = [
         {
-          app: { depends_on: [] },
+          app: { depends_on: [], metadata: {} },
           context: {
             dedupe_key: 'test',
             github_ref: 'refs/heads/main',
@@ -200,7 +203,7 @@ describe('MetadataValidator', () => {
       const validator = new MetadataValidator(globalConfig);
       const jobs: Jobs = [
         {
-          app: { depends_on: [] },
+          app: { depends_on: [], metadata: {} },
           context: {
             dedupe_key: 'test',
             github_ref: 'refs/heads/main',

@@ -29,6 +29,7 @@ describe('run', () => {
   const stubJob: InputJob = {
     app: {
       depends_on: [],
+      metadata: {},
     },
     context: {
       dedupe_key: 'refs/heads/main',
@@ -61,6 +62,7 @@ describe('run', () => {
       },
     },
     params: {},
+    metadata: {},
   };
 
   const stubContext = {

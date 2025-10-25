@@ -138,6 +138,7 @@ describe('jobMatchesChangedFiles', () => {
   ): Job => ({
     app: {
       depends_on: dependencies,
+      metadata: {},
     },
     context: {
       dedupe_key: 'test',
@@ -151,6 +152,7 @@ describe('jobMatchesChangedFiles', () => {
     on: { push: null },
     configs: {},
     params: {},
+    metadata: {},
   });
 
   it('matches when files are within app path', () => {

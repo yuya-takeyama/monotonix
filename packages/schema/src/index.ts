@@ -18,7 +18,7 @@ export type GlobalConfig = z.infer<typeof GlobalConfigSchema>;
 
 const AppSchema = z.object({
   depends_on: z.array(z.string()).optional().default([]),
-  metadata: MetadataSchema.optional(), // New: optional app metadata
+  metadata: MetadataSchema.default({}), // Default to empty object
 });
 
 const ContextSchema = z.object({
@@ -76,13 +76,13 @@ export const JobConfigsSchema = z
 const LocalConfigJobSchema = z.object({
   on: JobEventSchema,
   configs: JobConfigsSchema,
-  metadata: MetadataSchema.optional(), // New: optional job metadata
+  metadata: MetadataSchema.default({}), // Default to empty object
 });
 
 export type LocalConfigJob = z.infer<typeof LocalConfigJobSchema>;
 
 export const LocalConfigSchema = z.object({
-  app: AppSchema.optional(),
+  app: AppSchema.default(() => ({ depends_on: [], metadata: {} })),
   jobs: z.record(z.string(), LocalConfigJobSchema),
 });
 
@@ -96,7 +96,7 @@ export const JobSchema = z.object({
   on: JobEventSchema,
   configs: JobConfigsSchema,
   params: JobParamsSchema,
-  metadata: MetadataSchema.optional(), // New: job metadata (from job definition)
+  metadata: MetadataSchema.default({}), // Default to empty object
 });
 
 export type Job = z.infer<typeof JobSchema>;
