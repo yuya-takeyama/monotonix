@@ -1,5 +1,11 @@
 # Change Log
 
+## [0.0.6] - 2025-10-25
+
+### Fixed
+
+- Ensure validation runs when app field is missing in schema [#165](https://github.com/yuya-takeyama/monotonix/pull/165)
+
 ## [0.0.5] - 2025-10-25
 
 ### Added
