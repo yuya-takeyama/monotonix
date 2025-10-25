@@ -1,4 +1,11 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(./scripts/prepare-release-branch.sh:*)",
+      "Bash(./scripts/publish-release.sh:*)"
+    ],
+    "deny": []
+  },
   "hooks": {
     "PostToolUse": [
       {
