@@ -224,7 +224,7 @@ describe('LocalConfigSchema - Metadata Support', () => {
       jobs: {},
     };
     const result = LocalConfigSchema.parse(input);
-    expect(result.app?.metadata).toEqual(input.app.metadata);
+    expect(result.app.metadata).toEqual(input.app.metadata);
   });
 
   it('accepts job metadata', () => {
@@ -268,7 +268,7 @@ describe('LocalConfigSchema - Metadata Support', () => {
       },
     };
     const result = LocalConfigSchema.parse(input);
-    expect(result.app?.metadata).toEqual({});
+    expect(result.app.metadata).toEqual({});
     expect(result.jobs.test?.metadata).toEqual({});
   });
 
@@ -290,6 +290,6 @@ describe('LocalConfigSchema - Metadata Support', () => {
       jobs: {},
     };
     const result = LocalConfigSchema.parse(input);
-    expect(result.app?.metadata).toEqual(input.app.metadata);
+    expect(result.app.metadata).toEqual(input.app.metadata);
   });
 });
