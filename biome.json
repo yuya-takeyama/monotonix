@@ -1,12 +1,12 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.1.1/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.3.0/schema.json",
   "files": {
     "includes": [
       "**",
-      "!**/dist/**",
-      "!**/node_modules/**",
-      "!**/.turbo/**",
-      "!**/coverage/**",
+      "!**/dist",
+      "!**/node_modules",
+      "!**/.turbo",
+      "!**/coverage",
       "!**/jest.config.js",
       "!**/tsconfig.json"
     ],
