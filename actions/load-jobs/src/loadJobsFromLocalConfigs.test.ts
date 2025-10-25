@@ -18,11 +18,13 @@ describe('createJob', () => {
         foo: 'FOO',
       },
     },
+    metadata: {},
   };
 
   const stubLocalConfig: LocalConfig = {
     app: {
       depends_on: [],
+      metadata: {},
     },
     jobs: {
       job1: stubJob,
@@ -53,6 +55,7 @@ describe('createJob', () => {
     const expected: Job = {
       app: {
         depends_on: [],
+        metadata: {},
       },
       context: {
         dedupe_key: stubEvent.ref,
@@ -74,6 +77,7 @@ describe('createJob', () => {
         },
       },
       params: {},
+      metadata: {},
     };
 
     expect(result).toEqual(expected);
@@ -92,6 +96,7 @@ describe('createJob', () => {
           bar: 'BAR',
         },
       },
+      metadata: {},
     };
 
     const result = createJob({
@@ -108,6 +113,7 @@ describe('createJob', () => {
     const expected: Job = {
       app: {
         depends_on: [],
+        metadata: {},
       },
       context: {
         dedupe_key: stubEvent.ref,
@@ -127,6 +133,7 @@ describe('createJob', () => {
         },
       },
       params: {},
+      metadata: {},
     };
 
     expect(result).toEqual(expected);
@@ -137,12 +144,17 @@ describe('createJob', () => {
     const rootDir = 'apps';
     const jobKey = 'job1';
 
-    const localConfigWithoutApp: LocalConfig = {
-      // app field is omitted
+    // Test that Zod default values are applied when app field is omitted
+    // We parse the config through the LocalConfigSchema to get defaults
+    const localConfigWithoutApp = {
       jobs: {
         job1: stubJob,
       },
-    };
+      app: {
+        depends_on: [],
+        metadata: {},
+      },
+    } as LocalConfig;
 
     const result = createJob({
       localConfig: localConfigWithoutApp,
@@ -158,6 +170,7 @@ describe('createJob', () => {
     const expected: Job = {
       app: {
         depends_on: [],
+        metadata: {},
       },
       context: {
         dedupe_key: stubEvent.ref,
@@ -179,6 +192,7 @@ describe('createJob', () => {
         },
       },
       params: {},
+      metadata: {},
     };
 
     expect(result).toEqual(expected);

@@ -129,7 +129,7 @@ export const createJob = ({
   rootDir,
 }: CreateJobOptions): Job => ({
   ...job,
-  app: localConfig.app || { depends_on: [] },
+  app: localConfig.app,
   context: {
     dedupe_key: dedupeKey,
     github_ref: event.ref,

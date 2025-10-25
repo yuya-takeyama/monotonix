@@ -29938,7 +29938,7 @@ exports.GlobalConfigSchema = zod_1.z.object({
 });
 const AppSchema = zod_1.z.object({
     depends_on: zod_1.z.array(zod_1.z.string()).optional().default([]),
-    metadata: MetadataSchema.optional(), // New: optional app metadata
+    metadata: MetadataSchema.default({}), // Default to empty object
 });
 const ContextSchema = zod_1.z.object({
     dedupe_key: zod_1.z.string(),
@@ -29985,10 +29985,10 @@ exports.JobConfigsSchema = zod_1.z
 const LocalConfigJobSchema = zod_1.z.object({
     on: JobEventSchema,
     configs: exports.JobConfigsSchema,
-    metadata: MetadataSchema.optional(), // New: optional job metadata
+    metadata: MetadataSchema.default({}), // Default to empty object
 });
 exports.LocalConfigSchema = zod_1.z.object({
-    app: AppSchema.optional(),
+    app: AppSchema.default(() => ({ depends_on: [], metadata: {} })),
     jobs: zod_1.z.record(zod_1.z.string(), LocalConfigJobSchema),
 });
 const JobParamsSchema = zod_1.z.object({}).catchall(zod_1.z.object({}).catchall(zod_1.z.any()));
@@ -29998,7 +29998,7 @@ exports.JobSchema = zod_1.z.object({
     on: JobEventSchema,
     configs: exports.JobConfigsSchema,
     params: JobParamsSchema,
-    metadata: MetadataSchema.optional(), // New: job metadata (from job definition)
+    metadata: MetadataSchema.default({}), // Default to empty object
 });
 exports.JobsSchema = zod_1.z.array(exports.JobSchema);
 

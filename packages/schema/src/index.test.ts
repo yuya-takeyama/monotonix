@@ -155,6 +155,60 @@ describe('GlobalConfigSchema', () => {
   });
 });
 
+describe('LocalConfigSchema - Default Values', () => {
+  it('applies default values when app field is missing', () => {
+    const input = {
+      jobs: {},
+    };
+    const result = LocalConfigSchema.parse(input);
+    expect(result.app).toEqual({
+      depends_on: [],
+      metadata: {},
+    });
+  });
+
+  it('applies default metadata when app exists but metadata is missing', () => {
+    const input = {
+      app: {
+        depends_on: ['apps/shared'],
+      },
+      jobs: {},
+    };
+    const result = LocalConfigSchema.parse(input);
+    expect(result.app.metadata).toEqual({});
+  });
+
+  it('applies default depends_on when app exists but depends_on is missing', () => {
+    const input = {
+      app: {
+        metadata: {
+          team: 'platform',
+        },
+      },
+      jobs: {},
+    };
+    const result = LocalConfigSchema.parse(input);
+    expect(result.app.depends_on).toEqual([]);
+  });
+
+  it('applies default metadata to jobs when missing', () => {
+    const input = {
+      jobs: {
+        build: {
+          on: {
+            push: {
+              branches: ['main'],
+            },
+          },
+          configs: {},
+        },
+      },
+    };
+    const result = LocalConfigSchema.parse(input);
+    expect(result.jobs.build?.metadata).toEqual({});
+  });
+});
+
 describe('LocalConfigSchema - Metadata Support', () => {
   it('accepts app metadata', () => {
     const input = {
@@ -201,7 +255,7 @@ describe('LocalConfigSchema - Metadata Support', () => {
     );
   });
 
-  it('accepts missing metadata', () => {
+  it('applies default empty object for missing metadata', () => {
     const input = {
       app: {
         depends_on: [],
@@ -214,8 +268,8 @@ describe('LocalConfigSchema - Metadata Support', () => {
       },
     };
     const result = LocalConfigSchema.parse(input);
-    expect(result.app?.metadata).toBeUndefined();
-    expect(result.jobs.test?.metadata).toBeUndefined();
+    expect(result.app?.metadata).toEqual({});
+    expect(result.jobs.test?.metadata).toEqual({});
   });
 
   it('accepts any metadata structure', () => {
