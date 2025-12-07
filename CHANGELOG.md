@@ -1,5 +1,28 @@
 # Change Log
 
+## [0.0.7] - 2025-12-07
+
+### Added
+
+- load-apps action for scanning monorepo structure [#177](https://github.com/yuya-takeyama/monotonix/pull/177)
+
+### Fixed
+
+- Resolve lint errors in load-apps test [#178](https://github.com/yuya-takeyama/monotonix/pull/178)
+- Update dependency glob to v13 [#176](https://github.com/yuya-takeyama/monotonix/pull/176)
+- Update dependency minimatch to v10.1.1 [#171](https://github.com/yuya-takeyama/monotonix/pull/171)
+- Update aws-sdk-js-v3 monorepo to v3.946.0 [#168](https://github.com/yuya-takeyama/monotonix/pull/168)
+- Update dependency ajv-formats to v3 [#159](https://github.com/yuya-takeyama/monotonix/pull/159)
+
+### Changed
+
+- Upgrade GitHub Actions runtime to node24 [#181](https://github.com/yuya-takeyama/monotonix/pull/181)
+- Update dependency @biomejs/biome to v2.3.8 [#167](https://github.com/yuya-takeyama/monotonix/pull/167)
+- Update Node.js to v24 [#169](https://github.com/yuya-takeyama/monotonix/pull/169)
+- Update dependency turbo to v2.6.3 [#172](https://github.com/yuya-takeyama/monotonix/pull/172)
+- Update dependency ts-jest to v29.4.6 [#179](https://github.com/yuya-takeyama/monotonix/pull/179)
+- Update actions/checkout action to v5.0.1 [#173](https://github.com/yuya-takeyama/monotonix/pull/173)
+
 ## [0.0.6] - 2025-10-25
 
 ### Fixed
