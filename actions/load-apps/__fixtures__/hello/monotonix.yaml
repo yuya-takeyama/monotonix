@@ -1,0 +1,11 @@
+app:
+  depends_on: []
+  metadata: {}
+
+jobs:
+  test:
+    on:
+      pull_request:
+    configs:
+      generic:
+        script: npm test

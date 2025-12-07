@@ -1,0 +1,20 @@
+name: 'Load Apps'
+description: 'Load app configurations from monotonix.yaml files'
+author: 'Yuya Takeyama'
+
+inputs:
+  root-dir:
+    description: 'Root directory'
+    required: true
+  local-config-file-name:
+    description: 'Local config file name'
+    required: false
+    default: 'monotonix.yaml'
+
+outputs:
+  result:
+    description: 'Apps'
+
+runs:
+  using: 'node20'
+  main: 'dist/index.js'
