@@ -13777,7 +13777,12 @@ const NODE_REGION_CONFIG_FILE_OPTIONS = {
 const validRegions = new Set();
 const checkRegion = (region, check = utilEndpoints.isValidHostLabel) => {
     if (!validRegions.has(region) && !check(region)) {
-        throw new Error(`Region not accepted: region="${region}" is not a valid hostname component.`);
+        if (region === "*") {
+            console.warn(`@smithy/config-resolver WARN - Please use the caller region instead of "*". See "sigv4a" in https://github.com/aws/aws-sdk-js-v3/blob/main/supplemental-docs/CLIENTS.md.`);
+        }
+        else {
+            throw new Error(`Region not accepted: region="${region}" is not a valid hostname component.`);
+        }
     }
     else {
         validRegions.add(region);
@@ -15120,8 +15125,15 @@ class CborShapeDeserializer extends protocols.SerdeContext {
     }
     readValue(_schema, value) {
         const ns = schema.NormalizedSchema.of(_schema);
-        if (ns.isTimestampSchema() && typeof value === "number") {
-            return serde._parseEpochTimestamp(value);
+        if (ns.isTimestampSchema()) {
+            if (typeof value === "number") {
+                return serde._parseEpochTimestamp(value);
+            }
+            if (typeof value === "object") {
+                if (value.tag === 1 && "value" in value) {
+                    return serde._parseEpochTimestamp(value.value);
+                }
+            }
         }
         if (ns.isBlobSchema()) {
             if (typeof value === "string") {
@@ -15137,7 +15149,7 @@ class CborShapeDeserializer extends protocols.SerdeContext {
             typeof value === "symbol") {
             return value;
         }
-        else if (typeof value === "function" || typeof value === "object") {
+        else if (typeof value === "object") {
             if (value === null) {
                 return null;
             }
@@ -15175,7 +15187,10 @@ class CborShapeDeserializer extends protocols.SerdeContext {
             }
             else if (ns.isStructSchema()) {
                 for (const [key, memberSchema] of ns.structIterator()) {
-                    newObject[key] = this.readValue(memberSchema, value[key]);
+                    const v = this.readValue(memberSchema, value[key]);
+                    if (v != null) {
+                        newObject[key] = v;
+                    }
                 }
             }
             return newObject;
@@ -15241,7 +15256,6 @@ class SmithyRpcV2CborProtocol extends protocols.RpcProtocol {
         }
         const errorMetadata = {
             $metadata: metadata,
-            $response: response,
             $fault: response.statusCode <= 500 ? "client" : "server",
         };
         const registry = schema.TypeRegistry.for(namespace);
@@ -15491,7 +15505,7 @@ class HttpBindingProtocol extends HttpProtocol {
         for (const [memberName, memberNs] of ns.structIterator()) {
             const memberTraits = memberNs.getMergedTraits() ?? {};
             const inputMemberValue = input[memberName];
-            if (inputMemberValue == null) {
+            if (inputMemberValue == null && !memberNs.isIdempotencyToken()) {
                 continue;
             }
             if (memberTraits.httpPayload) {
@@ -15618,6 +15632,9 @@ class HttpBindingProtocol extends HttpProtocol {
                 }
             }
         }
+        else if (nonHttpBindingMembers.discardResponseBody) {
+            await collectBody(response.body, context);
+        }
         dataObject.$metadata = this.deserializeMetadata(response);
         return dataObject;
     }
@@ -15629,12 +15646,14 @@ class HttpBindingProtocol extends HttpProtocol {
         else {
             dataObject = arg4;
         }
+        let discardResponseBody = true;
         const deserializer = this.deserializer;
         const ns = schema.NormalizedSchema.of(schema$1);
         const nonHttpBindingMembers = [];
         for (const [memberName, memberSchema] of ns.structIterator()) {
             const memberTraits = memberSchema.getMemberTraits();
             if (memberTraits.httpPayload) {
+                discardResponseBody = false;
                 const isStreaming = memberSchema.isStreaming();
                 if (isStreaming) {
                     const isEventStream = memberSchema.isStructSchema();
@@ -15698,6 +15717,7 @@ class HttpBindingProtocol extends HttpProtocol {
                 nonHttpBindingMembers.push(memberName);
             }
         }
+        nonHttpBindingMembers.discardResponseBody = discardResponseBody;
         return nonHttpBindingMembers;
     }
 }
@@ -16072,7 +16092,12 @@ class ToStringShapeSerializer extends SerdeContext {
                 this.stringBuffer = value;
                 break;
             default:
-                this.stringBuffer = String(value);
+                if (ns.isIdempotencyToken()) {
+                    this.stringBuffer = serde.generateIdempotencyToken();
+                }
+                else {
+                    this.stringBuffer = String(value);
+                }
         }
     }
     flush() {
@@ -16173,6 +16198,9 @@ const schemaDeserializationMiddleware = (config) => (next, context) => async (ar
     catch (error) {
         Object.defineProperty(error, "$response", {
             value: response,
+            enumerable: false,
+            writable: false,
+            configurable: false,
         });
         if (!("$metadata" in error)) {
             const hint = `Deserialization error: to see the raw response, inspect the hidden field {error}.$response on this object.`;
@@ -17269,12 +17297,8 @@ const _parseRfc3339DateTimeWithOffset = (value) => {
     range(hours, 0, 23);
     range(minutes, 0, 59);
     range(seconds, 0, 60);
-    const date = new Date();
-    date.setUTCFullYear(Number(yearStr), Number(monthStr) - 1, Number(dayStr));
-    date.setUTCHours(Number(hours));
-    date.setUTCMinutes(Number(minutes));
-    date.setUTCSeconds(Number(seconds));
-    date.setUTCMilliseconds(Number(ms) ? Math.round(parseFloat(`0.${ms}`) * 1000) : 0);
+    const date = new Date(Date.UTC(Number(yearStr), Number(monthStr) - 1, Number(dayStr), Number(hours), Number(minutes), Number(seconds), Number(ms) ? Math.round(parseFloat(`0.${ms}`) * 1000) : 0));
+    date.setUTCFullYear(Number(yearStr));
     if (offsetStr.toUpperCase() != "Z") {
         const [, sign, offsetH, offsetM] = /([+-])(\d\d):(\d\d)/.exec(offsetStr) || [void 0, "+", 0, 0];
         const scalar = sign === "-" ? 1 : -1;
@@ -17308,18 +17332,13 @@ const _parseRfc7231DateTime = (value) => {
         [, month, day, hour, minute, second, fraction, year] = matches;
     }
     if (year && second) {
-        const date = new Date();
-        date.setUTCFullYear(Number(year));
-        date.setUTCMonth(months.indexOf(month));
+        const timestamp = Date.UTC(Number(year), months.indexOf(month), Number(day), Number(hour), Number(minute), Number(second), fraction ? Math.round(parseFloat(`0.${fraction}`) * 1000) : 0);
         range(day, 1, 31);
-        date.setUTCDate(Number(day));
         range(hour, 0, 23);
-        date.setUTCHours(Number(hour));
         range(minute, 0, 59);
-        date.setUTCMinutes(Number(minute));
         range(second, 0, 60);
-        date.setUTCSeconds(Number(second));
-        date.setUTCMilliseconds(fraction ? Math.round(parseFloat(`0.${fraction}`) * 1000) : 0);
+        const date = new Date(timestamp);
+        date.setUTCFullYear(Number(year));
         return date;
     }
     throw new TypeError(`Invalid RFC7231 date-time value ${value}.`);
@@ -18520,6 +18539,9 @@ const deserializerMiddleware = (options, deserializer) => (next, context) => asy
     catch (error) {
         Object.defineProperty(error, "$response", {
             value: response,
+            enumerable: false,
+            writable: false,
+            configurable: false,
         });
         if (!("$metadata" in error)) {
             const hint = `Deserialization error: to see the raw response, inspect the hidden field {error}.$response on this object.`;
@@ -19103,12 +19125,12 @@ const setSocketTimeout = (request, reject, timeoutInMs = 0) => {
 };
 
 const MIN_WAIT_TIME = 6_000;
-async function writeRequestBody(httpRequest, request, maxContinueTimeoutMs = MIN_WAIT_TIME) {
+async function writeRequestBody(httpRequest, request, maxContinueTimeoutMs = MIN_WAIT_TIME, externalAgent = false) {
     const headers = request.headers ?? {};
     const expect = headers.Expect || headers.expect;
     let timeoutId = -1;
     let sendBody = true;
-    if (expect === "100-continue") {
+    if (!externalAgent && expect === "100-continue") {
         sendBody = await Promise.race([
             new Promise((resolve) => {
                 timeoutId = Number(timing.setTimeout(() => resolve(true), Math.max(MIN_WAIT_TIME, maxContinueTimeoutMs)));
@@ -19162,6 +19184,7 @@ class NodeHttpHandler {
     config;
     configProvider;
     socketWarningTimestamp = 0;
+    externalAgent = false;
     metadata = { handlerProtocol: "http/1.1" };
     static create(instanceOrOptions) {
         if (typeof instanceOrOptions?.handle === "function") {
@@ -19218,12 +19241,14 @@ or increase socketAcquisitionWarningTimeout=(millis) in the NodeHttpHandler conf
             throwOnRequestTimeout,
             httpAgent: (() => {
                 if (httpAgent instanceof http.Agent || typeof httpAgent?.destroy === "function") {
+                    this.externalAgent = true;
                     return httpAgent;
                 }
                 return new http.Agent({ keepAlive, maxSockets, ...httpAgent });
             })(),
             httpsAgent: (() => {
                 if (httpsAgent instanceof https.Agent || typeof httpsAgent?.destroy === "function") {
+                    this.externalAgent = true;
                     return httpsAgent;
                 }
                 return new https.Agent({ keepAlive, maxSockets, ...httpsAgent });
@@ -19263,7 +19288,7 @@ or increase socketAcquisitionWarningTimeout=(millis) in the NodeHttpHandler conf
             const headers = request.headers ?? {};
             const expectContinue = (headers.Expect ?? headers.expect) === "100-continue";
             let agent = isSSL ? config.httpsAgent : config.httpAgent;
-            if (expectContinue) {
+            if (expectContinue && !this.externalAgent) {
                 agent = new (isSSL ? https.Agent : http.Agent)({
                     keepAlive: false,
                     maxSockets: Infinity,
@@ -19347,7 +19372,7 @@ or increase socketAcquisitionWarningTimeout=(millis) in the NodeHttpHandler conf
                     keepAliveMsecs: httpAgent.keepAliveMsecs,
                 }));
             }
-            writeRequestBodyPromise = writeRequestBody(req, request, effectiveRequestTimeout).catch((e) => {
+            writeRequestBodyPromise = writeRequestBody(req, request, effectiveRequestTimeout, this.externalAgent).catch((e) => {
                 timeouts.forEach(timing.clearTimeout);
                 return _reject(e);
             });
@@ -20225,16 +20250,15 @@ exports.getSSOTokenFilepath = getSSOTokenFilepath;
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.getSSOTokenFromFile = exports.tokenIntercept = void 0;
-const fs_1 = __nccwpck_require__(9896);
+const promises_1 = __nccwpck_require__(1943);
 const getSSOTokenFilepath_1 = __nccwpck_require__(8665);
-const { readFile } = fs_1.promises;
 exports.tokenIntercept = {};
 const getSSOTokenFromFile = async (id) => {
     if (exports.tokenIntercept[id]) {
         return exports.tokenIntercept[id];
     }
     const ssoTokenFilepath = (0, getSSOTokenFilepath_1.getSSOTokenFilepath)(id);
-    const ssoTokenText = await readFile(ssoTokenFilepath, "utf8");
+    const ssoTokenText = await (0, promises_1.readFile)(ssoTokenFilepath, "utf8");
     return JSON.parse(ssoTokenText);
 };
 exports.getSSOTokenFromFile = getSSOTokenFromFile;
@@ -20253,7 +20277,7 @@ var getSSOTokenFilepath = __nccwpck_require__(8665);
 var getSSOTokenFromFile = __nccwpck_require__(1546);
 var path = __nccwpck_require__(6928);
 var types = __nccwpck_require__(4566);
-var slurpFile = __nccwpck_require__(6746);
+var readFile = __nccwpck_require__(9816);
 
 const ENV_PROFILE = "AWS_PROFILE";
 const DEFAULT_PROFILE = "default";
@@ -20349,13 +20373,13 @@ const loadSharedConfigFiles = async (init = {}) => {
         resolvedConfigFilepath = path.join(homeDir, configFilepath.slice(2));
     }
     const parsedFiles = await Promise.all([
-        slurpFile.slurpFile(resolvedConfigFilepath, {
+        readFile.readFile(resolvedConfigFilepath, {
             ignoreCache: init.ignoreCache,
         })
             .then(parseIni)
             .then(getConfigData)
             .catch(swallowError$1),
-        slurpFile.slurpFile(resolvedFilepath, {
+        readFile.readFile(resolvedFilepath, {
             ignoreCache: init.ignoreCache,
         })
             .then(parseIni)
@@ -20372,7 +20396,7 @@ const getSsoSessionData = (data) => Object.entries(data)
     .reduce((acc, [key, value]) => ({ ...acc, [key.substring(key.indexOf(CONFIG_PREFIX_SEPARATOR) + 1)]: value }), {});
 
 const swallowError = () => ({});
-const loadSsoSessionData = async (init = {}) => slurpFile.slurpFile(init.configFilepath ?? getConfigFilepath())
+const loadSsoSessionData = async (init = {}) => readFile.readFile(init.configFilepath ?? getConfigFilepath())
     .then(parseIni)
     .then(getSsoSessionData)
     .catch(swallowError);
@@ -20399,10 +20423,10 @@ const parseKnownFiles = async (init) => {
 
 const externalDataInterceptor = {
     getFileRecord() {
-        return slurpFile.fileIntercept;
+        return readFile.fileIntercept;
     },
     interceptFile(path, contents) {
-        slurpFile.fileIntercept[path] = Promise.resolve(contents);
+        readFile.fileIntercept[path] = Promise.resolve(contents);
     },
     getTokenRecord() {
         return getSSOTokenFromFile.tokenIntercept;
@@ -20415,6 +20439,10 @@ const externalDataInterceptor = {
 Object.defineProperty(exports, "getSSOTokenFromFile", ({
     enumerable: true,
     get: function () { return getSSOTokenFromFile.getSSOTokenFromFile; }
+}));
+Object.defineProperty(exports, "readFile", ({
+    enumerable: true,
+    get: function () { return readFile.readFile; }
 }));
 exports.CONFIG_PREFIX_SEPARATOR = CONFIG_PREFIX_SEPARATOR;
 exports.DEFAULT_PROFILE = DEFAULT_PROFILE;
@@ -20440,27 +20468,26 @@ Object.keys(getSSOTokenFilepath).forEach(function (k) {
 
 /***/ }),
 
-/***/ 6746:
+/***/ 9816:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.slurpFile = exports.fileIntercept = exports.filePromisesHash = void 0;
-const fs_1 = __nccwpck_require__(9896);
-const { readFile } = fs_1.promises;
-exports.filePromisesHash = {};
+exports.readFile = exports.fileIntercept = exports.filePromises = void 0;
+const promises_1 = __nccwpck_require__(1455);
+exports.filePromises = {};
 exports.fileIntercept = {};
-const slurpFile = (path, options) => {
+const readFile = (path, options) => {
     if (exports.fileIntercept[path] !== undefined) {
         return exports.fileIntercept[path];
     }
-    if (!exports.filePromisesHash[path] || options?.ignoreCache) {
-        exports.filePromisesHash[path] = readFile(path, "utf8");
+    if (!exports.filePromises[path] || options?.ignoreCache) {
+        exports.filePromises[path] = (0, promises_1.readFile)(path, "utf8");
     }
-    return exports.filePromisesHash[path];
+    return exports.filePromises[path];
 };
-exports.slurpFile = slurpFile;
+exports.readFile = readFile;
 
 
 /***/ }),
@@ -23744,6 +23771,19 @@ exports.toUtf8 = toUtf8;
 "use strict";
 
 
+const getCircularReplacer = () => {
+    const seen = new WeakSet();
+    return (key, value) => {
+        if (typeof value === "object" && value !== null) {
+            if (seen.has(value)) {
+                return "[Circular]";
+            }
+            seen.add(value);
+        }
+        return value;
+    };
+};
+
 const sleep = (seconds) => {
     return new Promise((resolve) => setTimeout(resolve, seconds * 1000));
 };
@@ -23765,7 +23805,7 @@ const checkExceptions = (result) => {
         const abortError = new Error(`${JSON.stringify({
             ...result,
             reason: "Request was aborted",
-        })}`);
+        }, getCircularReplacer())}`);
         abortError.name = "AbortError";
         throw abortError;
     }
@@ -23773,12 +23813,12 @@ const checkExceptions = (result) => {
         const timeoutError = new Error(`${JSON.stringify({
             ...result,
             reason: "Waiter has timed out",
-        })}`);
+        }, getCircularReplacer())}`);
         timeoutError.name = "TimeoutError";
         throw timeoutError;
     }
     else if (result.state !== exports.WaiterState.SUCCESS) {
-        throw new Error(`${JSON.stringify(result)}`);
+        throw new Error(`${JSON.stringify(result, getCircularReplacer())}`);
     }
     return result;
 };
@@ -23838,7 +23878,7 @@ const createMessageFromResponse = (reason) => {
         }
         return `${reason.$metadata.httpStatusCode}: OK`;
     }
-    return String(reason?.message ?? JSON.stringify(reason) ?? "Unknown");
+    return String(reason?.message ?? JSON.stringify(reason, getCircularReplacer()) ?? "Unknown");
 };
 
 const validateWaiterOptions = (options) => {
@@ -48226,6 +48266,14 @@ module.exports = require("node:events");
 
 "use strict";
 module.exports = require("node:fs");
+
+/***/ }),
+
+/***/ 1455:
+/***/ ((module) => {
+
+"use strict";
+module.exports = require("node:fs/promises");
 
 /***/ }),
 
