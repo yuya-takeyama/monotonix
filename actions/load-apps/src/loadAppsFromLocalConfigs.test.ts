@@ -1,4 +1,3 @@
-import { LocalConfigSchema } from '@monotonix/schema';
 import { loadAppsFromLocalConfigFiles } from './loadAppsFromLocalConfigs';
 
 describe('loadAppsFromLocalConfigs', () => {
@@ -45,7 +44,7 @@ describe('loadAppsFromLocalConfigs', () => {
     const appWithDeps = result.find(
       app => app.depends_on && app.depends_on.length > 0,
     );
-    if (appWithDeps && appWithDeps.depends_on) {
+    if (appWithDeps?.depends_on) {
       expect(Array.isArray(appWithDeps.depends_on)).toBe(true);
     }
   });
