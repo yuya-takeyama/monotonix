@@ -11,7 +11,7 @@ type LoadAppsFromLocalConfigFilesOptions = {
 };
 
 export type App = BaseApp & {
-  app_path: string;
+  path: string;
   label: string;
 };
 
@@ -32,7 +32,7 @@ export const loadAppsFromLocalConfigFiles = async ({
       const appPath = dirname(localConfigPath);
 
       const app: App = {
-        app_path: appPath,
+        path: appPath,
         label: extractAppLabel(appPath, rootDir),
         ...localConfig.app,
       };

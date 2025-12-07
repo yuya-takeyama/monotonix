@@ -36070,7 +36070,7 @@ const loadAppsFromLocalConfigFiles = async ({ rootDir, localConfigFileName, }) =
             const localConfig = schema_1.LocalConfigSchema.parse((0, js_yaml_1.load)(localConfigContent));
             const appPath = (0, node_path_1.dirname)(localConfigPath);
             const app = {
-                app_path: appPath,
+                path: appPath,
                 label: (0, utils_1.extractAppLabel)(appPath, rootDir),
                 ...localConfig.app,
             };
@@ -36134,7 +36134,7 @@ class MetadataValidator {
             // Validate app metadata
             if (this.appValidator && app.metadata) {
                 if (!this.appValidator(app.metadata)) {
-                    errors.push(`Invalid app metadata for ${app.app_path}: ${this.ajv.errorsText(this.appValidator.errors)}`);
+                    errors.push(`Invalid app metadata for ${app.path}: ${this.ajv.errorsText(this.appValidator.errors)}`);
                 }
             }
         }

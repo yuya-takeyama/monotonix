@@ -24,7 +24,7 @@ export class MetadataValidator {
       if (this.appValidator && app.metadata) {
         if (!this.appValidator(app.metadata)) {
           errors.push(
-            `Invalid app metadata for ${app.app_path}: ${this.ajv.errorsText(this.appValidator.errors)}`,
+            `Invalid app metadata for ${app.path}: ${this.ajv.errorsText(this.appValidator.errors)}`,
           );
         }
       }

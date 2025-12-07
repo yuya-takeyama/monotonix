@@ -10,13 +10,13 @@ describe('loadAppsFromLocalConfigs', () => {
 
     expect(result).toHaveLength(2);
 
-    const echoApp = result.find(app => app.app_path === '__fixtures__/echo');
+    const echoApp = result.find(app => app.path === '__fixtures__/echo');
     expect(echoApp).toBeDefined();
     expect(echoApp?.label).toBe('echo');
     expect(echoApp?.depends_on).toEqual([]);
     expect(echoApp?.metadata).toEqual({});
 
-    const helloApp = result.find(app => app.app_path === '__fixtures__/hello');
+    const helloApp = result.find(app => app.path === '__fixtures__/hello');
     expect(helloApp).toBeDefined();
     expect(helloApp?.label).toBe('hello');
     expect(helloApp?.depends_on).toEqual([]);
@@ -30,7 +30,7 @@ describe('loadAppsFromLocalConfigs', () => {
     });
 
     const appWithMetadata = result.find(
-      app => app.app_path === '__fixtures__/echo',
+      app => app.path === '__fixtures__/echo',
     );
     expect(appWithMetadata).toBeDefined();
     expect(appWithMetadata?.metadata).toBeDefined();
