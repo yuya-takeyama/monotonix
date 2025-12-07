@@ -1,0 +1,14 @@
+app:
+  depends_on: []
+  metadata: {}
+
+jobs:
+  build:
+    on:
+      push:
+        branches:
+          - main
+    configs:
+      docker_build:
+        registry: aws
+        tagging: semver_datetime

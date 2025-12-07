@@ -21,6 +21,8 @@ const AppSchema = z.object({
   metadata: MetadataSchema.default({}), // Default to empty object
 });
 
+export type App = z.infer<typeof AppSchema>;
+
 const ContextSchema = z.object({
   dedupe_key: z.string(),
   github_ref: z.string(),

@@ -1,0 +1,29 @@
+{
+  "name": "@monotonix/load-apps",
+  "scripts": {
+    "build": "ncc build src/index.ts -o dist --source-map --license licenses.txt",
+    "format": "prettier --write .",
+    "test": "jest",
+    "all": "npm run format && npm run test && npm run package"
+  },
+  "dependencies": {
+    "@actions/core": "1.11.1",
+    "@monotonix/schema": "*",
+    "@monotonix/utils": "*",
+    "ajv": "^8.12.0",
+    "ajv-formats": "^2.1.1",
+    "glob": "11.0.3",
+    "js-yaml": "^4.1.0",
+    "zod": "4.1.12"
+  },
+  "devDependencies": {
+    "@types/jest": "30.0.0",
+    "@types/js-yaml": "4.0.9",
+    "@types/node": "22.16.3",
+    "@vercel/ncc": "0.38.4",
+    "jest": "30.2.0",
+    "prettier": "3.6.2",
+    "ts-jest": "29.4.5",
+    "typescript": "5.9.3"
+  }
+}

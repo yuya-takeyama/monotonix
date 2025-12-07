@@ -1,0 +1,24 @@
+name: 'Load Apps'
+description: 'Load app configurations from monotonix.yaml files'
+author: 'Yuya Takeyama'
+
+inputs:
+  root-dir:
+    description: 'Root directory'
+    required: true
+  local-config-file-name:
+    description: 'Local config file name'
+    required: false
+    default: 'monotonix.yaml'
+  global-config-file-path:
+    description: 'Global config file path for metadata validation schemas'
+    required: false
+    default: 'monotonix-global.yaml'
+
+outputs:
+  result:
+    description: 'Apps'
+
+runs:
+  using: 'node20'
+  main: 'dist/index.js'
