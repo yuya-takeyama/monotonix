@@ -19,7 +19,7 @@
     "@types/jest": "30.0.0",
     "@types/js-yaml": "4.0.9",
     "@types/luxon": "3.7.1",
-    "@types/node": "22.16.3",
+    "@types/node": "24.10.1",
     "@vercel/ncc": "^0.38.3",
     "jest": "30.2.0",
     "prettier": "3.6.2",
