@@ -10,6 +10,10 @@ inputs:
     description: 'Local config file name'
     required: false
     default: 'monotonix.yaml'
+  global-config-file-path:
+    description: 'Global config file path for metadata validation schemas'
+    required: false
+    default: 'monotonix-global.yaml'
 
 outputs:
   result:
