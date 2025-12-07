@@ -30,6 +30,6 @@ inputs:
     default: ${{ startsWith(github.event_name, 'pull_request') && '7d' || '180d' }}
 
 runs:
-  using: 'node20'
+  using: 'node24'
   main: 'dist/index.js'
   post: 'dist/post/index.js'
