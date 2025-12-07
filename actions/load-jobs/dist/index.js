@@ -3558,11 +3558,11 @@ var __copyProps = (to, from, except, desc) => {
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
 // pkg/dist-src/index.js
-var dist_src_exports = {};
-__export(dist_src_exports, {
+var index_exports = {};
+__export(index_exports, {
   Octokit: () => Octokit
 });
-module.exports = __toCommonJS(dist_src_exports);
+module.exports = __toCommonJS(index_exports);
 var import_universal_user_agent = __nccwpck_require__(9367);
 var import_before_after_hook = __nccwpck_require__(7544);
 var import_request = __nccwpck_require__(3059);
@@ -3570,13 +3570,28 @@ var import_graphql = __nccwpck_require__(1147);
 var import_auth_token = __nccwpck_require__(3452);
 
 // pkg/dist-src/version.js
-var VERSION = "5.2.0";
+var VERSION = "5.2.2";
 
 // pkg/dist-src/index.js
 var noop = () => {
 };
 var consoleWarn = console.warn.bind(console);
 var consoleError = console.error.bind(console);
+function createLogger(logger = {}) {
+  if (typeof logger.debug !== "function") {
+    logger.debug = noop;
+  }
+  if (typeof logger.info !== "function") {
+    logger.info = noop;
+  }
+  if (typeof logger.warn !== "function") {
+    logger.warn = consoleWarn;
+  }
+  if (typeof logger.error !== "function") {
+    logger.error = consoleError;
+  }
+  return logger;
+}
 var userAgentTrail = `octokit-core.js/${VERSION} ${(0, import_universal_user_agent.getUserAgent)()}`;
 var Octokit = class {
   static {
@@ -3650,15 +3665,7 @@ var Octokit = class {
     }
     this.request = import_request.request.defaults(requestDefaults);
     this.graphql = (0, import_graphql.withCustomRequest)(this.request).defaults(requestDefaults);
-    this.log = Object.assign(
-      {
-        debug: noop,
-        info: noop,
-        warn: consoleWarn,
-        error: consoleError
-      },
-      options.log
-    );
+    this.log = createLogger(options.log);
     this.hook = hook;
     if (!options.authStrategy) {
       if (!options.auth) {
@@ -4111,18 +4118,18 @@ var __copyProps = (to, from, except, desc) => {
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
 // pkg/dist-src/index.js
-var dist_src_exports = {};
-__export(dist_src_exports, {
+var index_exports = {};
+__export(index_exports, {
   GraphqlResponseError: () => GraphqlResponseError,
   graphql: () => graphql2,
   withCustomRequest: () => withCustomRequest
 });
-module.exports = __toCommonJS(dist_src_exports);
+module.exports = __toCommonJS(index_exports);
 var import_request3 = __nccwpck_require__(3059);
 var import_universal_user_agent = __nccwpck_require__(9367);
 
 // pkg/dist-src/version.js
-var VERSION = "7.1.0";
+var VERSION = "7.1.1";
 
 // pkg/dist-src/with-defaults.js
 var import_request2 = __nccwpck_require__(3059);
@@ -4170,8 +4177,7 @@ function graphql(request2, query, options) {
       );
     }
     for (const key in options) {
-      if (!FORBIDDEN_VARIABLE_OPTIONS.includes(key))
-        continue;
+      if (!FORBIDDEN_VARIABLE_OPTIONS.includes(key)) continue;
       return Promise.reject(
         new Error(
           `[@octokit/graphql] "${key}" cannot be used as variable name`
@@ -14692,6 +14698,22 @@ function charFromCodepoint(c) {
   );
 }
 
+// set a property of a literal object, while protecting against prototype pollution,
+// see https://github.com/nodeca/js-yaml/issues/164 for more details
+function setProperty(object, key, value) {
+  // used for this specific key only because Object.defineProperty is slow
+  if (key === '__proto__') {
+    Object.defineProperty(object, key, {
+      configurable: true,
+      enumerable: true,
+      writable: true,
+      value: value
+    });
+  } else {
+    object[key] = value;
+  }
+}
+
 var simpleEscapeCheck = new Array(256); // integer, for fast access
 var simpleEscapeMap = new Array(256);
 for (var i = 0; i < 256; i++) {
@@ -14870,7 +14892,7 @@ function mergeMappings(state, destination, source, overridableKeys) {
     key = sourceKeys[index];
 
     if (!_hasOwnProperty.call(destination, key)) {
-      destination[key] = source[key];
+      setProperty(destination, key, source[key]);
       overridableKeys[key] = true;
     }
   }
@@ -14930,17 +14952,7 @@ function storeMappingPair(state, _result, overridableKeys, keyTag, keyNode, valu
       throwError(state, 'duplicated mapping key');
     }
 
-    // used for this specific key only because Object.defineProperty is slow
-    if (keyNode === '__proto__') {
-      Object.defineProperty(_result, keyNode, {
-        configurable: true,
-        enumerable: true,
-        writable: true,
-        value: valueNode
-      });
-    } else {
-      _result[keyNode] = valueNode;
-    }
+    setProperty(_result, keyNode, valueNode);
     delete overridableKeys[keyNode];
   }
 
@@ -42909,29 +42921,50 @@ function expand_(str, isTop) {
 "use strict";
 
 
-const { normalizeIPv6, normalizeIPv4, removeDotSegments, recomposeAuthority, normalizeComponentEncoding } = __nccwpck_require__(8753)
-const SCHEMES = __nccwpck_require__(2256)
+const { normalizeIPv6, removeDotSegments, recomposeAuthority, normalizeComponentEncoding, isIPv4, nonSimpleDomain } = __nccwpck_require__(8753)
+const { SCHEMES, getSchemeHandler } = __nccwpck_require__(2256)
 
+/**
+ * @template {import('./types/index').URIComponent|string} T
+ * @param {T} uri
+ * @param {import('./types/index').Options} [options]
+ * @returns {T}
+ */
 function normalize (uri, options) {
   if (typeof uri === 'string') {
-    uri = serialize(parse(uri, options), options)
+    uri = /** @type {T} */ (serialize(parse(uri, options), options))
   } else if (typeof uri === 'object') {
-    uri = parse(serialize(uri, options), options)
+    uri = /** @type {T} */ (parse(serialize(uri, options), options))
   }
   return uri
 }
 
+/**
+ * @param {string} baseURI
+ * @param {string} relativeURI
+ * @param {import('./types/index').Options} [options]
+ * @returns {string}
+ */
 function resolve (baseURI, relativeURI, options) {
-  const schemelessOptions = Object.assign({ scheme: 'null' }, options)
-  const resolved = resolveComponents(parse(baseURI, schemelessOptions), parse(relativeURI, schemelessOptions), schemelessOptions, true)
-  return serialize(resolved, { ...schemelessOptions, skipEscape: true })
+  const schemelessOptions = options ? Object.assign({ scheme: 'null' }, options) : { scheme: 'null' }
+  const resolved = resolveComponent(parse(baseURI, schemelessOptions), parse(relativeURI, schemelessOptions), schemelessOptions, true)
+  schemelessOptions.skipEscape = true
+  return serialize(resolved, schemelessOptions)
 }
 
-function resolveComponents (base, relative, options, skipNormalization) {
+/**
+ * @param {import ('./types/index').URIComponent} base
+ * @param {import ('./types/index').URIComponent} relative
+ * @param {import('./types/index').Options} [options]
+ * @param {boolean} [skipNormalization=false]
+ * @returns {import ('./types/index').URIComponent}
+ */
+function resolveComponent (base, relative, options, skipNormalization) {
+  /** @type {import('./types/index').URIComponent} */
   const target = {}
   if (!skipNormalization) {
-    base = parse(serialize(base, options), options) // normalize base components
-    relative = parse(serialize(relative, options), options) // normalize relative components
+    base = parse(serialize(base, options), options) // normalize base component
+    relative = parse(serialize(relative, options), options) // normalize relative component
   }
   options = options || {}
 
@@ -42960,7 +42993,7 @@ function resolveComponents (base, relative, options, skipNormalization) {
           target.query = base.query
         }
       } else {
-        if (relative.path.charAt(0) === '/') {
+        if (relative.path[0] === '/') {
           target.path = removeDotSegments(relative.path)
         } else {
           if ((base.userinfo !== undefined || base.host !== undefined || base.port !== undefined) && !base.path) {
@@ -42987,6 +43020,12 @@ function resolveComponents (base, relative, options, skipNormalization) {
   return target
 }
 
+/**
+ * @param {import ('./types/index').URIComponent|string} uriA
+ * @param {import ('./types/index').URIComponent|string} uriB
+ * @param {import ('./types/index').Options} options
+ * @returns {boolean}
+ */
 function equal (uriA, uriB, options) {
   if (typeof uriA === 'string') {
     uriA = unescape(uriA)
@@ -43005,8 +43044,13 @@ function equal (uriA, uriB, options) {
   return uriA.toLowerCase() === uriB.toLowerCase()
 }
 
+/**
+ * @param {Readonly<import('./types/index').URIComponent>} cmpts
+ * @param {import('./types/index').Options} [opts]
+ * @returns {string}
+ */
 function serialize (cmpts, opts) {
-  const components = {
+  const component = {
     host: cmpts.host,
     scheme: cmpts.scheme,
     userinfo: cmpts.userinfo,
@@ -43026,28 +43070,28 @@ function serialize (cmpts, opts) {
   const uriTokens = []
 
   // find scheme handler
-  const schemeHandler = SCHEMES[(options.scheme || components.scheme || '').toLowerCase()]
+  const schemeHandler = getSchemeHandler(options.scheme || component.scheme)
 
   // perform scheme specific serialization
-  if (schemeHandler && schemeHandler.serialize) schemeHandler.serialize(components, options)
+  if (schemeHandler && schemeHandler.serialize) schemeHandler.serialize(component, options)
 
-  if (components.path !== undefined) {
+  if (component.path !== undefined) {
     if (!options.skipEscape) {
-      components.path = escape(components.path)
+      component.path = escape(component.path)
 
-      if (components.scheme !== undefined) {
-        components.path = components.path.split('%3A').join(':')
+      if (component.scheme !== undefined) {
+        component.path = component.path.split('%3A').join(':')
       }
     } else {
-      components.path = unescape(components.path)
+      component.path = unescape(component.path)
     }
   }
 
-  if (options.reference !== 'suffix' && components.scheme) {
-    uriTokens.push(components.scheme, ':')
+  if (options.reference !== 'suffix' && component.scheme) {
+    uriTokens.push(component.scheme, ':')
   }
 
-  const authority = recomposeAuthority(components)
+  const authority = recomposeAuthority(component)
   if (authority !== undefined) {
     if (options.reference !== 'suffix') {
       uriTokens.push('//')
@@ -43055,51 +43099,49 @@ function serialize (cmpts, opts) {
 
     uriTokens.push(authority)
 
-    if (components.path && components.path.charAt(0) !== '/') {
+    if (component.path && component.path[0] !== '/') {
       uriTokens.push('/')
     }
   }
-  if (components.path !== undefined) {
-    let s = components.path
+  if (component.path !== undefined) {
+    let s = component.path
 
     if (!options.absolutePath && (!schemeHandler || !schemeHandler.absolutePath)) {
       s = removeDotSegments(s)
     }
 
-    if (authority === undefined) {
-      s = s.replace(/^\/\//u, '/%2F') // don't allow the path to start with "//"
+    if (
+      authority === undefined &&
+      s[0] === '/' &&
+      s[1] === '/'
+    ) {
+      // don't allow the path to start with "//"
+      s = '/%2F' + s.slice(2)
     }
 
     uriTokens.push(s)
   }
 
-  if (components.query !== undefined) {
-    uriTokens.push('?', components.query)
+  if (component.query !== undefined) {
+    uriTokens.push('?', component.query)
   }
 
-  if (components.fragment !== undefined) {
-    uriTokens.push('#', components.fragment)
+  if (component.fragment !== undefined) {
+    uriTokens.push('#', component.fragment)
   }
   return uriTokens.join('')
 }
 
-const hexLookUp = Array.from({ length: 127 }, (_v, k) => /[^!"$&'()*+,\-.;=_`a-z{}~]/u.test(String.fromCharCode(k)))
-
-function nonSimpleDomain (value) {
-  let code = 0
-  for (let i = 0, len = value.length; i < len; ++i) {
-    code = value.charCodeAt(i)
-    if (code > 126 || hexLookUp[code]) {
-      return true
-    }
-  }
-  return false
-}
-
 const URI_PARSE = /^(?:([^#/:?]+):)?(?:\/\/((?:([^#/?@]*)@)?(\[[^#/?\]]+\]|[^#/:?]*)(?::(\d*))?))?([^#?]*)(?:\?([^#]*))?(?:#((?:.|[\n\r])*))?/u
 
+/**
+ * @param {string} uri
+ * @param {import('./types/index').Options} [opts]
+ * @returns
+ */
 function parse (uri, opts) {
   const options = Object.assign({}, opts)
+  /** @type {import('./types/index').URIComponent} */
   const parsed = {
     scheme: undefined,
     userinfo: undefined,
@@ -43109,9 +43151,15 @@ function parse (uri, opts) {
     query: undefined,
     fragment: undefined
   }
-  const gotEncoding = uri.indexOf('%') !== -1
+
   let isIP = false
-  if (options.reference === 'suffix') uri = (options.scheme ? options.scheme + ':' : '') + '//' + uri
+  if (options.reference === 'suffix') {
+    if (options.scheme) {
+      uri = options.scheme + ':' + uri
+    } else {
+      uri = '//' + uri
+    }
+  }
 
   const matches = uri.match(URI_PARSE)
 
@@ -43130,13 +43178,12 @@ function parse (uri, opts) {
       parsed.port = matches[5]
     }
     if (parsed.host) {
-      const ipv4result = normalizeIPv4(parsed.host)
-      if (ipv4result.isIPV4 === false) {
-        const ipv6result = normalizeIPv6(ipv4result.host)
+      const ipv4result = isIPv4(parsed.host)
+      if (ipv4result === false) {
+        const ipv6result = normalizeIPv6(parsed.host)
         parsed.host = ipv6result.host.toLowerCase()
         isIP = ipv6result.isIPV6
       } else {
-        parsed.host = ipv4result.host
         isIP = true
       }
     }
@@ -43156,7 +43203,7 @@ function parse (uri, opts) {
     }
 
     // find scheme handler
-    const schemeHandler = SCHEMES[(options.scheme || parsed.scheme || '').toLowerCase()]
+    const schemeHandler = getSchemeHandler(options.scheme || parsed.scheme)
 
     // check if scheme can't handle IRIs
     if (!options.unicodeSupport && (!schemeHandler || !schemeHandler.unicodeSupport)) {
@@ -43173,11 +43220,13 @@ function parse (uri, opts) {
     }
 
     if (!schemeHandler || (schemeHandler && !schemeHandler.skipNormalize)) {
-      if (gotEncoding && parsed.scheme !== undefined) {
-        parsed.scheme = unescape(parsed.scheme)
-      }
-      if (gotEncoding && parsed.host !== undefined) {
-        parsed.host = unescape(parsed.host)
+      if (uri.indexOf('%') !== -1) {
+        if (parsed.scheme !== undefined) {
+          parsed.scheme = unescape(parsed.scheme)
+        }
+        if (parsed.host !== undefined) {
+          parsed.host = unescape(parsed.host)
+        }
       }
       if (parsed.path) {
         parsed.path = escape(unescape(parsed.path))
@@ -43201,7 +43250,7 @@ const fastUri = {
   SCHEMES,
   normalize,
   resolve,
-  resolveComponents,
+  resolveComponent,
   equal,
   serialize,
   parse
@@ -43215,301 +43264,380 @@ module.exports.fastUri = fastUri
 /***/ }),
 
 /***/ 2256:
-/***/ ((module) => {
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
 "use strict";
 
 
-const UUID_REG = /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/iu
+const { isUUID } = __nccwpck_require__(8753)
 const URN_REG = /([\da-z][\d\-a-z]{0,31}):((?:[\w!$'()*+,\-.:;=@]|%[\da-f]{2})+)/iu
 
-function isSecure (wsComponents) {
-  return typeof wsComponents.secure === 'boolean' ? wsComponents.secure : String(wsComponents.scheme).toLowerCase() === 'wss'
+const supportedSchemeNames = /** @type {const} */ (['http', 'https', 'ws',
+  'wss', 'urn', 'urn:uuid'])
+
+/** @typedef {supportedSchemeNames[number]} SchemeName */
+
+/**
+ * @param {string} name
+ * @returns {name is SchemeName}
+ */
+function isValidSchemeName (name) {
+  return supportedSchemeNames.indexOf(/** @type {*} */ (name)) !== -1
 }
 
-function httpParse (components) {
-  if (!components.host) {
-    components.error = components.error || 'HTTP URIs must have a host.'
+/**
+ * @callback SchemeFn
+ * @param {import('../types/index').URIComponent} component
+ * @param {import('../types/index').Options} options
+ * @returns {import('../types/index').URIComponent}
+ */
+
+/**
+ * @typedef {Object} SchemeHandler
+ * @property {SchemeName} scheme - The scheme name.
+ * @property {boolean} [domainHost] - Indicates if the scheme supports domain hosts.
+ * @property {SchemeFn} parse - Function to parse the URI component for this scheme.
+ * @property {SchemeFn} serialize - Function to serialize the URI component for this scheme.
+ * @property {boolean} [skipNormalize] - Indicates if normalization should be skipped for this scheme.
+ * @property {boolean} [absolutePath] - Indicates if the scheme uses absolute paths.
+ * @property {boolean} [unicodeSupport] - Indicates if the scheme supports Unicode.
+ */
+
+/**
+ * @param {import('../types/index').URIComponent} wsComponent
+ * @returns {boolean}
+ */
+function wsIsSecure (wsComponent) {
+  if (wsComponent.secure === true) {
+    return true
+  } else if (wsComponent.secure === false) {
+    return false
+  } else if (wsComponent.scheme) {
+    return (
+      wsComponent.scheme.length === 3 &&
+      (wsComponent.scheme[0] === 'w' || wsComponent.scheme[0] === 'W') &&
+      (wsComponent.scheme[1] === 's' || wsComponent.scheme[1] === 'S') &&
+      (wsComponent.scheme[2] === 's' || wsComponent.scheme[2] === 'S')
+    )
+  } else {
+    return false
+  }
+}
+
+/** @type {SchemeFn} */
+function httpParse (component) {
+  if (!component.host) {
+    component.error = component.error || 'HTTP URIs must have a host.'
   }
 
-  return components
+  return component
 }
 
-function httpSerialize (components) {
-  const secure = String(components.scheme).toLowerCase() === 'https'
+/** @type {SchemeFn} */
+function httpSerialize (component) {
+  const secure = String(component.scheme).toLowerCase() === 'https'
 
   // normalize the default port
-  if (components.port === (secure ? 443 : 80) || components.port === '') {
-    components.port = undefined
+  if (component.port === (secure ? 443 : 80) || component.port === '') {
+    component.port = undefined
   }
 
   // normalize the empty path
-  if (!components.path) {
-    components.path = '/'
+  if (!component.path) {
+    component.path = '/'
   }
 
   // NOTE: We do not parse query strings for HTTP URIs
   // as WWW Form Url Encoded query strings are part of the HTML4+ spec,
   // and not the HTTP spec.
 
-  return components
+  return component
 }
 
-function wsParse (wsComponents) {
+/** @type {SchemeFn} */
+function wsParse (wsComponent) {
 // indicate if the secure flag is set
-  wsComponents.secure = isSecure(wsComponents)
+  wsComponent.secure = wsIsSecure(wsComponent)
 
   // construct resouce name
-  wsComponents.resourceName = (wsComponents.path || '/') + (wsComponents.query ? '?' + wsComponents.query : '')
-  wsComponents.path = undefined
-  wsComponents.query = undefined
+  wsComponent.resourceName = (wsComponent.path || '/') + (wsComponent.query ? '?' + wsComponent.query : '')
+  wsComponent.path = undefined
+  wsComponent.query = undefined
 
-  return wsComponents
+  return wsComponent
 }
 
-function wsSerialize (wsComponents) {
+/** @type {SchemeFn} */
+function wsSerialize (wsComponent) {
 // normalize the default port
-  if (wsComponents.port === (isSecure(wsComponents) ? 443 : 80) || wsComponents.port === '') {
-    wsComponents.port = undefined
+  if (wsComponent.port === (wsIsSecure(wsComponent) ? 443 : 80) || wsComponent.port === '') {
+    wsComponent.port = undefined
   }
 
   // ensure scheme matches secure flag
-  if (typeof wsComponents.secure === 'boolean') {
-    wsComponents.scheme = (wsComponents.secure ? 'wss' : 'ws')
-    wsComponents.secure = undefined
+  if (typeof wsComponent.secure === 'boolean') {
+    wsComponent.scheme = (wsComponent.secure ? 'wss' : 'ws')
+    wsComponent.secure = undefined
   }
 
   // reconstruct path from resource name
-  if (wsComponents.resourceName) {
-    const [path, query] = wsComponents.resourceName.split('?')
-    wsComponents.path = (path && path !== '/' ? path : undefined)
-    wsComponents.query = query
-    wsComponents.resourceName = undefined
+  if (wsComponent.resourceName) {
+    const [path, query] = wsComponent.resourceName.split('?')
+    wsComponent.path = (path && path !== '/' ? path : undefined)
+    wsComponent.query = query
+    wsComponent.resourceName = undefined
   }
 
   // forbid fragment component
-  wsComponents.fragment = undefined
+  wsComponent.fragment = undefined
 
-  return wsComponents
+  return wsComponent
 }
 
-function urnParse (urnComponents, options) {
-  if (!urnComponents.path) {
-    urnComponents.error = 'URN can not be parsed'
-    return urnComponents
+/** @type {SchemeFn} */
+function urnParse (urnComponent, options) {
+  if (!urnComponent.path) {
+    urnComponent.error = 'URN can not be parsed'
+    return urnComponent
   }
-  const matches = urnComponents.path.match(URN_REG)
+  const matches = urnComponent.path.match(URN_REG)
   if (matches) {
-    const scheme = options.scheme || urnComponents.scheme || 'urn'
-    urnComponents.nid = matches[1].toLowerCase()
-    urnComponents.nss = matches[2]
-    const urnScheme = `${scheme}:${options.nid || urnComponents.nid}`
-    const schemeHandler = SCHEMES[urnScheme]
-    urnComponents.path = undefined
+    const scheme = options.scheme || urnComponent.scheme || 'urn'
+    urnComponent.nid = matches[1].toLowerCase()
+    urnComponent.nss = matches[2]
+    const urnScheme = `${scheme}:${options.nid || urnComponent.nid}`
+    const schemeHandler = getSchemeHandler(urnScheme)
+    urnComponent.path = undefined
 
     if (schemeHandler) {
-      urnComponents = schemeHandler.parse(urnComponents, options)
+      urnComponent = schemeHandler.parse(urnComponent, options)
     }
   } else {
-    urnComponents.error = urnComponents.error || 'URN can not be parsed.'
+    urnComponent.error = urnComponent.error || 'URN can not be parsed.'
   }
 
-  return urnComponents
+  return urnComponent
 }
 
-function urnSerialize (urnComponents, options) {
-  const scheme = options.scheme || urnComponents.scheme || 'urn'
-  const nid = urnComponents.nid.toLowerCase()
+/** @type {SchemeFn} */
+function urnSerialize (urnComponent, options) {
+  if (urnComponent.nid === undefined) {
+    throw new Error('URN without nid cannot be serialized')
+  }
+  const scheme = options.scheme || urnComponent.scheme || 'urn'
+  const nid = urnComponent.nid.toLowerCase()
   const urnScheme = `${scheme}:${options.nid || nid}`
-  const schemeHandler = SCHEMES[urnScheme]
+  const schemeHandler = getSchemeHandler(urnScheme)
 
   if (schemeHandler) {
-    urnComponents = schemeHandler.serialize(urnComponents, options)
+    urnComponent = schemeHandler.serialize(urnComponent, options)
   }
 
-  const uriComponents = urnComponents
-  const nss = urnComponents.nss
-  uriComponents.path = `${nid || options.nid}:${nss}`
+  const uriComponent = urnComponent
+  const nss = urnComponent.nss
+  uriComponent.path = `${nid || options.nid}:${nss}`
 
   options.skipEscape = true
-  return uriComponents
+  return uriComponent
 }
 
-function urnuuidParse (urnComponents, options) {
-  const uuidComponents = urnComponents
-  uuidComponents.uuid = uuidComponents.nss
-  uuidComponents.nss = undefined
+/** @type {SchemeFn} */
+function urnuuidParse (urnComponent, options) {
+  const uuidComponent = urnComponent
+  uuidComponent.uuid = uuidComponent.nss
+  uuidComponent.nss = undefined
 
-  if (!options.tolerant && (!uuidComponents.uuid || !UUID_REG.test(uuidComponents.uuid))) {
-    uuidComponents.error = uuidComponents.error || 'UUID is not valid.'
+  if (!options.tolerant && (!uuidComponent.uuid || !isUUID(uuidComponent.uuid))) {
+    uuidComponent.error = uuidComponent.error || 'UUID is not valid.'
   }
 
-  return uuidComponents
+  return uuidComponent
 }
 
-function urnuuidSerialize (uuidComponents) {
-  const urnComponents = uuidComponents
+/** @type {SchemeFn} */
+function urnuuidSerialize (uuidComponent) {
+  const urnComponent = uuidComponent
   // normalize UUID
-  urnComponents.nss = (uuidComponents.uuid || '').toLowerCase()
-  return urnComponents
+  urnComponent.nss = (uuidComponent.uuid || '').toLowerCase()
+  return urnComponent
 }
 
-const http = {
+const http = /** @type {SchemeHandler} */ ({
   scheme: 'http',
   domainHost: true,
   parse: httpParse,
   serialize: httpSerialize
-}
+})
 
-const https = {
+const https = /** @type {SchemeHandler} */ ({
   scheme: 'https',
   domainHost: http.domainHost,
   parse: httpParse,
   serialize: httpSerialize
-}
+})
 
-const ws = {
+const ws = /** @type {SchemeHandler} */ ({
   scheme: 'ws',
   domainHost: true,
   parse: wsParse,
   serialize: wsSerialize
-}
+})
 
-const wss = {
+const wss = /** @type {SchemeHandler} */ ({
   scheme: 'wss',
   domainHost: ws.domainHost,
   parse: ws.parse,
   serialize: ws.serialize
-}
+})
 
-const urn = {
+const urn = /** @type {SchemeHandler} */ ({
   scheme: 'urn',
   parse: urnParse,
   serialize: urnSerialize,
   skipNormalize: true
-}
+})
 
-const urnuuid = {
+const urnuuid = /** @type {SchemeHandler} */ ({
   scheme: 'urn:uuid',
   parse: urnuuidParse,
   serialize: urnuuidSerialize,
   skipNormalize: true
-}
+})
 
-const SCHEMES = {
+const SCHEMES = /** @type {Record<SchemeName, SchemeHandler>} */ ({
   http,
   https,
   ws,
   wss,
   urn,
   'urn:uuid': urnuuid
-}
+})
 
-module.exports = SCHEMES
+Object.setPrototypeOf(SCHEMES, null)
 
-
-/***/ }),
-
-/***/ 9517:
-/***/ ((module) => {
-
-"use strict";
-
-
-const HEX = {
-  0: 0,
-  1: 1,
-  2: 2,
-  3: 3,
-  4: 4,
-  5: 5,
-  6: 6,
-  7: 7,
-  8: 8,
-  9: 9,
-  a: 10,
-  A: 10,
-  b: 11,
-  B: 11,
-  c: 12,
-  C: 12,
-  d: 13,
-  D: 13,
-  e: 14,
-  E: 14,
-  f: 15,
-  F: 15
+/**
+ * @param {string|undefined} scheme
+ * @returns {SchemeHandler|undefined}
+ */
+function getSchemeHandler (scheme) {
+  return (
+    scheme && (
+      SCHEMES[/** @type {SchemeName} */ (scheme)] ||
+      SCHEMES[/** @type {SchemeName} */(scheme.toLowerCase())])
+  ) ||
+    undefined
 }
 
 module.exports = {
-  HEX
+  wsIsSecure,
+  SCHEMES,
+  isValidSchemeName,
+  getSchemeHandler,
 }
 
 
 /***/ }),
 
 /***/ 8753:
-/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+/***/ ((module) => {
 
 "use strict";
 
 
-const { HEX } = __nccwpck_require__(9517)
+/** @type {(value: string) => boolean} */
+const isUUID = RegExp.prototype.test.bind(/^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/iu)
 
-const IPV4_REG = /^(?:(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]\d|\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]\d|\d)$/u
-
-function normalizeIPv4 (host) {
-  if (findToken(host, '.') < 3) { return { host, isIPV4: false } }
-  const matches = host.match(IPV4_REG) || []
-  const [address] = matches
-  if (address) {
-    return { host: stripLeadingZeros(address, '.'), isIPV4: true }
-  } else {
-    return { host, isIPV4: false }
-  }
-}
+/** @type {(value: string) => boolean} */
+const isIPv4 = RegExp.prototype.test.bind(/^(?:(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]\d|\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]\d|\d)$/u)
 
 /**
- * @param {string[]} input
- * @param {boolean} [keepZero=false]
- * @returns {string|undefined}
+ * @param {Array<string>} input
+ * @returns {string}
  */
-function stringArrayToHexStripped (input, keepZero = false) {
+function stringArrayToHexStripped (input) {
   let acc = ''
-  let strip = true
-  for (const c of input) {
-    if (HEX[c] === undefined) return undefined
-    if (c !== '0' && strip === true) strip = false
-    if (!strip) acc += c
+  let code = 0
+  let i = 0
+
+  for (i = 0; i < input.length; i++) {
+    code = input[i].charCodeAt(0)
+    if (code === 48) {
+      continue
+    }
+    if (!((code >= 48 && code <= 57) || (code >= 65 && code <= 70) || (code >= 97 && code <= 102))) {
+      return ''
+    }
+    acc += input[i]
+    break
   }
-  if (keepZero && acc.length === 0) acc = '0'
+
+  for (i += 1; i < input.length; i++) {
+    code = input[i].charCodeAt(0)
+    if (!((code >= 48 && code <= 57) || (code >= 65 && code <= 70) || (code >= 97 && code <= 102))) {
+      return ''
+    }
+    acc += input[i]
+  }
   return acc
 }
 
+/**
+ * @typedef {Object} GetIPV6Result
+ * @property {boolean} error - Indicates if there was an error parsing the IPv6 address.
+ * @property {string} address - The parsed IPv6 address.
+ * @property {string} [zone] - The zone identifier, if present.
+ */
+
+/**
+ * @param {string} value
+ * @returns {boolean}
+ */
+const nonSimpleDomain = RegExp.prototype.test.bind(/[^!"$&'()*+,\-.;=_`a-z{}~]/u)
+
+/**
+ * @param {Array<string>} buffer
+ * @returns {boolean}
+ */
+function consumeIsZone (buffer) {
+  buffer.length = 0
+  return true
+}
+
+/**
+ * @param {Array<string>} buffer
+ * @param {Array<string>} address
+ * @param {GetIPV6Result} output
+ * @returns {boolean}
+ */
+function consumeHextets (buffer, address, output) {
+  if (buffer.length) {
+    const hex = stringArrayToHexStripped(buffer)
+    if (hex !== '') {
+      address.push(hex)
+    } else {
+      output.error = true
+      return false
+    }
+    buffer.length = 0
+  }
+  return true
+}
+
+/**
+ * @param {string} input
+ * @returns {GetIPV6Result}
+ */
 function getIPV6 (input) {
   let tokenCount = 0
   const output = { error: false, address: '', zone: '' }
+  /** @type {Array<string>} */
   const address = []
+  /** @type {Array<string>} */
   const buffer = []
-  let isZone = false
   let endipv6Encountered = false
   let endIpv6 = false
 
-  function consume () {
-    if (buffer.length) {
-      if (isZone === false) {
-        const hex = stringArrayToHexStripped(buffer)
-        if (hex !== undefined) {
-          address.push(hex)
-        } else {
-          output.error = true
-          return false
-        }
-      }
-      buffer.length = 0
-    }
-    return true
-  }
+  let consume = consumeHextets
 
   for (let i = 0; i < input.length; i++) {
     const cursor = input[i]
@@ -43518,29 +43646,28 @@ function getIPV6 (input) {
       if (endipv6Encountered === true) {
         endIpv6 = true
       }
-      if (!consume()) { break }
-      tokenCount++
-      address.push(':')
-      if (tokenCount > 7) {
+      if (!consume(buffer, address, output)) { break }
+      if (++tokenCount > 7) {
         // not valid
         output.error = true
         break
       }
-      if (i - 1 >= 0 && input[i - 1] === ':') {
+      if (i > 0 && input[i - 1] === ':') {
         endipv6Encountered = true
       }
+      address.push(':')
       continue
     } else if (cursor === '%') {
-      if (!consume()) { break }
+      if (!consume(buffer, address, output)) { break }
       // switch to zone detection
-      isZone = true
+      consume = consumeIsZone
     } else {
       buffer.push(cursor)
       continue
     }
   }
   if (buffer.length) {
-    if (isZone) {
+    if (consume === consumeIsZone) {
       output.zone = buffer.join('')
     } else if (endIpv6) {
       address.push(buffer.join(''))
@@ -43552,6 +43679,17 @@ function getIPV6 (input) {
   return output
 }
 
+/**
+ * @typedef {Object} NormalizeIPv6Result
+ * @property {string} host - The normalized host.
+ * @property {string} [escapedHost] - The escaped host.
+ * @property {boolean} isIPV6 - Indicates if the host is an IPv6 address.
+ */
+
+/**
+ * @param {string} host
+ * @returns {NormalizeIPv6Result}
+ */
 function normalizeIPv6 (host) {
   if (findToken(host, ':') < 2) { return { host, isIPV6: false } }
   const ipv6 = getIPV6(host)
@@ -43563,35 +43701,17 @@ function normalizeIPv6 (host) {
       newHost += '%' + ipv6.zone
       escapedHost += '%25' + ipv6.zone
     }
-    return { host: newHost, escapedHost, isIPV6: true }
+    return { host: newHost, isIPV6: true, escapedHost }
   } else {
     return { host, isIPV6: false }
   }
 }
 
-function stripLeadingZeros (str, token) {
-  let out = ''
-  let skip = true
-  const l = str.length
-  for (let i = 0; i < l; i++) {
-    const c = str[i]
-    if (c === '0' && skip) {
-      if ((i + 1 <= l && str[i + 1] === token) || i + 1 === l) {
-        out += c
-        skip = false
-      }
-    } else {
-      if (c === token) {
-        skip = true
-      } else {
-        skip = false
-      }
-      out += c
-    }
-  }
-  return out
-}
-
+/**
+ * @param {string} str
+ * @param {string} token
+ * @returns {number}
+ */
 function findToken (str, token) {
   let ind = 0
   for (let i = 0; i < str.length; i++) {
@@ -43600,99 +43720,161 @@ function findToken (str, token) {
   return ind
 }
 
-const RDS1 = /^\.\.?\//u
-const RDS2 = /^\/\.(?:\/|$)/u
-const RDS3 = /^\/\.\.(?:\/|$)/u
-const RDS5 = /^\/?(?:.|\n)*?(?=\/|$)/u
-
-function removeDotSegments (input) {
+/**
+ * @param {string} path
+ * @returns {string}
+ *
+ * @see https://datatracker.ietf.org/doc/html/rfc3986#section-5.2.4
+ */
+function removeDotSegments (path) {
+  let input = path
   const output = []
+  let nextSlash = -1
+  let len = 0
 
-  while (input.length) {
-    if (input.match(RDS1)) {
-      input = input.replace(RDS1, '')
-    } else if (input.match(RDS2)) {
-      input = input.replace(RDS2, '/')
-    } else if (input.match(RDS3)) {
-      input = input.replace(RDS3, '/')
-      output.pop()
-    } else if (input === '.' || input === '..') {
-      input = ''
-    } else {
-      const im = input.match(RDS5)
-      if (im) {
-        const s = im[0]
-        input = input.slice(s.length)
-        output.push(s)
+  // eslint-disable-next-line no-cond-assign
+  while (len = input.length) {
+    if (len === 1) {
+      if (input === '.') {
+        break
+      } else if (input === '/') {
+        output.push('/')
+        break
       } else {
-        throw new Error('Unexpected dot segment condition')
+        output.push(input)
+        break
+      }
+    } else if (len === 2) {
+      if (input[0] === '.') {
+        if (input[1] === '.') {
+          break
+        } else if (input[1] === '/') {
+          input = input.slice(2)
+          continue
+        }
+      } else if (input[0] === '/') {
+        if (input[1] === '.' || input[1] === '/') {
+          output.push('/')
+          break
+        }
+      }
+    } else if (len === 3) {
+      if (input === '/..') {
+        if (output.length !== 0) {
+          output.pop()
+        }
+        output.push('/')
+        break
       }
     }
+    if (input[0] === '.') {
+      if (input[1] === '.') {
+        if (input[2] === '/') {
+          input = input.slice(3)
+          continue
+        }
+      } else if (input[1] === '/') {
+        input = input.slice(2)
+        continue
+      }
+    } else if (input[0] === '/') {
+      if (input[1] === '.') {
+        if (input[2] === '/') {
+          input = input.slice(2)
+          continue
+        } else if (input[2] === '.') {
+          if (input[3] === '/') {
+            input = input.slice(3)
+            if (output.length !== 0) {
+              output.pop()
+            }
+            continue
+          }
+        }
+      }
+    }
+
+    // Rule 2E: Move normal path segment to output
+    if ((nextSlash = input.indexOf('/', 1)) === -1) {
+      output.push(input)
+      break
+    } else {
+      output.push(input.slice(0, nextSlash))
+      input = input.slice(nextSlash)
+    }
   }
+
   return output.join('')
 }
 
-function normalizeComponentEncoding (components, esc) {
+/**
+ * @param {import('../types/index').URIComponent} component
+ * @param {boolean} esc
+ * @returns {import('../types/index').URIComponent}
+ */
+function normalizeComponentEncoding (component, esc) {
   const func = esc !== true ? escape : unescape
-  if (components.scheme !== undefined) {
-    components.scheme = func(components.scheme)
+  if (component.scheme !== undefined) {
+    component.scheme = func(component.scheme)
   }
-  if (components.userinfo !== undefined) {
-    components.userinfo = func(components.userinfo)
+  if (component.userinfo !== undefined) {
+    component.userinfo = func(component.userinfo)
   }
-  if (components.host !== undefined) {
-    components.host = func(components.host)
+  if (component.host !== undefined) {
+    component.host = func(component.host)
   }
-  if (components.path !== undefined) {
-    components.path = func(components.path)
+  if (component.path !== undefined) {
+    component.path = func(component.path)
   }
-  if (components.query !== undefined) {
-    components.query = func(components.query)
+  if (component.query !== undefined) {
+    component.query = func(component.query)
   }
-  if (components.fragment !== undefined) {
-    components.fragment = func(components.fragment)
+  if (component.fragment !== undefined) {
+    component.fragment = func(component.fragment)
   }
-  return components
+  return component
 }
 
-function recomposeAuthority (components) {
+/**
+ * @param {import('../types/index').URIComponent} component
+ * @returns {string|undefined}
+ */
+function recomposeAuthority (component) {
   const uriTokens = []
 
-  if (components.userinfo !== undefined) {
-    uriTokens.push(components.userinfo)
+  if (component.userinfo !== undefined) {
+    uriTokens.push(component.userinfo)
     uriTokens.push('@')
   }
 
-  if (components.host !== undefined) {
-    let host = unescape(components.host)
-    const ipV4res = normalizeIPv4(host)
-
-    if (ipV4res.isIPV4) {
-      host = ipV4res.host
-    } else {
-      const ipV6res = normalizeIPv6(ipV4res.host)
+  if (component.host !== undefined) {
+    let host = unescape(component.host)
+    if (!isIPv4(host)) {
+      const ipV6res = normalizeIPv6(host)
       if (ipV6res.isIPV6 === true) {
         host = `[${ipV6res.escapedHost}]`
       } else {
-        host = components.host
+        host = component.host
       }
     }
     uriTokens.push(host)
   }
 
-  if (typeof components.port === 'number' || typeof components.port === 'string') {
+  if (typeof component.port === 'number' || typeof component.port === 'string') {
     uriTokens.push(':')
-    uriTokens.push(String(components.port))
+    uriTokens.push(String(component.port))
   }
 
   return uriTokens.length ? uriTokens.join('') : undefined
 };
 
 module.exports = {
+  nonSimpleDomain,
   recomposeAuthority,
   normalizeComponentEncoding,
   removeDotSegments,
-  normalizeIPv4,
+  isIPv4,
+  isUUID,
   normalizeIPv6,
   stringArrayToHexStripped
 }
@@ -45559,7 +45741,9 @@ class AST {
         if (this.#root === this)
             this.#fillNegs();
         if (!this.type) {
-            const noEmpty = this.isStart() && this.isEnd();
+            const noEmpty = this.isStart() &&
+                this.isEnd() &&
+                !this.#parts.some(s => typeof s !== 'string');
             const src = this.#parts
                 .map(p => {
                 const [re, _, hasMagic, uflag] = typeof p === 'string'
@@ -45715,10 +45899,7 @@ class AST {
                 }
             }
             if (c === '*') {
-                if (noEmpty && glob === '*')
-                    re += starNoEmpty;
-                else
-                    re += star;
+                re += noEmpty && glob === '*' ? starNoEmpty : star;
                 hasMagic = true;
                 continue;
             }
@@ -45906,16 +46087,24 @@ exports.escape = void 0;
 /**
  * Escape all magic characters in a glob pattern.
  *
- * If the {@link windowsPathsNoEscape | GlobOptions.windowsPathsNoEscape}
+ * If the {@link MinimatchOptions.windowsPathsNoEscape}
  * option is used, then characters are escaped by wrapping in `[]`, because
  * a magic character wrapped in a character class can only be satisfied by
  * that exact character.  In this mode, `\` is _not_ escaped, because it is
  * not interpreted as a magic character, but instead as a path separator.
+ *
+ * If the {@link MinimatchOptions.magicalBraces} option is used,
+ * then braces (`{` and `}`) will be escaped.
  */
-const escape = (s, { windowsPathsNoEscape = false, } = {}) => {
+const escape = (s, { windowsPathsNoEscape = false, magicalBraces = false, } = {}) => {
     // don't need to escape +@! because we escape the parens
     // that make those magic, and escaping ! as [!] isn't valid,
     // because [!]] is a valid glob class meaning not ']'.
+    if (magicalBraces) {
+        return windowsPathsNoEscape
+            ? s.replace(/[?*()[\]{}]/g, '[$&]')
+            : s.replace(/[?*()[\]\\{}]/g, '\\$&');
+    }
     return windowsPathsNoEscape
         ? s.replace(/[?*()[\]]/g, '[$&]')
         : s.replace(/[?*()[\]\\]/g, '\\$&');
@@ -46571,7 +46760,7 @@ class Minimatch {
             }
         }
         // resolve and reduce . and .. portions in the file as well.
-        // dont' need to do the second phase, because it's only one string[]
+        // don't need to do the second phase, because it's only one string[]
         const { optimizationLevel = 1 } = this.options;
         if (optimizationLevel >= 2) {
             file = this.levelTwoFileOptimize(file);
@@ -46824,14 +47013,25 @@ class Minimatch {
                     }
                 }
                 else if (next === undefined) {
-                    pp[i - 1] = prev + '(?:\\/|' + twoStar + ')?';
+                    pp[i - 1] = prev + '(?:\\/|\\/' + twoStar + ')?';
                 }
                 else if (next !== exports.GLOBSTAR) {
                     pp[i - 1] = prev + '(?:\\/|\\/' + twoStar + '\\/)' + next;
                     pp[i + 1] = exports.GLOBSTAR;
                 }
             });
-            return pp.filter(p => p !== exports.GLOBSTAR).join('/');
+            const filtered = pp.filter(p => p !== exports.GLOBSTAR);
+            // For partial matches, we need to make the pattern match
+            // any prefix of the full path. We do this by generating
+            // alternative patterns that match progressively longer prefixes.
+            if (this.partial && filtered.length >= 1) {
+                const prefixes = [];
+                for (let i = 1; i <= filtered.length; i++) {
+                    prefixes.push(filtered.slice(0, i).join('/'));
+                }
+                return '(?:' + prefixes.join('|') + ')';
+            }
+            return filtered.join('/');
         })
             .join('|');
         // need to wrap in parens if we had more than one thing with |,
@@ -46840,6 +47040,10 @@ class Minimatch {
         // must match entire pattern
         // ending in a * or ** will make it less strict.
         re = '^' + open + re + close + '$';
+        // In partial mode, '/' should always match as it's a valid prefix for any pattern
+        if (this.partial) {
+            re = '^(?:\\/|' + open + re.slice(1, -1) + close + ')$';
+        }
         // can match anything, as long as it's not this.
         if (this.negate)
             re = '^(?!' + re + ').+$';
@@ -46956,21 +47160,35 @@ exports.unescape = void 0;
 /**
  * Un-escape a string that has been escaped with {@link escape}.
  *
- * If the {@link windowsPathsNoEscape} option is used, then square-brace
- * escapes are removed, but not backslash escapes.  For example, it will turn
- * the string `'[*]'` into `*`, but it will not turn `'\\*'` into `'*'`,
- * becuase `\` is a path separator in `windowsPathsNoEscape` mode.
+ * If the {@link MinimatchOptions.windowsPathsNoEscape} option is used, then
+ * square-bracket escapes are removed, but not backslash escapes.
  *
- * When `windowsPathsNoEscape` is not set, then both brace escapes and
+ * For example, it will turn the string `'[*]'` into `*`, but it will not
+ * turn `'\\*'` into `'*'`, because `\` is a path separator in
+ * `windowsPathsNoEscape` mode.
+ *
+ * When `windowsPathsNoEscape` is not set, then both square-bracket escapes and
  * backslash escapes are removed.
  *
  * Slashes (and backslashes in `windowsPathsNoEscape` mode) cannot be escaped
  * or unescaped.
+ *
+ * When `magicalBraces` is not set, escapes of braces (`{` and `}`) will not be
+ * unescaped.
  */
-const unescape = (s, { windowsPathsNoEscape = false, } = {}) => {
+const unescape = (s, { windowsPathsNoEscape = false, magicalBraces = true, } = {}) => {
+    if (magicalBraces) {
+        return windowsPathsNoEscape
+            ? s.replace(/\[([^\/\\])\]/g, '$1')
+            : s
+                .replace(/((?!\\).|^)\[([^\/\\])\]/g, '$1$2')
+                .replace(/\\([^\/])/g, '$1');
+    }
     return windowsPathsNoEscape
-        ? s.replace(/\[([^\/\\])\]/g, '$1')
-        : s.replace(/((?!\\).|^)\[([^\/\\])\]/g, '$1$2').replace(/\\([^\/])/g, '$1');
+        ? s.replace(/\[([^\/\\{}])\]/g, '$1')
+        : s
+            .replace(/((?!\\).|^)\[([^\/\\{}])\]/g, '$1$2')
+            .replace(/\\([^\/{}])/g, '$1');
 };
 exports.unescape = unescape;
 //# sourceMappingURL=unescape.js.map
@@ -49977,7 +50195,7 @@ const entToType = (s) => s.isFile() ? IFREG
                         : s.isFIFO() ? IFIFO
                             : UNKNOWN;
 // normalize unicode path names
-const normalizeCache = new Map();
+const normalizeCache = new lru_cache_1.LRUCache({ max: 2 ** 12 });
 const normalize = (s) => {
     const c = normalizeCache.get(s);
     if (c)
@@ -49986,7 +50204,7 @@ const normalize = (s) => {
     normalizeCache.set(s, n);
     return n;
 };
-const normalizeNocaseCache = new Map();
+const normalizeNocaseCache = new lru_cache_1.LRUCache({ max: 2 ** 12 });
 const normalizeNocase = (s) => {
     const c = normalizeNocaseCache.get(s);
     if (c)
@@ -50177,6 +50395,7 @@ class PathBase {
     get parentPath() {
         return (this.parent || this).fullpath();
     }
+    /* c8 ignore start */
     /**
      * Deprecated alias for Dirent['parentPath'] Somewhat counterintuitively,
      * this property refers to the *parent* path, not the path object itself.
@@ -50186,6 +50405,7 @@ class PathBase {
     get path() {
         return this.parentPath;
     }
+    /* c8 ignore stop */
     /**
      * Do not create new Path objects directly.  They should always be accessed
      * via the PathScurry class or other methods on the Path class.
@@ -51905,18 +52125,20 @@ exports.PathScurry = process.platform === 'win32' ? PathScurryWin32
  */
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.LRUCache = void 0;
-const perf = typeof performance === 'object' &&
+const defaultPerf = (typeof performance === 'object' &&
     performance &&
-    typeof performance.now === 'function'
-    ? performance
+    typeof performance.now === 'function') ?
+    performance
     : Date;
 const warned = new Set();
 /* c8 ignore start */
-const PROCESS = (typeof process === 'object' && !!process ? process : {});
+const PROCESS = (typeof process === 'object' && !!process ?
+    process
+    : {});
 /* c8 ignore start */
 const emitWarning = (msg, type, code, fn) => {
-    typeof PROCESS.emitWarning === 'function'
-        ? PROCESS.emitWarning(msg, type, code, fn)
+    typeof PROCESS.emitWarning === 'function' ?
+        PROCESS.emitWarning(msg, type, code, fn)
         : console.error(`[${code}] ${type}: ${msg}`);
 };
 let AC = globalThis.AbortController;
@@ -51980,16 +52202,11 @@ const isPosInt = (n) => n && n === Math.floor(n) && n > 0 && isFinite(n);
 // zeroes at init time is brutal when you get that big.
 // But why not be complete?
 // Maybe in the future, these limits will have expanded.
-const getUintArray = (max) => !isPosInt(max)
-    ? null
-    : max <= Math.pow(2, 8)
-        ? Uint8Array
-        : max <= Math.pow(2, 16)
-            ? Uint16Array
-            : max <= Math.pow(2, 32)
-                ? Uint32Array
-                : max <= Number.MAX_SAFE_INTEGER
-                    ? ZeroArray
+const getUintArray = (max) => !isPosInt(max) ? null
+    : max <= Math.pow(2, 8) ? Uint8Array
+        : max <= Math.pow(2, 16) ? Uint16Array
+            : max <= Math.pow(2, 32) ? Uint32Array
+                : max <= Number.MAX_SAFE_INTEGER ? ZeroArray
                     : null;
 /* c8 ignore stop */
 class ZeroArray extends Array {
@@ -52048,9 +52265,17 @@ class LRUCache {
     #max;
     #maxSize;
     #dispose;
+    #onInsert;
     #disposeAfter;
     #fetchMethod;
     #memoMethod;
+    #perf;
+    /**
+     * {@link LRUCache.OptionsBase.perf}
+     */
+    get perf() {
+        return this.#perf;
+    }
     /**
      * {@link LRUCache.OptionsBase.ttl}
      */
@@ -52126,9 +52351,11 @@ class LRUCache {
     #sizes;
     #starts;
     #ttls;
+    #autopurgeTimers;
     #hasDispose;
     #hasFetchMethod;
     #hasDisposeAfter;
+    #hasOnInsert;
     /**
      * Do not call this method unless you need to inspect the
      * inner workings of the cache.  If anything returned by this
@@ -52143,6 +52370,7 @@ class LRUCache {
             // properties
             starts: c.#starts,
             ttls: c.#ttls,
+            autopurgeTimers: c.#autopurgeTimers,
             sizes: c.#sizes,
             keyMap: c.#keyMap,
             keyList: c.#keyList,
@@ -52206,13 +52434,25 @@ class LRUCache {
         return this.#dispose;
     }
     /**
+     * {@link LRUCache.OptionsBase.onInsert} (read-only)
+     */
+    get onInsert() {
+        return this.#onInsert;
+    }
+    /**
      * {@link LRUCache.OptionsBase.disposeAfter} (read-only)
      */
     get disposeAfter() {
         return this.#disposeAfter;
     }
     constructor(options) {
-        const { max = 0, ttl, ttlResolution = 1, ttlAutopurge, updateAgeOnGet, updateAgeOnHas, allowStale, dispose, disposeAfter, noDisposeOnSet, noUpdateTTL, maxSize = 0, maxEntrySize = 0, sizeCalculation, fetchMethod, memoMethod, noDeleteOnFetchRejection, noDeleteOnStaleGet, allowStaleOnFetchRejection, allowStaleOnFetchAbort, ignoreFetchAbort, } = options;
+        const { max = 0, ttl, ttlResolution = 1, ttlAutopurge, updateAgeOnGet, updateAgeOnHas, allowStale, dispose, onInsert, disposeAfter, noDisposeOnSet, noUpdateTTL, maxSize = 0, maxEntrySize = 0, sizeCalculation, fetchMethod, memoMethod, noDeleteOnFetchRejection, noDeleteOnStaleGet, allowStaleOnFetchRejection, allowStaleOnFetchAbort, ignoreFetchAbort, perf, } = options;
+        if (perf !== undefined) {
+            if (typeof perf?.now !== 'function') {
+                throw new TypeError('perf option must have a now() method if specified');
+            }
+        }
+        this.#perf = perf ?? defaultPerf;
         if (max !== 0 && !isPosInt(max)) {
             throw new TypeError('max option must be a nonnegative integer');
         }
@@ -52232,13 +52472,11 @@ class LRUCache {
                 throw new TypeError('sizeCalculation set to non-function');
             }
         }
-        if (memoMethod !== undefined &&
-            typeof memoMethod !== 'function') {
+        if (memoMethod !== undefined && typeof memoMethod !== 'function') {
             throw new TypeError('memoMethod must be a function if defined');
         }
         this.#memoMethod = memoMethod;
-        if (fetchMethod !== undefined &&
-            typeof fetchMethod !== 'function') {
+        if (fetchMethod !== undefined && typeof fetchMethod !== 'function') {
             throw new TypeError('fetchMethod must be a function if specified');
         }
         this.#fetchMethod = fetchMethod;
@@ -52256,6 +52494,9 @@ class LRUCache {
         if (typeof dispose === 'function') {
             this.#dispose = dispose;
         }
+        if (typeof onInsert === 'function') {
+            this.#onInsert = onInsert;
+        }
         if (typeof disposeAfter === 'function') {
             this.#disposeAfter = disposeAfter;
             this.#disposed = [];
@@ -52265,6 +52506,7 @@ class LRUCache {
             this.#disposed = undefined;
         }
         this.#hasDispose = !!this.#dispose;
+        this.#hasOnInsert = !!this.#onInsert;
         this.#hasDisposeAfter = !!this.#disposeAfter;
         this.noDisposeOnSet = !!noDisposeOnSet;
         this.noUpdateTTL = !!noUpdateTTL;
@@ -52289,9 +52531,7 @@ class LRUCache {
         this.updateAgeOnGet = !!updateAgeOnGet;
         this.updateAgeOnHas = !!updateAgeOnHas;
         this.ttlResolution =
-            isPosInt(ttlResolution) || ttlResolution === 0
-                ? ttlResolution
-                : 1;
+            isPosInt(ttlResolution) || ttlResolution === 0 ? ttlResolution : 1;
         this.ttlAutopurge = !!ttlAutopurge;
         this.ttl = ttl || 0;
         if (this.ttl) {
@@ -52326,10 +52566,21 @@ class LRUCache {
         const starts = new ZeroArray(this.#max);
         this.#ttls = ttls;
         this.#starts = starts;
-        this.#setItemTTL = (index, ttl, start = perf.now()) => {
+        const purgeTimers = this.ttlAutopurge ?
+            new Array(this.#max)
+            : undefined;
+        this.#autopurgeTimers = purgeTimers;
+        this.#setItemTTL = (index, ttl, start = this.#perf.now()) => {
             starts[index] = ttl !== 0 ? start : 0;
             ttls[index] = ttl;
-            if (ttl !== 0 && this.ttlAutopurge) {
+            // clear out the purge timer if we're setting TTL to 0, and
+            // previously had a ttl purge timer running, so it doesn't
+            // fire unnecessarily.
+            if (purgeTimers?.[index]) {
+                clearTimeout(purgeTimers[index]);
+                purgeTimers[index] = undefined;
+            }
+            if (ttl !== 0 && purgeTimers) {
                 const t = setTimeout(() => {
                     if (this.#isStale(index)) {
                         this.#delete(this.#keyList[index], 'expire');
@@ -52341,10 +52592,11 @@ class LRUCache {
                     t.unref();
                 }
                 /* c8 ignore stop */
+                purgeTimers[index] = t;
             }
         };
         this.#updateItemAge = index => {
-            starts[index] = ttls[index] !== 0 ? perf.now() : 0;
+            starts[index] = ttls[index] !== 0 ? this.#perf.now() : 0;
         };
         this.#statusTTL = (status, index) => {
             if (ttls[index]) {
@@ -52364,7 +52616,7 @@ class LRUCache {
         // that costly call repeatedly.
         let cachedNow = 0;
         const getNow = () => {
-            const n = perf.now();
+            const n = this.#perf.now();
             if (this.ttlResolution > 0) {
                 cachedNow = n;
                 const t = setTimeout(() => (cachedNow = 0), this.ttlResolution);
@@ -52532,8 +52784,7 @@ class LRUCache {
     *keys() {
         for (const i of this.#indexes()) {
             const k = this.#keyList[i];
-            if (k !== undefined &&
-                !this.#isBackgroundFetch(this.#valList[i])) {
+            if (k !== undefined && !this.#isBackgroundFetch(this.#valList[i])) {
                 yield k;
             }
         }
@@ -52547,8 +52798,7 @@ class LRUCache {
     *rkeys() {
         for (const i of this.#rindexes()) {
             const k = this.#keyList[i];
-            if (k !== undefined &&
-                !this.#isBackgroundFetch(this.#valList[i])) {
+            if (k !== undefined && !this.#isBackgroundFetch(this.#valList[i])) {
                 yield k;
             }
         }
@@ -52560,8 +52810,7 @@ class LRUCache {
     *values() {
         for (const i of this.#indexes()) {
             const v = this.#valList[i];
-            if (v !== undefined &&
-                !this.#isBackgroundFetch(this.#valList[i])) {
+            if (v !== undefined && !this.#isBackgroundFetch(this.#valList[i])) {
                 yield this.#valList[i];
             }
         }
@@ -52575,8 +52824,7 @@ class LRUCache {
     *rvalues() {
         for (const i of this.#rindexes()) {
             const v = this.#valList[i];
-            if (v !== undefined &&
-                !this.#isBackgroundFetch(this.#valList[i])) {
+            if (v !== undefined && !this.#isBackgroundFetch(this.#valList[i])) {
                 yield this.#valList[i];
             }
         }
@@ -52601,9 +52849,7 @@ class LRUCache {
     find(fn, getOptions = {}) {
         for (const i of this.#indexes()) {
             const v = this.#valList[i];
-            const value = this.#isBackgroundFetch(v)
-                ? v.__staleWhileFetching
-                : v;
+            const value = this.#isBackgroundFetch(v) ? v.__staleWhileFetching : v;
             if (value === undefined)
                 continue;
             if (fn(value, this.#keyList[i], this)) {
@@ -52625,9 +52871,7 @@ class LRUCache {
     forEach(fn, thisp = this) {
         for (const i of this.#indexes()) {
             const v = this.#valList[i];
-            const value = this.#isBackgroundFetch(v)
-                ? v.__staleWhileFetching
-                : v;
+            const value = this.#isBackgroundFetch(v) ? v.__staleWhileFetching : v;
             if (value === undefined)
                 continue;
             fn.call(thisp, value, this.#keyList[i], this);
@@ -52640,9 +52884,7 @@ class LRUCache {
     rforEach(fn, thisp = this) {
         for (const i of this.#rindexes()) {
             const v = this.#valList[i];
-            const value = this.#isBackgroundFetch(v)
-                ? v.__staleWhileFetching
-                : v;
+            const value = this.#isBackgroundFetch(v) ? v.__staleWhileFetching : v;
             if (value === undefined)
                 continue;
             fn.call(thisp, value, this.#keyList[i], this);
@@ -52679,17 +52921,18 @@ class LRUCache {
         if (i === undefined)
             return undefined;
         const v = this.#valList[i];
-        const value = this.#isBackgroundFetch(v)
-            ? v.__staleWhileFetching
-            : v;
+        /* c8 ignore start - this isn't tested for the info function,
+         * but it's the same logic as found in other places. */
+        const value = this.#isBackgroundFetch(v) ? v.__staleWhileFetching : v;
         if (value === undefined)
             return undefined;
+        /* c8 ignore end */
         const entry = { value };
         if (this.#ttls && this.#starts) {
             const ttl = this.#ttls[i];
             const start = this.#starts[i];
             if (ttl && start) {
-                const remain = ttl - (perf.now() - start);
+                const remain = ttl - (this.#perf.now() - start);
                 entry.ttl = remain;
                 entry.start = Date.now();
             }
@@ -52717,9 +52960,7 @@ class LRUCache {
         for (const i of this.#indexes({ allowStale: true })) {
             const key = this.#keyList[i];
             const v = this.#valList[i];
-            const value = this.#isBackgroundFetch(v)
-                ? v.__staleWhileFetching
-                : v;
+            const value = this.#isBackgroundFetch(v) ? v.__staleWhileFetching : v;
             if (value === undefined || key === undefined)
                 continue;
             const entry = { value };
@@ -52727,7 +52968,7 @@ class LRUCache {
                 entry.ttl = this.#ttls[i];
                 // always dump the start relative to a portable timestamp
                 // it's ok for this to be a bit slow, it's a rare operation.
-                const age = perf.now() - this.#starts[i];
+                const age = this.#perf.now() - this.#starts[i];
                 entry.start = Math.floor(Date.now() - age);
             }
             if (this.#sizes) {
@@ -52757,7 +52998,7 @@ class LRUCache {
                 //
                 // it's ok for this to be a bit slow, it's a rare operation.
                 const age = Date.now() - entry.start;
-                entry.start = perf.now() - age;
+                entry.start = this.#perf.now() - age;
             }
             this.set(key, entry.value, entry);
         }
@@ -52814,12 +53055,9 @@ class LRUCache {
         let index = this.#size === 0 ? undefined : this.#keyMap.get(k);
         if (index === undefined) {
             // addition
-            index = (this.#size === 0
-                ? this.#tail
-                : this.#free.length !== 0
-                    ? this.#free.pop()
-                    : this.#size === this.#max
-                        ? this.#evict(false)
+            index = (this.#size === 0 ? this.#tail
+                : this.#free.length !== 0 ? this.#free.pop()
+                    : this.#size === this.#max ? this.#evict(false)
                         : this.#size);
             this.#keyList[index] = k;
             this.#valList[index] = v;
@@ -52832,6 +53070,9 @@ class LRUCache {
             if (status)
                 status.set = 'add';
             noUpdateTTL = false;
+            if (this.#hasOnInsert) {
+                this.#onInsert?.(v, k, 'add');
+            }
         }
         else {
             // update
@@ -52863,8 +53104,8 @@ class LRUCache {
                 this.#valList[index] = v;
                 if (status) {
                     status.set = 'replace';
-                    const oldValue = oldVal && this.#isBackgroundFetch(oldVal)
-                        ? oldVal.__staleWhileFetching
+                    const oldValue = oldVal && this.#isBackgroundFetch(oldVal) ?
+                        oldVal.__staleWhileFetching
                         : oldVal;
                     if (oldValue !== undefined)
                         status.oldValue = oldValue;
@@ -52872,6 +53113,9 @@ class LRUCache {
             }
             else if (status) {
                 status.set = 'update';
+            }
+            if (this.#hasOnInsert) {
+                this.onInsert?.(v, k, v === oldVal ? 'update' : 'replace');
             }
         }
         if (ttl !== 0 && !this.#ttls) {
@@ -52938,6 +53182,10 @@ class LRUCache {
             }
         }
         this.#removeItemSize(head);
+        if (this.#autopurgeTimers?.[head]) {
+            clearTimeout(this.#autopurgeTimers[head]);
+            this.#autopurgeTimers[head] = undefined;
+        }
         // if we aren't about to use the index, then null these out
         if (free) {
             this.#keyList[head] = undefined;
@@ -53010,8 +53258,7 @@ class LRUCache {
     peek(k, peekOptions = {}) {
         const { allowStale = this.allowStale } = peekOptions;
         const index = this.#keyMap.get(k);
-        if (index === undefined ||
-            (!allowStale && this.#isStale(index))) {
+        if (index === undefined || (!allowStale && this.#isStale(index))) {
             return;
         }
         const v = this.#valList[index];
@@ -53053,9 +53300,13 @@ class LRUCache {
             }
             // either we didn't abort, and are still here, or we did, and ignored
             const bf = p;
-            if (this.#valList[index] === p) {
+            // if nothing else has been written there but we're set to update the
+            // cache and ignore the abort, or if it's still pending on this specific
+            // background request, then write it to the cache.
+            const vl = this.#valList[index];
+            if (vl === p || (ignoreAbort && updateCache && vl === undefined)) {
                 if (v === undefined) {
-                    if (bf.__staleWhileFetching) {
+                    if (bf.__staleWhileFetching !== undefined) {
                         this.#valList[index] = bf.__staleWhileFetching;
                     }
                     else {
@@ -53117,8 +53368,7 @@ class LRUCache {
             // defer check until we are actually aborting,
             // so fetchMethod can override.
             ac.signal.addEventListener('abort', () => {
-                if (!options.ignoreFetchAbort ||
-                    options.allowStaleOnFetchAbort) {
+                if (!options.ignoreFetchAbort || options.allowStaleOnFetchAbort) {
                     res(undefined);
                     // when it eventually resolves, update the cache.
                     if (options.allowStaleOnFetchAbort) {
@@ -53350,6 +53600,10 @@ class LRUCache {
         if (this.#size !== 0) {
             const index = this.#keyMap.get(k);
             if (index !== undefined) {
+                if (this.#autopurgeTimers?.[index]) {
+                    clearTimeout(this.#autopurgeTimers?.[index]);
+                    this.#autopurgeTimers[index] = undefined;
+                }
                 deleted = true;
                 if (this.#size === 1) {
                     this.#clear(reason);
@@ -53425,6 +53679,11 @@ class LRUCache {
         if (this.#ttls && this.#starts) {
             this.#ttls.fill(0);
             this.#starts.fill(0);
+            for (const t of this.#autopurgeTimers ?? []) {
+                if (t !== undefined)
+                    clearTimeout(t);
+            }
+            this.#autopurgeTimers?.fill(undefined);
         }
         if (this.#sizes) {
             this.#sizes.fill(0);
