@@ -14,7 +14,7 @@
     "ajv-formats": "^3.0.0",
     "glob": "13.0.0",
     "js-yaml": "^4.1.0",
-    "zod": "4.1.12"
+    "zod": "4.1.13"
   },
   "devDependencies": {
     "@types/jest": "30.0.0",
