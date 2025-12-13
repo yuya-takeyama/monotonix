@@ -7,7 +7,7 @@
     "all": "npm run format && npm run test && npm run package"
   },
   "dependencies": {
-    "@actions/core": "1.11.1",
+    "@actions/core": "2.0.1",
     "@monotonix/schema": "*",
     "@monotonix/utils": "*",
     "ajv": "^8.12.0",
