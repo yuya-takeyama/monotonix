@@ -8,7 +8,7 @@
   },
   "dependencies": {
     "@actions/core": "2.0.1",
-    "@actions/github": "6.0.1",
+    "@actions/github": "7.0.0",
     "@monotonix/schema": "*",
     "@monotonix/utils": "*",
     "ajv": "^8.12.0",
