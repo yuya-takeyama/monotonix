@@ -1,4 +1,5 @@
 import { Context } from '@actions/github/lib/context';
+import { resolvePath } from '@monotonix/utils';
 import { generateImageReferences } from './generateImageReferences';
 import {
   DockerBuildGlobalConfig,
@@ -41,6 +42,14 @@ export function run({
       );
     }
 
+    const resolvedContext = localDockerBuildConfig.context
+      ? resolvePath(localDockerBuildConfig.context, job.context.app_path)
+      : job.context.app_path;
+
+    const resolvedDockerfile = localDockerBuildConfig.dockerfile
+      ? resolvePath(localDockerBuildConfig.dockerfile, job.context.app_path)
+      : undefined;
+
     return {
       ...job,
       params: {
@@ -58,7 +67,8 @@ export function run({
               },
             },
           },
-          context: job.context.app_path,
+          context: resolvedContext,
+          ...(resolvedDockerfile && { dockerfile: resolvedDockerfile }),
           tags: generateImageReferences({
             context,
             globalConfig,
