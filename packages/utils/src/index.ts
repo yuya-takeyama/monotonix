@@ -1,6 +1,10 @@
 import { join, normalize, relative } from 'path';
 
-const ROOT_PREFIX = '$root/';
+/**
+ * Prefix for paths resolved from repository root.
+ * Example: "$root/apps/shared" resolves to "apps/shared" from repo root.
+ */
+export const ROOT_PREFIX = '$root/';
 
 /**
  * Resolves a path based on its format:

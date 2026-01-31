@@ -7,19 +7,17 @@ import {
   LocalConfigJob,
   LocalConfigSchema,
 } from '@monotonix/schema';
-import { extractAppLabel, resolvePath } from '@monotonix/utils';
+import { extractAppLabel, ROOT_PREFIX, resolvePath } from '@monotonix/utils';
 import { globSync } from 'glob';
 import { load } from 'js-yaml';
 import { CommitInfo, getLastCommit } from './getLastCommit';
 import { Event } from './schema';
 
-const ROOT_PREFIX = '$root/';
-
 /**
  * Unresolved dependency - contains the original spec from config.
  * Must be resolved before use in filesystem operations.
  */
-type UnresolvedDependency = {
+export type UnresolvedDependency = {
   type: 'unresolved';
   appPath: string; // The app that declares this dependency
   spec: string; // Original spec from config (e.g., "$root/libs", "../shared")
@@ -29,7 +27,7 @@ type UnresolvedDependency = {
  * Resolved dependency - contains the absolute filesystem path.
  * Safe to use in filesystem operations like existsSync.
  */
-type ResolvedDependency = {
+export type ResolvedDependency = {
   type: 'resolved';
   appPath: string; // The app that declares this dependency
   spec: string; // Original spec for error messages
@@ -39,7 +37,7 @@ type ResolvedDependency = {
 /**
  * Creates an unresolved dependency from config.
  */
-const createUnresolvedDependency = (
+export const createUnresolvedDependency = (
   appPath: string,
   spec: string,
 ): UnresolvedDependency => ({
@@ -53,7 +51,7 @@ const createUnresolvedDependency = (
  * - $root/ prefix paths are resolved from rootDir
  * - Relative paths are resolved from appPath
  */
-const resolveDependency = (
+export const resolveDependency = (
   dep: UnresolvedDependency,
   rootDir: string,
 ): ResolvedDependency => {
@@ -234,7 +232,18 @@ export const calculateEffectiveTimestamp = async (
   );
 };
 
-const validateDependencies = (
+/**
+ * Validates all dependency paths in the given configs.
+ *
+ * Validation phases:
+ * 1. Create unresolved dependencies from config
+ * 2. Resolve all dependency paths to absolute filesystem paths
+ * 3. Validate existence + self-dependency check
+ * 4. Detect circular dependencies
+ *
+ * @throws Error if any dependency path is invalid
+ */
+export const validateDependencies = (
   allConfigs: Map<string, LocalConfig>,
   rootDir: string,
 ): Map<string, ResolvedDependency[]> => {

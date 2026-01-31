@@ -1,5 +1,9 @@
 import { Job, LocalConfig, LocalConfigJob } from '@monotonix/schema';
-import { createJob } from './loadJobsFromLocalConfigs';
+import {
+  createJob,
+  createUnresolvedDependency,
+  resolveDependency,
+} from './loadJobsFromLocalConfigs';
 import { Event } from './schema';
 
 describe('createJob', () => {
@@ -197,5 +201,105 @@ describe('createJob', () => {
 
     expect(result).toEqual(expected);
     expect(result.app.depends_on).toEqual([]);
+  });
+});
+
+describe('createUnresolvedDependency', () => {
+  it('creates an unresolved dependency with correct properties', () => {
+    const result = createUnresolvedDependency('/repo/apps/web', '$root/libs');
+
+    expect(result).toEqual({
+      type: 'unresolved',
+      appPath: '/repo/apps/web',
+      spec: '$root/libs',
+    });
+  });
+
+  it('creates an unresolved dependency with relative path', () => {
+    const result = createUnresolvedDependency('/repo/apps/web', '../shared');
+
+    expect(result).toEqual({
+      type: 'unresolved',
+      appPath: '/repo/apps/web',
+      spec: '../shared',
+    });
+  });
+});
+
+describe('resolveDependency', () => {
+  describe('with $root/ prefix', () => {
+    it('resolves $root/ path from repository root', () => {
+      const unresolved = createUnresolvedDependency(
+        '/repo/apps/web',
+        '$root/libs',
+      );
+      const result = resolveDependency(unresolved, '/repo');
+
+      expect(result).toEqual({
+        type: 'resolved',
+        appPath: '/repo/apps/web',
+        spec: '$root/libs',
+        absolutePath: '/repo/libs',
+      });
+    });
+
+    it('resolves nested $root/ path', () => {
+      const unresolved = createUnresolvedDependency(
+        '/repo/apps/web',
+        '$root/packages/shared/utils',
+      );
+      const result = resolveDependency(unresolved, '/repo');
+
+      expect(result).toEqual({
+        type: 'resolved',
+        appPath: '/repo/apps/web',
+        spec: '$root/packages/shared/utils',
+        absolutePath: '/repo/packages/shared/utils',
+      });
+    });
+  });
+
+  describe('with relative paths', () => {
+    it('resolves relative path from appPath', () => {
+      const unresolved = createUnresolvedDependency(
+        '/repo/apps/web',
+        '../shared',
+      );
+      const result = resolveDependency(unresolved, '/repo');
+
+      expect(result).toEqual({
+        type: 'resolved',
+        appPath: '/repo/apps/web',
+        spec: '../shared',
+        absolutePath: '/repo/apps/shared',
+      });
+    });
+
+    it('resolves deeply nested relative path', () => {
+      const unresolved = createUnresolvedDependency(
+        '/repo/apps/mono/apps/web',
+        '../../packages/common',
+      );
+      const result = resolveDependency(unresolved, '/repo');
+
+      expect(result).toEqual({
+        type: 'resolved',
+        appPath: '/repo/apps/mono/apps/web',
+        spec: '../../packages/common',
+        absolutePath: '/repo/apps/mono/packages/common',
+      });
+    });
+
+    it('resolves sibling directory path', () => {
+      const unresolved = createUnresolvedDependency('/repo/apps/web', './lib');
+      const result = resolveDependency(unresolved, '/repo');
+
+      expect(result).toEqual({
+        type: 'resolved',
+        appPath: '/repo/apps/web',
+        spec: './lib',
+        absolutePath: '/repo/apps/web/lib',
+      });
+    });
   });
 });

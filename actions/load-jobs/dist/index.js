@@ -43172,7 +43172,11 @@ const filterJobsByEvent = ({ jobs, event, }) => jobs
 })
     .map(job => JobSchema.parse(job));
 
-const ROOT_PREFIX$1 = '$root/';
+/**
+ * Prefix for paths resolved from repository root.
+ * Example: "$root/apps/shared" resolves to "apps/shared" from repo root.
+ */
+const ROOT_PREFIX = '$root/';
 /**
  * Resolves a path based on its format:
  * - Paths starting with "$root/" are resolved from repository root
@@ -43183,8 +43187,8 @@ const ROOT_PREFIX$1 = '$root/';
  * @returns The resolved path
  */
 const resolvePath = (inputPath, appPath) => {
-    if (inputPath.startsWith(ROOT_PREFIX$1)) {
-        return inputPath.slice(ROOT_PREFIX$1.length);
+    if (inputPath.startsWith(ROOT_PREFIX)) {
+        return inputPath.slice(ROOT_PREFIX.length);
     }
     return join(appPath, inputPath).replace(/\/$/, '');
 };
@@ -49117,7 +49121,6 @@ const getLastCommit = async (appPath) => {
     }
 };
 
-const ROOT_PREFIX = '$root/';
 /**
  * Creates an unresolved dependency from config.
  */
@@ -49226,6 +49229,17 @@ const calculateEffectiveTimestamp = async (appPath, resolvedDependencies) => {
     const maxTimestamp = Math.max(...allCommits.map(c => c.timestamp));
     return (allCommits.find(commit => commit.timestamp === maxTimestamp) || appCommit);
 };
+/**
+ * Validates all dependency paths in the given configs.
+ *
+ * Validation phases:
+ * 1. Create unresolved dependencies from config
+ * 2. Resolve all dependency paths to absolute filesystem paths
+ * 3. Validate existence + self-dependency check
+ * 4. Detect circular dependencies
+ *
+ * @throws Error if any dependency path is invalid
+ */
 const validateDependencies = (allConfigs, rootDir) => {
     // Phase 1: Create unresolved dependencies from config
     const unresolvedDepsMap = new Map();
