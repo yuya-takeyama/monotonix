@@ -4,13 +4,13 @@
     "build": "ncc build src/index.ts -o dist --source-map --license licenses.txt",
     "format": "prettier --write .",
     "test": "jest",
-    "all": "npm run format && npm run test && npm run package"
+    "all": "pnpm run format && pnpm run test && pnpm run package"
   },
   "dependencies": {
     "@actions/core": "2.0.3",
     "@actions/github": "6.0.1",
-    "@monotonix/schema": "*",
-    "@monotonix/utils": "*",
+    "@monotonix/schema": "workspace:*",
+    "@monotonix/utils": "workspace:*",
     "js-yaml": "^4.1.0",
     "luxon": "3.7.2",
     "zod": "4.3.6"
@@ -20,7 +20,7 @@
     "@types/js-yaml": "4.0.9",
     "@types/luxon": "3.7.1",
     "@types/node": "24.10.9",
-    "@vercel/ncc": "^0.38.3",
+    "@vercel/ncc": "0.38.4",
     "jest": "30.2.0",
     "prettier": "3.8.1",
     "ts-jest": "29.4.6",

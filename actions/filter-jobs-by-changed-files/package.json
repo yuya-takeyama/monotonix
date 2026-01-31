@@ -4,16 +4,17 @@
     "build": "ncc build src/index.ts -o dist --source-map --license licenses.txt",
     "format": "prettier --write .",
     "test": "jest --passWithNoTests",
-    "all": "npm run format && npm run test && npm run package"
+    "all": "pnpm run format && pnpm run test && pnpm run package"
   },
   "dependencies": {
     "@actions/core": "2.0.3",
     "@actions/github": "6.0.1",
-    "@monotonix/schema": "*"
+    "@monotonix/schema": "workspace:*"
   },
   "devDependencies": {
     "@types/jest": "30.0.0",
     "@types/node": "24.10.9",
+    "@vercel/ncc": "0.38.4",
     "jest": "30.2.0",
     "prettier": "3.8.1",
     "ts-jest": "29.4.6",
