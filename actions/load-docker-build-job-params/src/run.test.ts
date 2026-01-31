@@ -173,4 +173,34 @@ describe('run', () => {
     expect(result[0].params.docker_build.context).toBe('apps');
     expect(result[0].params.docker_build.dockerfile).toBeUndefined();
   });
+
+  it('resolves $root/ prefixed paths from repository root', () => {
+    const jobWithRootPaths: InputJob = {
+      ...stubJob,
+      context: {
+        ...stubJob.context,
+        app_path: 'apps/mono/apps/web',
+      },
+      configs: {
+        ...stubJob.configs,
+        docker_build: {
+          ...stubJob.configs.docker_build,
+          context: '$root/apps/mono',
+          dockerfile: '$root/apps/mono/apps/web/Dockerfile',
+        },
+      },
+    };
+
+    const result = run({
+      globalConfig: stubGlobalConfig,
+      jobs: [jobWithRootPaths],
+      context: stubContext,
+      timezone: 'UTC',
+    });
+
+    expect(result[0].params.docker_build.context).toBe('apps/mono');
+    expect(result[0].params.docker_build.dockerfile).toBe(
+      'apps/mono/apps/web/Dockerfile',
+    );
+  });
 });

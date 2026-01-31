@@ -3,7 +3,7 @@ import os__default, { EOL } from 'os';
 import * as crypto from 'crypto';
 import * as fs from 'fs';
 import { promises, existsSync, readFileSync } from 'fs';
-import path, { normalize, relative, join } from 'path';
+import { join, normalize, relative } from 'path';
 import http from 'http';
 import https from 'https';
 import 'net';
@@ -48423,6 +48423,22 @@ function loadGlobalConfig(globalConfigFilePath) {
     return DockerBuildGlobalConfigSchema.parse(load(globalConfigContent));
 }
 
+const ROOT_PREFIX = '$root/';
+/**
+ * Resolves a path based on its format:
+ * - Paths starting with "$root/" are resolved from repository root
+ * - All other paths are resolved relative to appPath
+ *
+ * @param inputPath - The path to resolve (e.g., "../..", "$root/apps/shared")
+ * @param appPath - The base path for relative resolution
+ * @returns The resolved path
+ */
+const resolvePath = (inputPath, appPath) => {
+    if (inputPath.startsWith(ROOT_PREFIX)) {
+        return inputPath.slice(ROOT_PREFIX.length);
+    }
+    return join(appPath, inputPath).replace(/\/$/, '');
+};
 const extractAppLabel = (appPath, rootDir) => {
     // Normalize both paths to handle various input formats
     const normalizedRootDir = normalize(rootDir || '.');
@@ -48495,12 +48511,10 @@ function run({ globalConfig, jobs, context, timezone, }) {
             throw new Error(`IAM not found from Global Config: ${localDockerBuildConfig.registry.aws.iam}`);
         }
         const resolvedContext = localDockerBuildConfig.context
-            ? path
-                .join(job.context.app_path, localDockerBuildConfig.context)
-                .replace(/\/$/, '')
+            ? resolvePath(localDockerBuildConfig.context, job.context.app_path)
             : job.context.app_path;
         const resolvedDockerfile = localDockerBuildConfig.dockerfile
-            ? path.join(job.context.app_path, localDockerBuildConfig.dockerfile)
+            ? resolvePath(localDockerBuildConfig.dockerfile, job.context.app_path)
             : undefined;
         return {
             ...job,

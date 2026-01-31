@@ -1,4 +1,22 @@
-import { normalize, relative } from 'path';
+import { join, normalize, relative } from 'path';
+
+const ROOT_PREFIX = '$root/';
+
+/**
+ * Resolves a path based on its format:
+ * - Paths starting with "$root/" are resolved from repository root
+ * - All other paths are resolved relative to appPath
+ *
+ * @param inputPath - The path to resolve (e.g., "../..", "$root/apps/shared")
+ * @param appPath - The base path for relative resolution
+ * @returns The resolved path
+ */
+export const resolvePath = (inputPath: string, appPath: string): string => {
+  if (inputPath.startsWith(ROOT_PREFIX)) {
+    return inputPath.slice(ROOT_PREFIX.length);
+  }
+  return join(appPath, inputPath).replace(/\/$/, '');
+};
 
 export const extractAppLabel = (appPath: string, rootDir: string): string => {
   // Normalize both paths to handle various input formats

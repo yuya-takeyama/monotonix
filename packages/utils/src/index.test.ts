@@ -1,4 +1,4 @@
-import { extractAppLabel } from './index';
+import { extractAppLabel, resolvePath } from './index';
 
 describe('extractAppLabel', () => {
   describe('with empty rootDir', () => {
@@ -61,5 +61,42 @@ describe('extractAppLabel', () => {
         `appPath "${appPath}" is outside of rootDir "${rootDir}". All app paths must be within the root directory.`,
       );
     });
+  });
+});
+
+describe('resolvePath', () => {
+  describe('with $root/ prefix (repository root)', () => {
+    test.each([
+      ['$root/apps/shared/lib', 'apps/web', 'apps/shared/lib'],
+      ['$root/packages/common', 'apps/api/src', 'packages/common'],
+      ['$root/libs', 'deeply/nested/app', 'libs'],
+    ])('resolvePath("%s", "%s") -> "%s"', (inputPath, appPath, expected) => {
+      expect(resolvePath(inputPath, appPath)).toBe(expected);
+    });
+  });
+
+  describe('with relative paths (from appPath)', () => {
+    test.each([
+      ['../..', 'apps/example/subapp', 'apps'],
+      ['../', 'apps/hello-world', 'apps'],
+      ['Dockerfile', 'apps/web', 'apps/web/Dockerfile'],
+      ['./Dockerfile', 'apps/web', 'apps/web/Dockerfile'],
+      ['config/app.yaml', 'apps/api', 'apps/api/config/app.yaml'],
+      ['../../shared', 'apps/mono/apps/web', 'apps/mono/shared'],
+    ])('resolvePath("%s", "%s") -> "%s"', (inputPath, appPath, expected) => {
+      expect(resolvePath(inputPath, appPath)).toBe(expected);
+    });
+  });
+
+  describe('trailing slash removal', () => {
+    test.each([
+      ['../', 'apps/web', 'apps'],
+      ['../../', 'apps/mono/web', 'apps'],
+    ])(
+      'resolvePath("%s", "%s") -> "%s" (no trailing slash)',
+      (inputPath, appPath, expected) => {
+        expect(resolvePath(inputPath, appPath)).toBe(expected);
+      },
+    );
   });
 });
