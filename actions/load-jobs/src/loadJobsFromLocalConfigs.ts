@@ -118,11 +118,14 @@ const createJobsFromConfigs = async (
       try {
         // Use already resolved dependency paths (type-safe)
         const resolvedDeps = resolvedDepsMap.get(appPath) || [];
-        const resolvedDepPaths = resolvedDeps.map(d => d.absolutePath);
+        // Use absolute paths for git operations (calculateEffectiveTimestamp)
+        const absoluteDepPaths = resolvedDeps.map(d => d.absolutePath);
+        // Use relative paths for job output (filter-jobs-by-changed-files comparison)
+        const relativeDepPaths = resolvedDeps.map(d => d.relativePath);
 
         const lastCommit = await calculateEffectiveTimestamp(
           appPath,
-          resolvedDepPaths,
+          absoluteDepPaths,
         );
 
         return Object.entries(localConfig.jobs).map(
@@ -133,7 +136,7 @@ const createJobsFromConfigs = async (
               lastCommit,
               jobKey,
               job,
-              resolvedDepPaths,
+              resolvedDepPaths: relativeDepPaths,
               ...context,
             }),
         );

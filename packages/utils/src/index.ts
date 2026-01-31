@@ -17,14 +17,16 @@ export type UnresolvedPath = {
 };
 
 /**
- * Resolved path - contains the absolute filesystem path.
- * Safe to use in filesystem operations like existsSync.
+ * Resolved path - contains both absolute and relative paths.
+ * - absolutePath: Safe to use in filesystem operations like existsSync
+ * - relativePath: Relative to repository root, for comparing with GitHub changed files
  */
 export type ResolvedPath = {
   type: 'resolved';
   basePath: string; // The base path used for resolution
   spec: string; // Original spec for error messages
   absolutePath: string; // Resolved absolute filesystem path
+  relativePath: string; // Relative path from repository root
 };
 
 /**
@@ -73,11 +75,15 @@ export const resolveToAbsolutePath = (
     ? join(repositoryRoot, resolved)
     : resolved;
 
+  // Calculate relative path from repository root
+  const relativePath = relative(repositoryRoot, absolutePath);
+
   return {
     type: 'resolved',
     basePath: unresolved.basePath,
     spec: unresolved.spec,
     absolutePath,
+    relativePath,
   };
 };
 
