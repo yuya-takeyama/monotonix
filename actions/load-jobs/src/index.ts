@@ -7,6 +7,13 @@ import { MetadataValidator } from './validateMetadata';
 
 (async () => {
   try {
+    const repositoryRoot = process.env.GITHUB_WORKSPACE;
+    if (!repositoryRoot) {
+      throw new Error(
+        'GITHUB_WORKSPACE environment variable is not set. This action must be run in a GitHub Actions environment.',
+      );
+    }
+
     const rootDir = getInput('root-dir');
     const localConfigFileName =
       getInput('local-config-file-name') || 'monotonix.yaml';
@@ -23,6 +30,7 @@ import { MetadataValidator } from './validateMetadata';
 
     const result = await run({
       rootDir,
+      repositoryRoot,
       dedupeKey,
       requiredConfigKeys,
       localConfigFileName,

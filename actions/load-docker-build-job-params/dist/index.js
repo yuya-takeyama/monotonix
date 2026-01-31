@@ -48425,21 +48425,21 @@ function loadGlobalConfig(globalConfigFilePath) {
 
 /**
  * Prefix for paths resolved from repository root.
- * Example: "$root/apps/shared" resolves to "apps/shared" from repo root.
+ * Example: "$repoRoot/apps/shared" resolves to "apps/shared" from repo root.
  */
-const ROOT_PREFIX = '$root/';
+const REPO_ROOT_PREFIX = '$repoRoot/';
 /**
  * Resolves a path based on its format:
- * - Paths starting with "$root/" are resolved from repository root
+ * - Paths starting with "$repoRoot/" are resolved from repository root
  * - All other paths are resolved relative to appPath
  *
- * @param inputPath - The path to resolve (e.g., "../..", "$root/apps/shared")
+ * @param inputPath - The path to resolve (e.g., "../..", "$repoRoot/apps/shared")
  * @param appPath - The base path for relative resolution
- * @returns The resolved path (relative for $root/, absolute for relative paths)
+ * @returns The resolved path (relative for $repoRoot/, absolute for relative paths)
  */
 const resolvePath = (inputPath, appPath) => {
-    if (inputPath.startsWith(ROOT_PREFIX)) {
-        return inputPath.slice(ROOT_PREFIX.length);
+    if (inputPath.startsWith(REPO_ROOT_PREFIX)) {
+        return inputPath.slice(REPO_ROOT_PREFIX.length);
     }
     return join(appPath, inputPath).replace(/\/$/, '');
 };

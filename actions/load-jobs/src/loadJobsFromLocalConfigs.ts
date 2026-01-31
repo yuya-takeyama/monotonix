@@ -33,16 +33,17 @@ export const createUnresolvedDependency = (
 
 /**
  * Resolves a dependency to an absolute filesystem path.
- * - $root/ prefix paths are resolved from rootDir
+ * - $repoRoot/ prefix paths are resolved from repositoryRoot
  * - Relative paths are resolved from appPath
  */
 export const resolveDependency = (
   dep: UnresolvedDependency,
-  rootDir: string,
-): ResolvedDependency => resolveToAbsolutePath(dep, rootDir);
+  repositoryRoot: string,
+): ResolvedDependency => resolveToAbsolutePath(dep, repositoryRoot);
 
 type LoadJobsFromLocalConfigFilesOptions = {
   rootDir: string;
+  repositoryRoot: string;
   dedupeKey: string;
   requiredConfigKeys: string[];
   localConfigFileName: string;
@@ -51,6 +52,7 @@ type LoadJobsFromLocalConfigFilesOptions = {
 
 export const loadJobsFromLocalConfigFiles = async ({
   rootDir,
+  repositoryRoot,
   dedupeKey,
   requiredConfigKeys,
   localConfigFileName,
@@ -58,7 +60,11 @@ export const loadJobsFromLocalConfigFiles = async ({
 }: LoadJobsFromLocalConfigFilesOptions): Promise<Jobs> => {
   const allConfigs = await loadAllLocalConfigs(rootDir, localConfigFileName);
 
-  const resolvedDepsMap = validateDependencies(allConfigs, rootDir);
+  const resolvedDepsMap = validateDependencies(
+    allConfigs,
+    rootDir,
+    repositoryRoot,
+  );
 
   const jobs = await createJobsFromConfigs(allConfigs, resolvedDepsMap, {
     dedupeKey,
@@ -218,6 +224,7 @@ export const calculateEffectiveTimestamp = async (
 export const validateDependencies = (
   allConfigs: Map<string, LocalConfig>,
   rootDir: string,
+  repositoryRoot: string,
 ): Map<string, ResolvedDependency[]> => {
   // Phase 1: Create unresolved dependencies from config
   const unresolvedDepsMap = new Map<string, UnresolvedDependency[]>();
@@ -235,7 +242,7 @@ export const validateDependencies = (
 
   for (const [appPath, unresolvedDeps] of unresolvedDepsMap) {
     const resolvedDeps = unresolvedDeps.map(dep =>
-      resolveDependency(dep, rootDir),
+      resolveDependency(dep, repositoryRoot),
     );
     resolvedDepsMap.set(appPath, resolvedDeps);
   }

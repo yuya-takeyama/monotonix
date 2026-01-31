@@ -69,8 +69,8 @@ app:
   depends_on: [] # Optional: specify dependencies
   # Example with dependencies:
   # depends_on:
-  #   - $root/apps/shared/lib  # $root/ prefix = from repository root
-  #   - ../common              # Relative path = from app directory
+  #   - $repoRoot/apps/shared/lib  # $repoRoot/ prefix = from repository root
+  #   - ../common                  # Relative path = from app directory
 jobs:
   job_name:
     on: # GitHub event triggers
@@ -82,16 +82,16 @@ jobs:
         tagging: semver_datetime
         context: ../.. # Optional: relative to app directory
         dockerfile: Dockerfile # Optional: relative to app directory
-        # Or use $root/ prefix for repository root paths:
-        # context: $root/apps/mono
-        # dockerfile: $root/apps/mono/apps/web/Dockerfile
+        # Or use $repoRoot/ prefix for repository root paths:
+        # context: $repoRoot/apps/mono
+        # dockerfile: $repoRoot/apps/mono/apps/web/Dockerfile
 ```
 
 ### Path Resolution
 
 All path fields (`depends_on`, `context`, `dockerfile`) use the following resolution rules:
 
-- **`$root/` prefix**: Resolved from repository root (e.g., `$root/apps/shared` → `apps/shared`)
+- **`$repoRoot/` prefix**: Resolved from repository root (e.g., `$repoRoot/apps/shared` → `apps/shared`)
 - **Relative paths**: Resolved from the app directory where `monotonix.yaml` is located (e.g., `../..`, `./Dockerfile`)
 
 ### Global Configuration (`monotonix-global.yaml`)

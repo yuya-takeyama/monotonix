@@ -70,11 +70,11 @@ describe('extractAppLabel', () => {
 });
 
 describe('resolvePath', () => {
-  describe('with $root/ prefix (repository root)', () => {
+  describe('with $repoRoot/ prefix (repository root)', () => {
     test.each([
-      ['$root/apps/shared/lib', 'apps/web', 'apps/shared/lib'],
-      ['$root/packages/common', 'apps/api/src', 'packages/common'],
-      ['$root/libs', 'deeply/nested/app', 'libs'],
+      ['$repoRoot/apps/shared/lib', 'apps/web', 'apps/shared/lib'],
+      ['$repoRoot/packages/common', 'apps/api/src', 'packages/common'],
+      ['$repoRoot/libs', 'deeply/nested/app', 'libs'],
     ])('resolvePath("%s", "%s") -> "%s"', (inputPath, appPath, expected) => {
       expect(resolvePath(inputPath, appPath)).toBe(expected);
     });
@@ -107,13 +107,13 @@ describe('resolvePath', () => {
 });
 
 describe('createUnresolvedPath', () => {
-  it('creates an unresolved path with $root/ spec', () => {
-    const result = createUnresolvedPath('/repo/apps/web', '$root/libs');
+  it('creates an unresolved path with $repoRoot/ spec', () => {
+    const result = createUnresolvedPath('/repo/apps/web', '$repoRoot/libs');
 
     expect(result).toEqual({
       type: 'unresolved',
       basePath: '/repo/apps/web',
-      spec: '$root/libs',
+      spec: '$repoRoot/libs',
     });
   });
 
@@ -129,30 +129,33 @@ describe('createUnresolvedPath', () => {
 });
 
 describe('resolveToAbsolutePath', () => {
-  describe('with $root/ prefix', () => {
-    it('resolves $root/ path from repository root', () => {
-      const unresolved = createUnresolvedPath('/repo/apps/web', '$root/libs');
-      const result = resolveToAbsolutePath(unresolved, '/repo');
-
-      expect(result).toEqual({
-        type: 'resolved',
-        basePath: '/repo/apps/web',
-        spec: '$root/libs',
-        absolutePath: '/repo/libs',
-      });
-    });
-
-    it('resolves nested $root/ path', () => {
+  describe('with $repoRoot/ prefix', () => {
+    it('resolves $repoRoot/ path from repository root', () => {
       const unresolved = createUnresolvedPath(
         '/repo/apps/web',
-        '$root/packages/shared/utils',
+        '$repoRoot/libs',
       );
       const result = resolveToAbsolutePath(unresolved, '/repo');
 
       expect(result).toEqual({
         type: 'resolved',
         basePath: '/repo/apps/web',
-        spec: '$root/packages/shared/utils',
+        spec: '$repoRoot/libs',
+        absolutePath: '/repo/libs',
+      });
+    });
+
+    it('resolves nested $repoRoot/ path', () => {
+      const unresolved = createUnresolvedPath(
+        '/repo/apps/web',
+        '$repoRoot/packages/shared/utils',
+      );
+      const result = resolveToAbsolutePath(unresolved, '/repo');
+
+      expect(result).toEqual({
+        type: 'resolved',
+        basePath: '/repo/apps/web',
+        spec: '$repoRoot/packages/shared/utils',
         absolutePath: '/repo/packages/shared/utils',
       });
     });
