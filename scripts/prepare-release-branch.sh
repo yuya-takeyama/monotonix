@@ -36,13 +36,13 @@ fi
 
 # Install dependencies and run build/test
 echo "→ Installing dependencies..."
-npm install
+pnpm install
 
 echo "→ Building project..."
-npm run build
+pnpm run build
 
 echo "→ Running tests..."
-npm run test
+pnpm run test
 
 # Fetch latest main
 echo "→ Fetching latest main branch..."
