@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "@actions/core": "3.0.0",
-    "@actions/github": "6.0.1",
+    "@actions/github": "9.0.0",
     "@monotonix/schema": "workspace:*",
     "@monotonix/utils": "workspace:*",
     "js-yaml": "^4.1.0",
