@@ -2,6 +2,7 @@ import { context } from '@actions/github';
 import { run } from './run';
 
 type Context = typeof context;
+
 import { DockerBuildGlobalConfig, InputJob, OutputJob } from './schema';
 
 describe('run', () => {

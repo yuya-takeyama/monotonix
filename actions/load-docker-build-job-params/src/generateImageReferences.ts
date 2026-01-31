@@ -1,10 +1,10 @@
 import { context } from '@actions/github';
 import { extractAppLabel } from '@monotonix/utils';
-
-type Context = typeof context;
 import { DateTime } from 'luxon';
 import { join } from 'path';
 import { DockerBuildGlobalConfig, InputJob } from './schema';
+
+type Context = typeof context;
 
 type generateTagsType = {
   context: Context;

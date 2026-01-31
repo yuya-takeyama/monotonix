@@ -1,7 +1,5 @@
 import { context } from '@actions/github';
 import { resolvePath } from '@monotonix/utils';
-
-type Context = typeof context;
 import { generateImageReferences } from './generateImageReferences';
 import {
   DockerBuildGlobalConfig,
@@ -9,6 +7,8 @@ import {
   OutputJob,
   OutputJobs,
 } from './schema';
+
+type Context = typeof context;
 
 type runParams = {
   globalConfig: DockerBuildGlobalConfig;
