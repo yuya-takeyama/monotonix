@@ -54,6 +54,7 @@ describe('createJob', () => {
       job: stubJob,
       event: stubEvent as Event,
       rootDir,
+      resolvedDepPaths: [],
     });
 
     const expected: Job = {
@@ -112,6 +113,7 @@ describe('createJob', () => {
       job: differentJob,
       event: stubEvent as Event,
       rootDir,
+      resolvedDepPaths: [],
     });
 
     const expected: Job = {
@@ -169,6 +171,7 @@ describe('createJob', () => {
       job: stubJob,
       event: stubEvent as Event,
       rootDir,
+      resolvedDepPaths: [],
     });
 
     const expected: Job = {
@@ -243,6 +246,7 @@ describe('resolveDependency', () => {
         basePath: '/repo/apps/web',
         spec: '$repoRoot/libs',
         absolutePath: '/repo/libs',
+        relativePath: 'libs',
       });
     });
 
@@ -258,6 +262,7 @@ describe('resolveDependency', () => {
         basePath: '/repo/apps/web',
         spec: '$repoRoot/packages/shared/utils',
         absolutePath: '/repo/packages/shared/utils',
+        relativePath: 'packages/shared/utils',
       });
     });
   });
@@ -275,6 +280,7 @@ describe('resolveDependency', () => {
         basePath: '/repo/apps/web',
         spec: '../shared',
         absolutePath: '/repo/apps/shared',
+        relativePath: 'apps/shared',
       });
     });
 
@@ -290,6 +296,7 @@ describe('resolveDependency', () => {
         basePath: '/repo/apps/mono/apps/web',
         spec: '../../packages/common',
         absolutePath: '/repo/apps/mono/packages/common',
+        relativePath: 'apps/mono/packages/common',
       });
     });
 
@@ -302,6 +309,7 @@ describe('resolveDependency', () => {
         basePath: '/repo/apps/web',
         spec: './lib',
         absolutePath: '/repo/apps/web/lib',
+        relativePath: 'apps/web/lib',
       });
     });
   });

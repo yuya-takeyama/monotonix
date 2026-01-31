@@ -43214,11 +43214,14 @@ const resolveToAbsolutePath = (unresolved, repositoryRoot) => {
     const absolutePath = unresolved.spec.startsWith(REPO_ROOT_PREFIX)
         ? join(repositoryRoot, resolved)
         : resolved;
+    // Calculate relative path from repository root
+    const relativePath = relative(repositoryRoot, absolutePath);
     return {
         type: 'resolved',
         basePath: unresolved.basePath,
         spec: unresolved.spec,
         absolutePath,
+        relativePath,
     };
 };
 const extractAppLabel = (appPath, rootDir) => {
@@ -49194,14 +49197,18 @@ const createJobsFromConfigs = async (allConfigs, resolvedDepsMap, context) => {
         try {
             // Use already resolved dependency paths (type-safe)
             const resolvedDeps = resolvedDepsMap.get(appPath) || [];
-            const resolvedDepPaths = resolvedDeps.map(d => d.absolutePath);
-            const lastCommit = await calculateEffectiveTimestamp(appPath, resolvedDepPaths);
+            // Use absolute paths for git operations (calculateEffectiveTimestamp)
+            const absoluteDepPaths = resolvedDeps.map(d => d.absolutePath);
+            // Use relative paths for job output (filter-jobs-by-changed-files comparison)
+            const relativeDepPaths = resolvedDeps.map(d => d.relativePath);
+            const lastCommit = await calculateEffectiveTimestamp(appPath, absoluteDepPaths);
             return Object.entries(localConfig.jobs).map(([jobKey, job]) => createJob({
                 localConfig,
                 appPath,
                 lastCommit,
                 jobKey,
                 job,
+                resolvedDepPaths: relativeDepPaths,
                 ...context,
             }));
         }
@@ -49211,9 +49218,12 @@ const createJobsFromConfigs = async (allConfigs, resolvedDepsMap, context) => {
         }
     }));
 };
-const createJob = ({ localConfig, dedupeKey, appPath, lastCommit, jobKey, job, event, rootDir, }) => ({
+const createJob = ({ localConfig, dedupeKey, appPath, lastCommit, jobKey, job, event, rootDir, resolvedDepPaths, }) => ({
     ...job,
-    app: localConfig.app,
+    app: {
+        ...localConfig.app,
+        depends_on: resolvedDepPaths,
+    },
     context: {
         dedupe_key: dedupeKey,
         github_ref: event.ref,

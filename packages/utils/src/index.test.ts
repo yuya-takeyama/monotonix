@@ -142,6 +142,7 @@ describe('resolveToAbsolutePath', () => {
         basePath: '/repo/apps/web',
         spec: '$repoRoot/libs',
         absolutePath: '/repo/libs',
+        relativePath: 'libs',
       });
     });
 
@@ -157,6 +158,7 @@ describe('resolveToAbsolutePath', () => {
         basePath: '/repo/apps/web',
         spec: '$repoRoot/packages/shared/utils',
         absolutePath: '/repo/packages/shared/utils',
+        relativePath: 'packages/shared/utils',
       });
     });
   });
@@ -171,6 +173,7 @@ describe('resolveToAbsolutePath', () => {
         basePath: '/repo/apps/web',
         spec: '../shared',
         absolutePath: '/repo/apps/shared',
+        relativePath: 'apps/shared',
       });
     });
 
@@ -186,6 +189,7 @@ describe('resolveToAbsolutePath', () => {
         basePath: '/repo/apps/mono/apps/web',
         spec: '../../packages/common',
         absolutePath: '/repo/apps/mono/packages/common',
+        relativePath: 'apps/mono/packages/common',
       });
     });
 
@@ -198,6 +202,7 @@ describe('resolveToAbsolutePath', () => {
         basePath: '/repo/apps/web',
         spec: './lib',
         absolutePath: '/repo/apps/web/lib',
+        relativePath: 'apps/web/lib',
       });
     });
   });
