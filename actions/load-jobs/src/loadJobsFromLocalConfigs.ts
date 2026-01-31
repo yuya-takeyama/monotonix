@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname } from 'node:path';
 import {
   Job,
   Jobs,
@@ -7,11 +7,39 @@ import {
   LocalConfigJob,
   LocalConfigSchema,
 } from '@monotonix/schema';
-import { extractAppLabel } from '@monotonix/utils';
+import {
+  createUnresolvedPath,
+  extractAppLabel,
+  type ResolvedPath,
+  resolveToAbsolutePath,
+  type UnresolvedPath,
+} from '@monotonix/utils';
 import { globSync } from 'glob';
 import { load } from 'js-yaml';
 import { CommitInfo, getLastCommit } from './getLastCommit';
 import { Event } from './schema';
+
+// Re-export types with domain-specific aliases for dependencies
+export type UnresolvedDependency = UnresolvedPath;
+export type ResolvedDependency = ResolvedPath;
+
+/**
+ * Creates an unresolved dependency from config.
+ */
+export const createUnresolvedDependency = (
+  appPath: string,
+  spec: string,
+): UnresolvedDependency => createUnresolvedPath(appPath, spec);
+
+/**
+ * Resolves a dependency to an absolute filesystem path.
+ * - $root/ prefix paths are resolved from rootDir
+ * - Relative paths are resolved from appPath
+ */
+export const resolveDependency = (
+  dep: UnresolvedDependency,
+  rootDir: string,
+): ResolvedDependency => resolveToAbsolutePath(dep, rootDir);
 
 type LoadJobsFromLocalConfigFilesOptions = {
   rootDir: string;
@@ -30,9 +58,9 @@ export const loadJobsFromLocalConfigFiles = async ({
 }: LoadJobsFromLocalConfigFilesOptions): Promise<Jobs> => {
   const allConfigs = await loadAllLocalConfigs(rootDir, localConfigFileName);
 
-  validateDependencies(allConfigs, rootDir);
+  const resolvedDepsMap = validateDependencies(allConfigs, rootDir);
 
-  const jobs = await createJobsFromConfigs(allConfigs, {
+  const jobs = await createJobsFromConfigs(allConfigs, resolvedDepsMap, {
     dedupeKey,
     event,
     rootDir,
@@ -76,14 +104,19 @@ type JobCreationContext = {
 
 const createJobsFromConfigs = async (
   allConfigs: Map<string, LocalConfig>,
+  resolvedDepsMap: Map<string, ResolvedDependency[]>,
   context: JobCreationContext,
 ): Promise<Job[][]> => {
   return Promise.all(
     Array.from(allConfigs.entries()).map(async ([appPath, localConfig]) => {
       try {
+        // Use already resolved dependency paths (type-safe)
+        const resolvedDeps = resolvedDepsMap.get(appPath) || [];
+        const resolvedDepPaths = resolvedDeps.map(d => d.absolutePath);
+
         const lastCommit = await calculateEffectiveTimestamp(
           appPath,
-          localConfig.app?.depends_on || [],
+          resolvedDepPaths,
         );
 
         return Object.entries(localConfig.jobs).map(
@@ -145,25 +178,21 @@ export const createJob = ({
 
 export const calculateEffectiveTimestamp = async (
   appPath: string,
-  dependencies: string[],
+  resolvedDependencies: string[],
 ): Promise<CommitInfo> => {
   const appCommit = await getLastCommit(appPath);
 
   // Skip if no dependencies
-  if (dependencies.length === 0) {
+  if (resolvedDependencies.length === 0) {
     return appCommit;
   }
 
   // Get commit info for all dependencies in parallel
+  // Note: Dependencies are already validated (existence check) in validateDependencies
   const dependencyCommits = await Promise.all(
-    dependencies
+    resolvedDependencies
       .filter(dep => dep !== appPath) // Skip self-dependency
-      .map(async dep => {
-        if (!existsSync(dep)) {
-          throw new Error(`Dependency path does not exist: ${dep}`);
-        }
-        return getLastCommit(dep);
-      }),
+      .map(dep => getLastCommit(dep)),
   );
 
   // Find the most recent commit among app and all dependencies
@@ -175,43 +204,79 @@ export const calculateEffectiveTimestamp = async (
   );
 };
 
-const validateDependencies = (
+/**
+ * Validates all dependency paths in the given configs.
+ *
+ * Validation phases:
+ * 1. Create unresolved dependencies from config
+ * 2. Resolve all dependency paths to absolute filesystem paths
+ * 3. Validate existence + self-dependency check
+ * 4. Detect circular dependencies
+ *
+ * @throws Error if any dependency path is invalid
+ */
+export const validateDependencies = (
   allConfigs: Map<string, LocalConfig>,
   rootDir: string,
-): void => {
-  // First pass: validate individual dependencies
-  for (const [appPath, config] of allConfigs) {
-    const appLabel = extractAppLabel(appPath, rootDir);
-    const dependencies = config.app?.depends_on || [];
+): Map<string, ResolvedDependency[]> => {
+  // Phase 1: Create unresolved dependencies from config
+  const unresolvedDepsMap = new Map<string, UnresolvedDependency[]>();
 
-    for (const dep of dependencies) {
-      if (dep === appPath) {
+  for (const [appPath, config] of allConfigs) {
+    const dependencies = config.app?.depends_on || [];
+    const unresolvedDeps = dependencies.map(spec =>
+      createUnresolvedDependency(appPath, spec),
+    );
+    unresolvedDepsMap.set(appPath, unresolvedDeps);
+  }
+
+  // Phase 2: Resolve all dependency paths
+  const resolvedDepsMap = new Map<string, ResolvedDependency[]>();
+
+  for (const [appPath, unresolvedDeps] of unresolvedDepsMap) {
+    const resolvedDeps = unresolvedDeps.map(dep =>
+      resolveDependency(dep, rootDir),
+    );
+    resolvedDepsMap.set(appPath, resolvedDeps);
+  }
+
+  // Phase 3: Validate each resolved path (existence check + self-dependency check)
+  for (const [appPath, resolvedDeps] of resolvedDepsMap) {
+    const appLabel = extractAppLabel(appPath, rootDir);
+
+    for (const dep of resolvedDeps) {
+      if (dep.absolutePath === appPath) {
         throw new Error(
           `Self-dependency detected: "${appLabel}" cannot depend on itself`,
         );
       }
 
-      if (!existsSync(dep)) {
+      if (!existsSync(dep.absolutePath)) {
         throw new Error(
-          `Dependency "${dep}" does not exist (required by "${appLabel}")`,
+          `Dependency "${dep.spec}" does not exist (required by "${appLabel}")`,
         );
       }
     }
   }
 
-  // Second pass: detect circular dependencies
-  detectCircularDependencies(allConfigs, rootDir);
+  // Phase 4: Detect circular dependencies
+  detectCircularDependencies(allConfigs, rootDir, resolvedDepsMap);
+
+  return resolvedDepsMap;
 };
 
 const detectCircularDependencies = (
   allConfigs: Map<string, LocalConfig>,
   rootDir: string,
+  resolvedDepsMap: Map<string, ResolvedDependency[]>,
 ): void => {
   const visited = new Set<string>();
   const recursionStack = new Set<string>();
 
   for (const [appPath] of allConfigs) {
-    if (hasCircularDependency(appPath, allConfigs, visited, recursionStack)) {
+    if (
+      hasCircularDependency(appPath, resolvedDepsMap, visited, recursionStack)
+    ) {
       const appLabel = extractAppLabel(appPath, rootDir);
       throw new Error(`Circular dependency detected involving "${appLabel}"`);
     }
@@ -220,7 +285,7 @@ const detectCircularDependencies = (
 
 const hasCircularDependency = (
   appPath: string,
-  allConfigs: Map<string, LocalConfig>,
+  resolvedDepsMap: Map<string, ResolvedDependency[]>,
   visited: Set<string>,
   recursionStack: Set<string>,
 ): boolean => {
@@ -235,12 +300,17 @@ const hasCircularDependency = (
   visited.add(appPath);
   recursionStack.add(appPath);
 
-  const config = allConfigs.get(appPath);
-  if (config) {
-    const dependencies = config.app?.depends_on || [];
-
-    for (const dep of dependencies) {
-      if (hasCircularDependency(dep, allConfigs, visited, recursionStack)) {
+  const resolvedDeps = resolvedDepsMap.get(appPath);
+  if (resolvedDeps) {
+    for (const dep of resolvedDeps) {
+      if (
+        hasCircularDependency(
+          dep.absolutePath,
+          resolvedDepsMap,
+          visited,
+          recursionStack,
+        )
+      ) {
         return true;
       }
     }

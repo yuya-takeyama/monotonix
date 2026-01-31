@@ -48423,6 +48423,10 @@ function loadGlobalConfig(globalConfigFilePath) {
     return DockerBuildGlobalConfigSchema.parse(load(globalConfigContent));
 }
 
+/**
+ * Prefix for paths resolved from repository root.
+ * Example: "$root/apps/shared" resolves to "apps/shared" from repo root.
+ */
 const ROOT_PREFIX = '$root/';
 /**
  * Resolves a path based on its format:
@@ -48431,7 +48435,7 @@ const ROOT_PREFIX = '$root/';
  *
  * @param inputPath - The path to resolve (e.g., "../..", "$root/apps/shared")
  * @param appPath - The base path for relative resolution
- * @returns The resolved path
+ * @returns The resolved path (relative for $root/, absolute for relative paths)
  */
 const resolvePath = (inputPath, appPath) => {
     if (inputPath.startsWith(ROOT_PREFIX)) {
