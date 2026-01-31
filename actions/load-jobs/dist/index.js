@@ -49202,6 +49202,7 @@ const createJobsFromConfigs = async (allConfigs, resolvedDepsMap, context) => {
                 lastCommit,
                 jobKey,
                 job,
+                resolvedDepPaths,
                 ...context,
             }));
         }
@@ -49211,9 +49212,12 @@ const createJobsFromConfigs = async (allConfigs, resolvedDepsMap, context) => {
         }
     }));
 };
-const createJob = ({ localConfig, dedupeKey, appPath, lastCommit, jobKey, job, event, rootDir, }) => ({
+const createJob = ({ localConfig, dedupeKey, appPath, lastCommit, jobKey, job, event, rootDir, resolvedDepPaths, }) => ({
     ...job,
-    app: localConfig.app,
+    app: {
+        ...localConfig.app,
+        depends_on: resolvedDepPaths,
+    },
     context: {
         dedupe_key: dedupeKey,
         github_ref: event.ref,

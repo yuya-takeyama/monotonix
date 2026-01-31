@@ -133,6 +133,7 @@ const createJobsFromConfigs = async (
               lastCommit,
               jobKey,
               job,
+              resolvedDepPaths,
               ...context,
             }),
         );
@@ -155,6 +156,7 @@ type CreateJobOptions = {
   job: LocalConfigJob;
   event: Event;
   rootDir: string;
+  resolvedDepPaths: string[];
 };
 
 export const createJob = ({
@@ -166,9 +168,13 @@ export const createJob = ({
   job,
   event,
   rootDir,
+  resolvedDepPaths,
 }: CreateJobOptions): Job => ({
   ...job,
-  app: localConfig.app,
+  app: {
+    ...localConfig.app,
+    depends_on: resolvedDepPaths,
+  },
   context: {
     dedupe_key: dedupeKey,
     github_ref: event.ref,

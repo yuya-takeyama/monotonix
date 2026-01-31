@@ -54,6 +54,7 @@ describe('createJob', () => {
       job: stubJob,
       event: stubEvent as Event,
       rootDir,
+      resolvedDepPaths: [],
     });
 
     const expected: Job = {
@@ -112,6 +113,7 @@ describe('createJob', () => {
       job: differentJob,
       event: stubEvent as Event,
       rootDir,
+      resolvedDepPaths: [],
     });
 
     const expected: Job = {
@@ -169,6 +171,7 @@ describe('createJob', () => {
       job: stubJob,
       event: stubEvent as Event,
       rootDir,
+      resolvedDepPaths: [],
     });
 
     const expected: Job = {
