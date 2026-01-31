@@ -4,13 +4,14 @@
     "build": "ncc build src/index.ts -o dist --source-map --license licenses.txt",
     "format": "prettier --write .",
     "test": "jest",
-    "all": "npm run format && npm run test && npm run package"
+    "all": "pnpm run format && pnpm run test && pnpm run package"
   },
   "dependencies": {
     "@actions/core": "2.0.3",
+    "@actions/exec": "2.0.0",
     "@actions/github": "6.0.1",
-    "@monotonix/schema": "*",
-    "@monotonix/utils": "*",
+    "@monotonix/schema": "workspace:*",
+    "@monotonix/utils": "workspace:*",
     "ajv": "^8.12.0",
     "ajv-formats": "^3.0.0",
     "glob": "13.0.0",

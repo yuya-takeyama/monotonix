@@ -4,19 +4,20 @@
     "build": "ncc build src/index.ts -o dist --source-map --license licenses.txt && ncc build src/post.ts -o dist/post --source-map --license licenses.txt",
     "format": "prettier --write .",
     "test": "jest",
-    "all": "npm run format && npm run test && npm run package"
+    "all": "pnpm run format && pnpm run test && pnpm run package"
   },
   "dependencies": {
     "@actions/core": "2.0.3",
     "@actions/github": "6.0.1",
     "@aws-sdk/client-dynamodb": "3.980.0",
     "@aws-sdk/lib-dynamodb": "3.980.0",
-    "@monotonix/schema": "*",
-    "@monotonix/dynamodb-common": "*"
+    "@monotonix/schema": "workspace:*",
+    "@monotonix/dynamodb-common": "workspace:*"
   },
   "devDependencies": {
     "@types/jest": "30.0.0",
     "@types/node": "24.10.9",
+    "@vercel/ncc": "0.38.4",
     "jest": "30.2.0",
     "prettier": "3.8.1",
     "ts-jest": "29.4.6",

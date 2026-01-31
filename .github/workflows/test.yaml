@@ -13,23 +13,38 @@ jobs:
       - name: Checkout
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
 
+      - name: Set up aqua
+        uses: aquaproj/aqua-installer@e2d0136abcf70b7a2f6f505720640750557c4b33 # v4.0.4
+        with:
+          aqua_version: v2.56.5
+          # Workaround for sporadic SLSA verification failures during aqua installation.
+          # Keep `aqua i` in a separate step so tool installation verification stays enabled.
+          enable_aqua_install: 'false'
+        env:
+          AQUA_DISABLE_SLSA: 'true'
+
+      - name: Install tools with aqua
+        run: aqua i -l
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
       - name: Set up Node.js
         uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
         with:
           node-version-file: .nvmrc
-          cache: npm
+          cache: pnpm
 
       - name: Install dependencies
-        run: npm install
+        run: pnpm install --frozen-lockfile
 
       - name: Build
-        run: npm run build
+        run: pnpm run build
 
       - name: Lint
-        run: npm run lint
+        run: pnpm run lint
 
       - name: Format check
-        run: npm run format:check
+        run: pnpm run format:check
 
       - name: Test
-        run: npm run test
+        run: pnpm run test
