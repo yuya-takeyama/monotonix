@@ -177,7 +177,7 @@ describe('run', () => {
     expect(result[0].params.docker_build.dockerfile).toBeUndefined();
   });
 
-  it('resolves $root/ prefixed paths from repository root', () => {
+  it('resolves $repoRoot/ prefixed paths from repository root', () => {
     const jobWithRootPaths: InputJob = {
       ...stubJob,
       context: {
@@ -188,8 +188,8 @@ describe('run', () => {
         ...stubJob.configs,
         docker_build: {
           ...stubJob.configs.docker_build,
-          context: '$root/apps/mono',
-          dockerfile: '$root/apps/mono/apps/web/Dockerfile',
+          context: '$repoRoot/apps/mono',
+          dockerfile: '$repoRoot/apps/mono/apps/web/Dockerfile',
         },
       },
     };

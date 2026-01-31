@@ -4,6 +4,7 @@ import { Event } from './schema';
 
 type runParams = {
   rootDir: string;
+  repositoryRoot: string;
   dedupeKey: string;
   requiredConfigKeys: string[];
   localConfigFileName: string;
@@ -11,6 +12,7 @@ type runParams = {
 };
 export const run = async ({
   rootDir,
+  repositoryRoot,
   dedupeKey,
   requiredConfigKeys,
   localConfigFileName,
@@ -19,6 +21,7 @@ export const run = async ({
   return filterJobsByEvent({
     jobs: await loadJobsFromLocalConfigFiles({
       rootDir,
+      repositoryRoot,
       dedupeKey,
       requiredConfigKeys,
       localConfigFileName,

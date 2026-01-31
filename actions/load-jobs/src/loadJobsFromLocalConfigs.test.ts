@@ -206,12 +206,15 @@ describe('createJob', () => {
 
 describe('createUnresolvedDependency', () => {
   it('creates an unresolved dependency with correct properties', () => {
-    const result = createUnresolvedDependency('/repo/apps/web', '$root/libs');
+    const result = createUnresolvedDependency(
+      '/repo/apps/web',
+      '$repoRoot/libs',
+    );
 
     expect(result).toEqual({
       type: 'unresolved',
       basePath: '/repo/apps/web',
-      spec: '$root/libs',
+      spec: '$repoRoot/libs',
     });
   });
 
@@ -227,33 +230,33 @@ describe('createUnresolvedDependency', () => {
 });
 
 describe('resolveDependency', () => {
-  describe('with $root/ prefix', () => {
-    it('resolves $root/ path from repository root', () => {
+  describe('with $repoRoot/ prefix', () => {
+    it('resolves $repoRoot/ path from repository root', () => {
       const unresolved = createUnresolvedDependency(
         '/repo/apps/web',
-        '$root/libs',
+        '$repoRoot/libs',
       );
       const result = resolveDependency(unresolved, '/repo');
 
       expect(result).toEqual({
         type: 'resolved',
         basePath: '/repo/apps/web',
-        spec: '$root/libs',
+        spec: '$repoRoot/libs',
         absolutePath: '/repo/libs',
       });
     });
 
-    it('resolves nested $root/ path', () => {
+    it('resolves nested $repoRoot/ path', () => {
       const unresolved = createUnresolvedDependency(
         '/repo/apps/web',
-        '$root/packages/shared/utils',
+        '$repoRoot/packages/shared/utils',
       );
       const result = resolveDependency(unresolved, '/repo');
 
       expect(result).toEqual({
         type: 'resolved',
         basePath: '/repo/apps/web',
-        spec: '$root/packages/shared/utils',
+        spec: '$repoRoot/packages/shared/utils',
         absolutePath: '/repo/packages/shared/utils',
       });
     });
