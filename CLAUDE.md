@@ -10,7 +10,7 @@ Monotonix is a composable set of GitHub Actions for building efficient CI/CD pip
 
 ### Monorepo Structure
 
-- **actions/**: GitHub Actions as npm workspaces (TypeScript)
+- **actions/**: GitHub Actions as pnpm workspaces (TypeScript)
 - **packages/**: Shared packages (currently empty)
 - Uses Turbo for build orchestration across workspaces
 
@@ -38,22 +38,22 @@ The actions work together in a specific sequence:
 ### Building
 
 ```bash
-npm run build          # Build all actions using Turbo
+pnpm run build          # Build all actions using Turbo
 ```
 
 ### Testing
 
 ```bash
-npm run test           # Run tests for all actions (automatically runs build first)
+pnpm run test           # Run tests for all actions (automatically runs build first)
 ```
 
-**Note**: Running `npm run test` automatically executes `npm run build` first due to Turbo's task dependency configuration in `turbo.json`.
+**Note**: Running `pnpm run test` automatically executes `pnpm run build` first due to Turbo's task dependency configuration in `turbo.json`.
 
 ### Development Workflow
 
 1. Make your changes to any action or package
-2. Run `npm run build` from the root directory
-3. Run `npm run test` from the root directory
+2. Run `pnpm run build` from the root directory
+3. Run `pnpm run test` from the root directory
 4. Commit your changes including the built `dist/` files
 
 Do not filter or skip any packages during build/test - the full suite ensures everything works together correctly.
