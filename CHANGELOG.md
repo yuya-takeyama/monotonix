@@ -1,5 +1,42 @@
 # Change Log
 
+## [0.0.8] - 2026-02-01
+
+### Added
+
+- Path resolution with `$repoRoot/` prefix support for `context` and `dockerfile` fields [#214](https://github.com/yuya-takeyama/monotonix/pull/214)
+- Path validation for `depends_on` with `$root/` prefix support [#216](https://github.com/yuya-takeyama/monotonix/pull/216)
+
+### Changed
+
+- Migrate bundler from ncc to Rollup for ESM support [#212](https://github.com/yuya-takeyama/monotonix/pull/212)
+- Migrate from npm to pnpm [#207](https://github.com/yuya-takeyama/monotonix/pull/207)
+- Rename `$root/` prefix to `$repoRoot/` for clarity [#220](https://github.com/yuya-takeyama/monotonix/pull/220)
+- Update npm to pnpm references in CLAUDE.md and scripts [#208](https://github.com/yuya-takeyama/monotonix/pull/208)
+- Update and rename renovate.json to renovate.json5 [#217](https://github.com/yuya-takeyama/monotonix/pull/217)
+- Add aqua-renovate-config preset [#203](https://github.com/yuya-takeyama/monotonix/pull/203)
+- Update Node.js to v24.13.0 [#191](https://github.com/yuya-takeyama/monotonix/pull/191), [#188](https://github.com/yuya-takeyama/monotonix/pull/188)
+- Update dependency turbo to v2.8.1 [#195](https://github.com/yuya-takeyama/monotonix/pull/195)
+- Update dependency prettier to v3.8.1 [#198](https://github.com/yuya-takeyama/monotonix/pull/198), v3.7.4 [#186](https://github.com/yuya-takeyama/monotonix/pull/186)
+- Update dependency @biomejs/biome to v2.3.13 [#193](https://github.com/yuya-takeyama/monotonix/pull/193)
+- Update actions/checkout action to v6.0.2 [#209](https://github.com/yuya-takeyama/monotonix/pull/209), v6 [#187](https://github.com/yuya-takeyama/monotonix/pull/187)
+- Update actions/setup-node action to v6.2.0 [#199](https://github.com/yuya-takeyama/monotonix/pull/199), v6.1.0 [#185](https://github.com/yuya-takeyama/monotonix/pull/185)
+- Update npm to v11.8.0 [#201](https://github.com/yuya-takeyama/monotonix/pull/201), v11.7.0 [#183](https://github.com/yuya-takeyama/monotonix/pull/183)
+- Pin dependencies [#219](https://github.com/yuya-takeyama/monotonix/pull/219)
+- Update aquaproj/aqua-installer digest [#210](https://github.com/yuya-takeyama/monotonix/pull/210)
+- Update dependency suzuki-shunsuke/pinact to v3.8.0 [#206](https://github.com/yuya-takeyama/monotonix/pull/206)
+- Update dependency cli/cli to v2.86.0 [#205](https://github.com/yuya-takeyama/monotonix/pull/205)
+- Update dependency aquaproj/aqua-registry to v4.464.0 [#204](https://github.com/yuya-takeyama/monotonix/pull/204)
+
+### Fixed
+
+- Use resolved paths for job.app.depends_on [#221](https://github.com/yuya-takeyama/monotonix/pull/221)
+- Suppress external library warnings and fix TypeScript errors [#218](https://github.com/yuya-takeyama/monotonix/pull/218)
+- Update dependency @actions/github to v9 [#213](https://github.com/yuya-takeyama/monotonix/pull/213)
+- Update dependency @actions/core to v2.0.3 [#196](https://github.com/yuya-takeyama/monotonix/pull/196), v2 [#190](https://github.com/yuya-takeyama/monotonix/pull/190)
+- Update aws-sdk-js-v3 monorepo to v3.980.0 [#194](https://github.com/yuya-takeyama/monotonix/pull/194), v3.948.0 [#189](https://github.com/yuya-takeyama/monotonix/pull/189)
+- Update dependency zod to v4.3.6 [#192](https://github.com/yuya-takeyama/monotonix/pull/192), v4.1.13 [#184](https://github.com/yuya-takeyama/monotonix/pull/184)
+
 ## [0.0.7] - 2025-12-07
 
 ### Added
