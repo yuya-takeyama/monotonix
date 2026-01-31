@@ -4,7 +4,7 @@ import * as crypto from 'crypto';
 import * as fs from 'fs';
 import { promises, existsSync, readFileSync, realpathSync as realpathSync$1, readlinkSync, readdirSync, readdir as readdir$2, lstatSync } from 'fs';
 import * as path$1 from 'path';
-import { normalize as normalize$1, relative } from 'path';
+import { normalize as normalize$1, relative, join } from 'path';
 import http from 'http';
 import https from 'https';
 import 'net';
@@ -36,7 +36,7 @@ import * as child from 'child_process';
 import { setTimeout as setTimeout$1 } from 'timers';
 import * as actualFS from 'node:fs';
 import { readFileSync as readFileSync$1, existsSync as existsSync$1 } from 'node:fs';
-import { win32, posix, join, dirname } from 'node:path';
+import { win32, posix, join as join$1, dirname } from 'node:path';
 import { realpath, readlink, readdir as readdir$1, lstat as lstat$1 } from 'node:fs/promises';
 import { StringDecoder } from 'node:string_decoder';
 
@@ -43172,6 +43172,22 @@ const filterJobsByEvent = ({ jobs, event, }) => jobs
 })
     .map(job => JobSchema.parse(job));
 
+const ROOT_PREFIX$1 = '$root/';
+/**
+ * Resolves a path based on its format:
+ * - Paths starting with "$root/" are resolved from repository root
+ * - All other paths are resolved relative to appPath
+ *
+ * @param inputPath - The path to resolve (e.g., "../..", "$root/apps/shared")
+ * @param appPath - The base path for relative resolution
+ * @returns The resolved path
+ */
+const resolvePath = (inputPath, appPath) => {
+    if (inputPath.startsWith(ROOT_PREFIX$1)) {
+        return inputPath.slice(ROOT_PREFIX$1.length);
+    }
+    return join(appPath, inputPath).replace(/\/$/, '');
+};
 const extractAppLabel = (appPath, rootDir) => {
     // Normalize both paths to handle various input formats
     const normalizedRootDir = normalize$1(rootDir || '.');
@@ -49101,10 +49117,24 @@ const getLastCommit = async (appPath) => {
     }
 };
 
+const ROOT_PREFIX = '$root/';
+/**
+ * Resolves a dependency path to an absolute filesystem path.
+ * - $root/ prefix paths are resolved from rootDir
+ * - Relative paths are resolved from appPath
+ */
+const resolveDependencyPath = (dep, appPath, rootDir) => {
+    const resolved = resolvePath(dep, appPath);
+    // $root/ paths return relative paths from repository root, so join with rootDir
+    if (dep.startsWith(ROOT_PREFIX)) {
+        return join$1(rootDir, resolved);
+    }
+    return resolved;
+};
 const loadJobsFromLocalConfigFiles = async ({ rootDir, dedupeKey, requiredConfigKeys, localConfigFileName, event, }) => {
     const allConfigs = await loadAllLocalConfigs(rootDir, localConfigFileName);
-    validateDependencies(allConfigs, rootDir);
-    const jobs = await createJobsFromConfigs(allConfigs, {
+    const resolvedDepsMap = validateDependencies(allConfigs, rootDir);
+    const jobs = await createJobsFromConfigs(allConfigs, resolvedDepsMap, {
         dedupeKey,
         event,
         rootDir,
@@ -49115,7 +49145,7 @@ const loadJobsFromLocalConfigFiles = async ({ rootDir, dedupeKey, requiredConfig
         .filter(job => requiredConfigKeys.every(key => key in job.configs));
 };
 const loadAllLocalConfigs = async (rootDir, localConfigFileName) => {
-    const pattern = join(rootDir, '**', localConfigFileName);
+    const pattern = join$1(rootDir, '**', localConfigFileName);
     const localConfigPaths = globSync(pattern);
     const allConfigs = new Map();
     for (const localConfigPath of localConfigPaths) {
@@ -49130,10 +49160,13 @@ const loadAllLocalConfigs = async (rootDir, localConfigFileName) => {
     }
     return allConfigs;
 };
-const createJobsFromConfigs = async (allConfigs, context) => {
+const createJobsFromConfigs = async (allConfigs, resolvedDepsMap, context) => {
     return Promise.all(Array.from(allConfigs.entries()).map(async ([appPath, localConfig]) => {
         try {
-            const lastCommit = await calculateEffectiveTimestamp(appPath, localConfig.app?.depends_on || []);
+            // Use already resolved dependency paths
+            const resolvedDeps = resolvedDepsMap.get(appPath) || [];
+            const resolvedDepPaths = resolvedDeps.map(d => d.resolved);
+            const lastCommit = await calculateEffectiveTimestamp(appPath, resolvedDepPaths);
             return Object.entries(localConfig.jobs).map(([jobKey, job]) => createJob({
                 localConfig,
                 appPath,
@@ -49144,7 +49177,7 @@ const createJobsFromConfigs = async (allConfigs, context) => {
             }));
         }
         catch (err) {
-            const configPath = join(appPath, context.localConfigFileName);
+            const configPath = join$1(appPath, context.localConfigFileName);
             throw new Error(`Failed to process ${configPath}: ${err instanceof Error ? err.message : String(err)}`);
         }
     }));
@@ -49164,54 +49197,60 @@ const createJob = ({ localConfig, dedupeKey, appPath, lastCommit, jobKey, job, e
     params: {},
     metadata: job.metadata, // Propagate job metadata from job definition
 });
-const calculateEffectiveTimestamp = async (appPath, dependencies) => {
+const calculateEffectiveTimestamp = async (appPath, resolvedDependencies) => {
     const appCommit = await getLastCommit(appPath);
     // Skip if no dependencies
-    if (dependencies.length === 0) {
+    if (resolvedDependencies.length === 0) {
         return appCommit;
     }
     // Get commit info for all dependencies in parallel
-    const dependencyCommits = await Promise.all(dependencies
+    // Note: Dependencies are already validated (existence check) in validateDependencies
+    const dependencyCommits = await Promise.all(resolvedDependencies
         .filter(dep => dep !== appPath) // Skip self-dependency
-        .map(async (dep) => {
-        if (!existsSync$1(dep)) {
-            throw new Error(`Dependency path does not exist: ${dep}`);
-        }
-        return getLastCommit(dep);
-    }));
+        .map(dep => getLastCommit(dep)));
     // Find the most recent commit among app and all dependencies
     const allCommits = [appCommit, ...dependencyCommits];
     const maxTimestamp = Math.max(...allCommits.map(c => c.timestamp));
     return (allCommits.find(commit => commit.timestamp === maxTimestamp) || appCommit);
 };
 const validateDependencies = (allConfigs, rootDir) => {
-    // First pass: validate individual dependencies
+    // Phase 1: Resolve all dependency paths
+    const resolvedDepsMap = new Map();
     for (const [appPath, config] of allConfigs) {
-        const appLabel = extractAppLabel(appPath, rootDir);
         const dependencies = config.app?.depends_on || [];
-        for (const dep of dependencies) {
-            if (dep === appPath) {
+        const resolvedDeps = dependencies.map(dep => ({
+            original: dep,
+            resolved: resolveDependencyPath(dep, appPath, rootDir),
+        }));
+        resolvedDepsMap.set(appPath, resolvedDeps);
+    }
+    // Phase 2: Validate each resolved path (existence check + self-dependency check)
+    for (const [appPath, resolvedDeps] of resolvedDepsMap) {
+        const appLabel = extractAppLabel(appPath, rootDir);
+        for (const { original, resolved } of resolvedDeps) {
+            if (resolved === appPath) {
                 throw new Error(`Self-dependency detected: "${appLabel}" cannot depend on itself`);
             }
-            if (!existsSync$1(dep)) {
-                throw new Error(`Dependency "${dep}" does not exist (required by "${appLabel}")`);
+            if (!existsSync$1(resolved)) {
+                throw new Error(`Dependency "${original}" does not exist (required by "${appLabel}")`);
             }
         }
     }
-    // Second pass: detect circular dependencies
-    detectCircularDependencies(allConfigs, rootDir);
+    // Phase 3: Detect circular dependencies
+    detectCircularDependencies(allConfigs, rootDir, resolvedDepsMap);
+    return resolvedDepsMap;
 };
-const detectCircularDependencies = (allConfigs, rootDir) => {
+const detectCircularDependencies = (allConfigs, rootDir, resolvedDepsMap) => {
     const visited = new Set();
     const recursionStack = new Set();
     for (const [appPath] of allConfigs) {
-        if (hasCircularDependency(appPath, allConfigs, visited, recursionStack)) {
+        if (hasCircularDependency(appPath, resolvedDepsMap, visited, recursionStack)) {
             const appLabel = extractAppLabel(appPath, rootDir);
             throw new Error(`Circular dependency detected involving "${appLabel}"`);
         }
     }
 };
-const hasCircularDependency = (appPath, allConfigs, visited, recursionStack) => {
+const hasCircularDependency = (appPath, resolvedDepsMap, visited, recursionStack) => {
     if (recursionStack.has(appPath)) {
         return true;
     }
@@ -49220,11 +49259,10 @@ const hasCircularDependency = (appPath, allConfigs, visited, recursionStack) => 
     }
     visited.add(appPath);
     recursionStack.add(appPath);
-    const config = allConfigs.get(appPath);
-    if (config) {
-        const dependencies = config.app?.depends_on || [];
-        for (const dep of dependencies) {
-            if (hasCircularDependency(dep, allConfigs, visited, recursionStack)) {
+    const resolvedDeps = resolvedDepsMap.get(appPath);
+    if (resolvedDeps) {
+        for (const { resolved } of resolvedDeps) {
+            if (hasCircularDependency(resolved, resolvedDepsMap, visited, recursionStack)) {
                 return true;
             }
         }
