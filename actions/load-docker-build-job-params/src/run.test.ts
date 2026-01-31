@@ -108,4 +108,69 @@ describe('run', () => {
 
     expect(result).toEqual(expected);
   });
+
+  it('resolves custom context and dockerfile paths', () => {
+    const jobWithCustomPaths: InputJob = {
+      ...stubJob,
+      context: {
+        ...stubJob.context,
+        app_path: 'apps/example/subapp',
+      },
+      configs: {
+        ...stubJob.configs,
+        docker_build: {
+          ...stubJob.configs.docker_build,
+          context: '../../',
+          dockerfile: 'Dockerfile',
+        },
+      },
+    };
+
+    const result = run({
+      globalConfig: stubGlobalConfig,
+      jobs: [jobWithCustomPaths],
+      context: stubContext,
+      timezone: 'UTC',
+    });
+
+    expect(result[0].params.docker_build.context).toBe('apps');
+    expect(result[0].params.docker_build.dockerfile).toBe(
+      'apps/example/subapp/Dockerfile',
+    );
+  });
+
+  it('uses app_path as context when custom context is not specified', () => {
+    const result = run({
+      globalConfig: stubGlobalConfig,
+      jobs: [stubJob],
+      context: stubContext,
+      timezone: 'UTC',
+    });
+
+    expect(result[0].params.docker_build.context).toBe('apps/hello-world');
+    expect(result[0].params.docker_build.dockerfile).toBeUndefined();
+  });
+
+  it('resolves only context when dockerfile is not specified', () => {
+    const jobWithContextOnly: InputJob = {
+      ...stubJob,
+      configs: {
+        ...stubJob.configs,
+        docker_build: {
+          ...stubJob.configs.docker_build,
+          context: '../',
+        },
+      },
+    };
+
+    const result = run({
+      globalConfig: stubGlobalConfig,
+      jobs: [jobWithContextOnly],
+      context: stubContext,
+      timezone: 'UTC',
+    });
+
+    expect(result[0].params.docker_build.context).toBe('apps');
+    expect(result[0].params.docker_build.dockerfile).toBeUndefined();
+  });
 });

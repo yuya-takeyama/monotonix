@@ -1,4 +1,5 @@
 import { Context } from '@actions/github/lib/context';
+import path from 'path';
 import { generateImageReferences } from './generateImageReferences';
 import {
   DockerBuildGlobalConfig,
@@ -41,6 +42,16 @@ export function run({
       );
     }
 
+    const resolvedContext = localDockerBuildConfig.context
+      ? path
+          .join(job.context.app_path, localDockerBuildConfig.context)
+          .replace(/\/$/, '')
+      : job.context.app_path;
+
+    const resolvedDockerfile = localDockerBuildConfig.dockerfile
+      ? path.join(job.context.app_path, localDockerBuildConfig.dockerfile)
+      : undefined;
+
     return {
       ...job,
       params: {
@@ -58,7 +69,8 @@ export function run({
               },
             },
           },
-          context: job.context.app_path,
+          context: resolvedContext,
+          ...(resolvedDockerfile && { dockerfile: resolvedDockerfile }),
           tags: generateImageReferences({
             context,
             globalConfig,

@@ -42,6 +42,8 @@ const InputJobSchema = JobSchema.extend({
       }),
       tagging: z.enum(['always_latest', 'semver_datetime', 'pull_request']),
       platforms: z.array(z.string()),
+      context: z.string().optional(),
+      dockerfile: z.string().optional(),
     }),
   }),
 });
@@ -67,6 +69,7 @@ const OutputJobSchema = InputJobSchema.extend({
         }),
       }),
       context: z.string(),
+      dockerfile: z.string().optional(),
       tags: z.string(),
       platforms: z.string(),
     }),
