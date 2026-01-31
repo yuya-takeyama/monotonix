@@ -11,7 +11,7 @@ Monotonix is a composable set of GitHub Actions for building efficient CI/CD pip
 ### Monorepo Structure
 
 - **actions/**: GitHub Actions as pnpm workspaces (TypeScript)
-- **packages/**: Shared packages (currently empty)
+- **packages/**: Shared packages (e.g., `@monotonix/utils`, `@monotonix/schema`)
 - Uses Turbo for build orchestration across workspaces
 
 ### Core Action Pipeline
@@ -69,8 +69,8 @@ app:
   depends_on: [] # Optional: specify dependencies
   # Example with dependencies:
   # depends_on:
-  #   - apps/shared/lib    # Include root-dir in paths
-  #   - apps/common/utils
+  #   - $root/apps/shared/lib  # $root/ prefix = from repository root
+  #   - ../common              # Relative path = from app directory
 jobs:
   job_name:
     on: # GitHub event triggers
@@ -80,7 +80,19 @@ jobs:
       docker_build:
         registry: { ... }
         tagging: semver_datetime
+        context: ../.. # Optional: relative to app directory
+        dockerfile: Dockerfile # Optional: relative to app directory
+        # Or use $root/ prefix for repository root paths:
+        # context: $root/apps/mono
+        # dockerfile: $root/apps/mono/apps/web/Dockerfile
 ```
+
+### Path Resolution
+
+All path fields (`depends_on`, `context`, `dockerfile`) use the following resolution rules:
+
+- **`$root/` prefix**: Resolved from repository root (e.g., `$root/apps/shared` → `apps/shared`)
+- **Relative paths**: Resolved from the app directory where `monotonix.yaml` is located (e.g., `../..`, `./Dockerfile`)
 
 ### Global Configuration (`monotonix-global.yaml`)
 
