@@ -78,8 +78,8 @@ app:
   depends_on: [] # Optional: specify dependencies
   # Example with dependencies:
   # depends_on:
-  #   - apps/shared/lib    # Include root-dir in paths
-  #   - apps/common/utils
+  #   - $repoRoot/apps/shared/lib  # $repoRoot/ prefix = from repository root
+  #   - ../common                  # Relative path = from app directory
 
 jobs:
   # Production build on main branch
