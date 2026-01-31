@@ -4,7 +4,7 @@ import * as crypto from 'crypto';
 import * as fs from 'fs';
 import { promises, existsSync, readFileSync, realpathSync as realpathSync$1, readlinkSync, readdirSync, readdir as readdir$2, lstatSync } from 'fs';
 import * as path$1 from 'path';
-import { normalize as normalize$1, relative, join as join$1 } from 'path';
+import { normalize as normalize$1, relative, join } from 'path';
 import http from 'http';
 import https from 'https';
 import 'net';
@@ -36,7 +36,7 @@ import * as child from 'child_process';
 import { setTimeout as setTimeout$1 } from 'timers';
 import * as actualFS from 'node:fs';
 import { readFileSync as readFileSync$1, existsSync as existsSync$1 } from 'node:fs';
-import { win32, posix, dirname } from 'node:path';
+import { win32, posix, join as join$1, dirname } from 'node:path';
 import { realpath, readlink, readdir as readdir$1, lstat as lstat$1 } from 'node:fs/promises';
 import { StringDecoder } from 'node:string_decoder';
 
@@ -43198,7 +43198,7 @@ const resolvePath = (inputPath, appPath) => {
     if (inputPath.startsWith(ROOT_PREFIX)) {
         return inputPath.slice(ROOT_PREFIX.length);
     }
-    return join$1(appPath, inputPath).replace(/\/$/, '');
+    return join(appPath, inputPath).replace(/\/$/, '');
 };
 /**
  * Resolves an unresolved path to an absolute filesystem path.
@@ -43209,7 +43209,7 @@ const resolveToAbsolutePath = (unresolved, rootDir) => {
     const resolved = resolvePath(unresolved.spec, unresolved.basePath);
     // $root/ paths return relative paths from repository root, so join with rootDir
     const absolutePath = unresolved.spec.startsWith(ROOT_PREFIX)
-        ? join$1(rootDir, resolved)
+        ? join(rootDir, resolved)
         : resolved;
     return {
         type: 'resolved',
@@ -49171,7 +49171,7 @@ const loadJobsFromLocalConfigFiles = async ({ rootDir, dedupeKey, requiredConfig
         .filter(job => requiredConfigKeys.every(key => key in job.configs));
 };
 const loadAllLocalConfigs = async (rootDir, localConfigFileName) => {
-    const pattern = join(rootDir, '**', localConfigFileName);
+    const pattern = join$1(rootDir, '**', localConfigFileName);
     const localConfigPaths = globSync(pattern);
     const allConfigs = new Map();
     for (const localConfigPath of localConfigPaths) {
@@ -49203,7 +49203,7 @@ const createJobsFromConfigs = async (allConfigs, resolvedDepsMap, context) => {
             }));
         }
         catch (err) {
-            const configPath = join(appPath, context.localConfigFileName);
+            const configPath = join$1(appPath, context.localConfigFileName);
             throw new Error(`Failed to process ${configPath}: ${err instanceof Error ? err.message : String(err)}`);
         }
     }));

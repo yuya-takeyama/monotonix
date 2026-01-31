@@ -1,5 +1,7 @@
-import { Context } from '@actions/github/lib/context';
+import { context } from '@actions/github';
 import { resolvePath } from '@monotonix/utils';
+
+type Context = typeof context;
 import { generateImageReferences } from './generateImageReferences';
 import {
   DockerBuildGlobalConfig,
