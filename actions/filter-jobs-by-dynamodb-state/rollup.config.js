@@ -20,11 +20,18 @@ const config = {
         moduleResolution: 'bundler',
         declaration: false,
       },
+      exclude: ['**/*.test.ts'],
     }),
     nodeResolve({ preferBuiltins: true }),
     commonjs(),
     json(),
   ],
+  onwarn(warning, warn) {
+    // Suppress warnings from external packages (node_modules)
+    if (warning.id?.includes('node_modules')) return;
+    if (warning.ids?.some(id => id.includes('node_modules'))) return;
+    warn(warning);
+  },
 };
 
 export default config;
