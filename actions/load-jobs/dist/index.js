@@ -4,7 +4,7 @@ import * as crypto from 'crypto';
 import * as fs from 'fs';
 import { promises, existsSync, readFileSync, realpathSync as realpathSync$1, readlinkSync, readdirSync, readdir as readdir$2, lstatSync } from 'fs';
 import * as path$1 from 'path';
-import { normalize as normalize$1, relative, join } from 'path';
+import { normalize as normalize$1, relative, join as join$1 } from 'path';
 import http from 'http';
 import https from 'https';
 import 'net';
@@ -36,7 +36,7 @@ import * as child from 'child_process';
 import { setTimeout as setTimeout$1 } from 'timers';
 import * as actualFS from 'node:fs';
 import { readFileSync as readFileSync$1, existsSync as existsSync$1 } from 'node:fs';
-import { win32, posix, join as join$1, dirname } from 'node:path';
+import { win32, posix, dirname } from 'node:path';
 import { realpath, readlink, readdir as readdir$1, lstat as lstat$1 } from 'node:fs/promises';
 import { StringDecoder } from 'node:string_decoder';
 
@@ -43178,19 +43178,45 @@ const filterJobsByEvent = ({ jobs, event, }) => jobs
  */
 const ROOT_PREFIX = '$root/';
 /**
+ * Creates an unresolved path from config.
+ */
+const createUnresolvedPath = (basePath, spec) => ({
+    type: 'unresolved',
+    basePath,
+    spec,
+});
+/**
  * Resolves a path based on its format:
  * - Paths starting with "$root/" are resolved from repository root
  * - All other paths are resolved relative to appPath
  *
  * @param inputPath - The path to resolve (e.g., "../..", "$root/apps/shared")
  * @param appPath - The base path for relative resolution
- * @returns The resolved path
+ * @returns The resolved path (relative for $root/, absolute for relative paths)
  */
 const resolvePath = (inputPath, appPath) => {
     if (inputPath.startsWith(ROOT_PREFIX)) {
         return inputPath.slice(ROOT_PREFIX.length);
     }
-    return join(appPath, inputPath).replace(/\/$/, '');
+    return join$1(appPath, inputPath).replace(/\/$/, '');
+};
+/**
+ * Resolves an unresolved path to an absolute filesystem path.
+ * - $root/ prefix paths are resolved from rootDir
+ * - Relative paths are resolved from basePath
+ */
+const resolveToAbsolutePath = (unresolved, rootDir) => {
+    const resolved = resolvePath(unresolved.spec, unresolved.basePath);
+    // $root/ paths return relative paths from repository root, so join with rootDir
+    const absolutePath = unresolved.spec.startsWith(ROOT_PREFIX)
+        ? join$1(rootDir, resolved)
+        : resolved;
+    return {
+        type: 'resolved',
+        basePath: unresolved.basePath,
+        spec: unresolved.spec,
+        absolutePath,
+    };
 };
 const extractAppLabel = (appPath, rootDir) => {
     // Normalize both paths to handle various input formats
@@ -49124,29 +49150,13 @@ const getLastCommit = async (appPath) => {
 /**
  * Creates an unresolved dependency from config.
  */
-const createUnresolvedDependency = (appPath, spec) => ({
-    type: 'unresolved',
-    appPath,
-    spec,
-});
+const createUnresolvedDependency = (appPath, spec) => createUnresolvedPath(appPath, spec);
 /**
  * Resolves a dependency to an absolute filesystem path.
  * - $root/ prefix paths are resolved from rootDir
  * - Relative paths are resolved from appPath
  */
-const resolveDependency = (dep, rootDir) => {
-    const resolved = resolvePath(dep.spec, dep.appPath);
-    // $root/ paths return relative paths from repository root, so join with rootDir
-    const absolutePath = dep.spec.startsWith(ROOT_PREFIX)
-        ? join$1(rootDir, resolved)
-        : resolved;
-    return {
-        type: 'resolved',
-        appPath: dep.appPath,
-        spec: dep.spec,
-        absolutePath,
-    };
-};
+const resolveDependency = (dep, rootDir) => resolveToAbsolutePath(dep, rootDir);
 const loadJobsFromLocalConfigFiles = async ({ rootDir, dedupeKey, requiredConfigKeys, localConfigFileName, event, }) => {
     const allConfigs = await loadAllLocalConfigs(rootDir, localConfigFileName);
     const resolvedDepsMap = validateDependencies(allConfigs, rootDir);
@@ -49161,7 +49171,7 @@ const loadJobsFromLocalConfigFiles = async ({ rootDir, dedupeKey, requiredConfig
         .filter(job => requiredConfigKeys.every(key => key in job.configs));
 };
 const loadAllLocalConfigs = async (rootDir, localConfigFileName) => {
-    const pattern = join$1(rootDir, '**', localConfigFileName);
+    const pattern = join(rootDir, '**', localConfigFileName);
     const localConfigPaths = globSync(pattern);
     const allConfigs = new Map();
     for (const localConfigPath of localConfigPaths) {
@@ -49193,7 +49203,7 @@ const createJobsFromConfigs = async (allConfigs, resolvedDepsMap, context) => {
             }));
         }
         catch (err) {
-            const configPath = join$1(appPath, context.localConfigFileName);
+            const configPath = join(appPath, context.localConfigFileName);
             throw new Error(`Failed to process ${configPath}: ${err instanceof Error ? err.message : String(err)}`);
         }
     }));

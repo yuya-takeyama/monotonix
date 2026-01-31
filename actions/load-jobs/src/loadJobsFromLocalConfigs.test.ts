@@ -210,7 +210,7 @@ describe('createUnresolvedDependency', () => {
 
     expect(result).toEqual({
       type: 'unresolved',
-      appPath: '/repo/apps/web',
+      basePath: '/repo/apps/web',
       spec: '$root/libs',
     });
   });
@@ -220,7 +220,7 @@ describe('createUnresolvedDependency', () => {
 
     expect(result).toEqual({
       type: 'unresolved',
-      appPath: '/repo/apps/web',
+      basePath: '/repo/apps/web',
       spec: '../shared',
     });
   });
@@ -237,7 +237,7 @@ describe('resolveDependency', () => {
 
       expect(result).toEqual({
         type: 'resolved',
-        appPath: '/repo/apps/web',
+        basePath: '/repo/apps/web',
         spec: '$root/libs',
         absolutePath: '/repo/libs',
       });
@@ -252,7 +252,7 @@ describe('resolveDependency', () => {
 
       expect(result).toEqual({
         type: 'resolved',
-        appPath: '/repo/apps/web',
+        basePath: '/repo/apps/web',
         spec: '$root/packages/shared/utils',
         absolutePath: '/repo/packages/shared/utils',
       });
@@ -269,7 +269,7 @@ describe('resolveDependency', () => {
 
       expect(result).toEqual({
         type: 'resolved',
-        appPath: '/repo/apps/web',
+        basePath: '/repo/apps/web',
         spec: '../shared',
         absolutePath: '/repo/apps/shared',
       });
@@ -284,7 +284,7 @@ describe('resolveDependency', () => {
 
       expect(result).toEqual({
         type: 'resolved',
-        appPath: '/repo/apps/mono/apps/web',
+        basePath: '/repo/apps/mono/apps/web',
         spec: '../../packages/common',
         absolutePath: '/repo/apps/mono/packages/common',
       });
@@ -296,7 +296,7 @@ describe('resolveDependency', () => {
 
       expect(result).toEqual({
         type: 'resolved',
-        appPath: '/repo/apps/web',
+        basePath: '/repo/apps/web',
         spec: './lib',
         absolutePath: '/repo/apps/web/lib',
       });

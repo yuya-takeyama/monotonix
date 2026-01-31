@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname } from 'node:path';
 import {
   Job,
   Jobs,
@@ -7,32 +7,21 @@ import {
   LocalConfigJob,
   LocalConfigSchema,
 } from '@monotonix/schema';
-import { extractAppLabel, ROOT_PREFIX, resolvePath } from '@monotonix/utils';
+import {
+  createUnresolvedPath,
+  extractAppLabel,
+  type ResolvedPath,
+  resolveToAbsolutePath,
+  type UnresolvedPath,
+} from '@monotonix/utils';
 import { globSync } from 'glob';
 import { load } from 'js-yaml';
 import { CommitInfo, getLastCommit } from './getLastCommit';
 import { Event } from './schema';
 
-/**
- * Unresolved dependency - contains the original spec from config.
- * Must be resolved before use in filesystem operations.
- */
-export type UnresolvedDependency = {
-  type: 'unresolved';
-  appPath: string; // The app that declares this dependency
-  spec: string; // Original spec from config (e.g., "$root/libs", "../shared")
-};
-
-/**
- * Resolved dependency - contains the absolute filesystem path.
- * Safe to use in filesystem operations like existsSync.
- */
-export type ResolvedDependency = {
-  type: 'resolved';
-  appPath: string; // The app that declares this dependency
-  spec: string; // Original spec for error messages
-  absolutePath: string; // Resolved absolute filesystem path
-};
+// Re-export types with domain-specific aliases for dependencies
+export type UnresolvedDependency = UnresolvedPath;
+export type ResolvedDependency = ResolvedPath;
 
 /**
  * Creates an unresolved dependency from config.
@@ -40,11 +29,7 @@ export type ResolvedDependency = {
 export const createUnresolvedDependency = (
   appPath: string,
   spec: string,
-): UnresolvedDependency => ({
-  type: 'unresolved',
-  appPath,
-  spec,
-});
+): UnresolvedDependency => createUnresolvedPath(appPath, spec);
 
 /**
  * Resolves a dependency to an absolute filesystem path.
@@ -54,20 +39,7 @@ export const createUnresolvedDependency = (
 export const resolveDependency = (
   dep: UnresolvedDependency,
   rootDir: string,
-): ResolvedDependency => {
-  const resolved = resolvePath(dep.spec, dep.appPath);
-  // $root/ paths return relative paths from repository root, so join with rootDir
-  const absolutePath = dep.spec.startsWith(ROOT_PREFIX)
-    ? join(rootDir, resolved)
-    : resolved;
-
-  return {
-    type: 'resolved',
-    appPath: dep.appPath,
-    spec: dep.spec,
-    absolutePath,
-  };
-};
+): ResolvedDependency => resolveToAbsolutePath(dep, rootDir);
 
 type LoadJobsFromLocalConfigFilesOptions = {
   rootDir: string;

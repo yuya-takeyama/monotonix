@@ -48435,7 +48435,7 @@ const ROOT_PREFIX = '$root/';
  *
  * @param inputPath - The path to resolve (e.g., "../..", "$root/apps/shared")
  * @param appPath - The base path for relative resolution
- * @returns The resolved path
+ * @returns The resolved path (relative for $root/, absolute for relative paths)
  */
 const resolvePath = (inputPath, appPath) => {
     if (inputPath.startsWith(ROOT_PREFIX)) {
