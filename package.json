@@ -4,7 +4,7 @@
   "license": "MIT",
   "scripts": {
     "build": "turbo run build",
-    "test": "turbo run test",
+    "test": "NODE_OPTIONS=--experimental-vm-modules turbo run test",
     "lint": "biome check .",
     "format": "prettier . --write",
     "format:check": "prettier . --check"
