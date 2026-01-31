@@ -7,7 +7,7 @@
     "all": "pnpm run format && pnpm run test && pnpm run package"
   },
   "dependencies": {
-    "@actions/core": "2.0.3",
+    "@actions/core": "3.0.0",
     "@monotonix/schema": "workspace:*",
     "@monotonix/utils": "workspace:*",
     "ajv": "^8.12.0",
