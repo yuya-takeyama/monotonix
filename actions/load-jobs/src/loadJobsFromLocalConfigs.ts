@@ -16,21 +16,59 @@ import { Event } from './schema';
 const ROOT_PREFIX = '$root/';
 
 /**
- * Resolves a dependency path to an absolute filesystem path.
+ * Unresolved dependency - contains the original spec from config.
+ * Must be resolved before use in filesystem operations.
+ */
+type UnresolvedDependency = {
+  type: 'unresolved';
+  appPath: string; // The app that declares this dependency
+  spec: string; // Original spec from config (e.g., "$root/libs", "../shared")
+};
+
+/**
+ * Resolved dependency - contains the absolute filesystem path.
+ * Safe to use in filesystem operations like existsSync.
+ */
+type ResolvedDependency = {
+  type: 'resolved';
+  appPath: string; // The app that declares this dependency
+  spec: string; // Original spec for error messages
+  absolutePath: string; // Resolved absolute filesystem path
+};
+
+/**
+ * Creates an unresolved dependency from config.
+ */
+const createUnresolvedDependency = (
+  appPath: string,
+  spec: string,
+): UnresolvedDependency => ({
+  type: 'unresolved',
+  appPath,
+  spec,
+});
+
+/**
+ * Resolves a dependency to an absolute filesystem path.
  * - $root/ prefix paths are resolved from rootDir
  * - Relative paths are resolved from appPath
  */
-const resolveDependencyPath = (
-  dep: string,
-  appPath: string,
+const resolveDependency = (
+  dep: UnresolvedDependency,
   rootDir: string,
-): string => {
-  const resolved = resolvePath(dep, appPath);
+): ResolvedDependency => {
+  const resolved = resolvePath(dep.spec, dep.appPath);
   // $root/ paths return relative paths from repository root, so join with rootDir
-  if (dep.startsWith(ROOT_PREFIX)) {
-    return join(rootDir, resolved);
-  }
-  return resolved;
+  const absolutePath = dep.spec.startsWith(ROOT_PREFIX)
+    ? join(rootDir, resolved)
+    : resolved;
+
+  return {
+    type: 'resolved',
+    appPath: dep.appPath,
+    spec: dep.spec,
+    absolutePath,
+  };
 };
 
 type LoadJobsFromLocalConfigFilesOptions = {
@@ -102,9 +140,9 @@ const createJobsFromConfigs = async (
   return Promise.all(
     Array.from(allConfigs.entries()).map(async ([appPath, localConfig]) => {
       try {
-        // Use already resolved dependency paths
+        // Use already resolved dependency paths (type-safe)
         const resolvedDeps = resolvedDepsMap.get(appPath) || [];
-        const resolvedDepPaths = resolvedDeps.map(d => d.resolved);
+        const resolvedDepPaths = resolvedDeps.map(d => d.absolutePath);
 
         const lastCommit = await calculateEffectiveTimestamp(
           appPath,
@@ -196,47 +234,51 @@ export const calculateEffectiveTimestamp = async (
   );
 };
 
-type ResolvedDependency = {
-  original: string;
-  resolved: string;
-};
-
 const validateDependencies = (
   allConfigs: Map<string, LocalConfig>,
   rootDir: string,
 ): Map<string, ResolvedDependency[]> => {
-  // Phase 1: Resolve all dependency paths
-  const resolvedDepsMap = new Map<string, ResolvedDependency[]>();
+  // Phase 1: Create unresolved dependencies from config
+  const unresolvedDepsMap = new Map<string, UnresolvedDependency[]>();
 
   for (const [appPath, config] of allConfigs) {
     const dependencies = config.app?.depends_on || [];
-    const resolvedDeps = dependencies.map(dep => ({
-      original: dep,
-      resolved: resolveDependencyPath(dep, appPath, rootDir),
-    }));
+    const unresolvedDeps = dependencies.map(spec =>
+      createUnresolvedDependency(appPath, spec),
+    );
+    unresolvedDepsMap.set(appPath, unresolvedDeps);
+  }
+
+  // Phase 2: Resolve all dependency paths
+  const resolvedDepsMap = new Map<string, ResolvedDependency[]>();
+
+  for (const [appPath, unresolvedDeps] of unresolvedDepsMap) {
+    const resolvedDeps = unresolvedDeps.map(dep =>
+      resolveDependency(dep, rootDir),
+    );
     resolvedDepsMap.set(appPath, resolvedDeps);
   }
 
-  // Phase 2: Validate each resolved path (existence check + self-dependency check)
+  // Phase 3: Validate each resolved path (existence check + self-dependency check)
   for (const [appPath, resolvedDeps] of resolvedDepsMap) {
     const appLabel = extractAppLabel(appPath, rootDir);
 
-    for (const { original, resolved } of resolvedDeps) {
-      if (resolved === appPath) {
+    for (const dep of resolvedDeps) {
+      if (dep.absolutePath === appPath) {
         throw new Error(
           `Self-dependency detected: "${appLabel}" cannot depend on itself`,
         );
       }
 
-      if (!existsSync(resolved)) {
+      if (!existsSync(dep.absolutePath)) {
         throw new Error(
-          `Dependency "${original}" does not exist (required by "${appLabel}")`,
+          `Dependency "${dep.spec}" does not exist (required by "${appLabel}")`,
         );
       }
     }
   }
 
-  // Phase 3: Detect circular dependencies
+  // Phase 4: Detect circular dependencies
   detectCircularDependencies(allConfigs, rootDir, resolvedDepsMap);
 
   return resolvedDepsMap;
@@ -279,10 +321,10 @@ const hasCircularDependency = (
 
   const resolvedDeps = resolvedDepsMap.get(appPath);
   if (resolvedDeps) {
-    for (const { resolved } of resolvedDeps) {
+    for (const dep of resolvedDeps) {
       if (
         hasCircularDependency(
-          resolved,
+          dep.absolutePath,
           resolvedDepsMap,
           visited,
           recursionStack,
