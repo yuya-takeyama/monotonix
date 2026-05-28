@@ -208,28 +208,38 @@ jobs:
         with:
           role-to-assume: arn:aws:iam::YOUR-ACCOUNT:role/monotonix-state-manager
           aws-region: YOUR-REGION
-      - uses: yuya-takeyama/monotonix/actions/set-dynamodb-state-to-running@main
+      - id: set-running
+        uses: yuya-takeyama/monotonix/actions/set-dynamodb-state-to-running@main
         with:
           dynamodb-table: monotonix-state
           dynamodb-region: YOUR-REGION
           job: ${{ toJSON(matrix.job) }}
-      - uses: actions/checkout@v4
+      - if: ${{ steps.set-running.outputs.should-run == 'true' }}
+        uses: actions/checkout@v4
 
-      - uses: aws-actions/configure-aws-credentials@v4
+      - if: ${{ steps.set-running.outputs.should-run == 'true' }}
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ matrix.job.params.docker_build.registry.aws.iam.role }}
           aws-region: ${{ matrix.job.params.docker_build.registry.aws.iam.region }}
-      - uses: aws-actions/amazon-ecr-login@v2
+      - if: ${{ steps.set-running.outputs.should-run == 'true' }}
+        uses: aws-actions/amazon-ecr-login@v2
         with:
           registry-type: ${{ matrix.job.params.docker_build.registry.aws.repository.type }}
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/build-push-action@v6
+      - if: ${{ steps.set-running.outputs.should-run == 'true' }}
+        uses: docker/setup-buildx-action@v3
+      - if: ${{ steps.set-running.outputs.should-run == 'true' }}
+        uses: docker/build-push-action@v6
         with:
           context: ${{ matrix.job.params.docker_build.context }}
           push: true
           tags: ${{ matrix.job.params.docker_build.tags }}
           platforms: ${{ matrix.job.params.docker_build.platforms }}
 ```
+
+When `set-dynamodb-state-to-running` outputs `should-run=false`, a newer or
+same commit is already running. Guard all subsequent work steps with this output
+so the job exits successfully without building or deploying stale commits.
 
 ## AWS Setup
 

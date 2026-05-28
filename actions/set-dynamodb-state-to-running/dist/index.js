@@ -27979,6 +27979,21 @@ function getInput(name, options) {
     const val = process.env[`INPUT_${name.replace(/ /g, '_').toUpperCase()}`] || '';
     return val.trim();
 }
+/**
+ * Sets the value of an output.
+ *
+ * @param     name     name of the output to set
+ * @param     value    value to store. Non-string values will be converted to a string via JSON.stringify
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function setOutput(name, value) {
+    const filePath = process.env['GITHUB_OUTPUT'] || '';
+    if (filePath) {
+        return issueFileCommand('OUTPUT', prepareKeyValueMessage(name, value));
+    }
+    process.stdout.write(os.EOL);
+    issueCommand('set-output', { name }, toCommandValue(value));
+}
 //-----------------------------------------------------------------------
 // Results
 //-----------------------------------------------------------------------
@@ -28000,12 +28015,12 @@ function error(message, properties = {}) {
     issueCommand('error', toCommandProperties(properties), message instanceof Error ? message.toString() : message);
 }
 /**
- * Adds a warning issue
- * @param message warning issue message. Errors will be converted to string via toString()
+ * Adds a notice issue
+ * @param message notice issue message. Errors will be converted to string via toString()
  * @param properties optional properties to add to the annotation.
  */
-function warning(message, properties = {}) {
-    issueCommand('warning', toCommandProperties(properties), message instanceof Error ? message.toString() : message);
+function notice(message, properties = {}) {
+    issueCommand('notice', toCommandProperties(properties), message instanceof Error ? message.toString() : message);
 }
 //-----------------------------------------------------------------------
 // Wrapper action state
@@ -45630,6 +45645,10 @@ class DynamoDBDocumentClient extends Client {
     }
 }
 
+const RUNNING_STATE_CLAIMED_STATE_KEY = 'MONOTONIX_DYNAMODB_RUNNING_STATE_CLAIMED';
+const saveRunningStateClaimed = () => {
+    saveState(RUNNING_STATE_CLAIMED_STATE_KEY, 'true');
+};
 const parseDuration = (duration) => {
     const regex = /(\d+)(\D+)/g;
     let matches;
@@ -45675,19 +45694,27 @@ const saveAwsCredentialsIntoState = () => {
     saveState('MONOTONIX_DYNAMODB_STATE_AWS_SESSION_TOKEN', process.env.AWS_SESSION_TOKEN);
 };
 
-const run = async ({ table, region, job, ttl, }) => {
+const run = async ({ table, region, job, ttl, docClient, }) => {
     saveAwsCredentialsIntoState();
-    const client = new DynamoDBClient({ region });
-    const docClient = DynamoDBDocumentClient.from(client);
+    const dynamoDbDocClient = docClient ?? DynamoDBDocumentClient.from(new DynamoDBClient({ region }));
     const pk = `STATE#${job.context.dedupe_key}`;
     try {
-        await putRunningState({ job, table, docClient, pk, ttl });
+        await putRunningState({
+            job,
+            table,
+            docClient: dynamoDbDocClient,
+            pk,
+            ttl,
+        });
+        saveRunningStateClaimed();
+        return { shouldRun: true };
     }
     catch (err) {
         if (err instanceof ConditionalCheckFailedException) {
-            warning(`${job.context.label}: A job is already running for a newer commit`);
+            notice(`${job.context.label}: A job is already running for a newer commit`);
+            return { shouldRun: false };
         }
-        throw err; // Let it fail not to run subsequent steps
+        throw err;
     }
 };
 const putRunningState = async ({ job, table, docClient, pk, ttl, }) => {
@@ -45712,24 +45739,27 @@ const putRunningState = async ({ job, table, docClient, pk, ttl, }) => {
     }));
 };
 
-try {
-    const table = getInput('dynamodb-table');
-    const region = getInput('dynamodb-region');
-    const jobJson = getInput('job');
-    const job = JobSchema.parse(JSON.parse(jobJson));
-    const ttlDuration = parseDuration(getInput('running-ttl'));
-    const ttl = Math.floor(Date.now() / 1000) + ttlDuration;
-    run({
-        table,
-        region,
-        job,
-        ttl,
-    });
-}
-catch (error) {
-    console.error(error);
-    setFailed(`Action failed with error: ${error}`);
-}
+(async () => {
+    try {
+        const table = getInput('dynamodb-table');
+        const region = getInput('dynamodb-region');
+        const jobJson = getInput('job');
+        const job = JobSchema.parse(JSON.parse(jobJson));
+        const ttlDuration = parseDuration(getInput('running-ttl'));
+        const ttl = Math.floor(Date.now() / 1000) + ttlDuration;
+        const result = await run({
+            table,
+            region,
+            job,
+            ttl,
+        });
+        setOutput('should-run', result.shouldRun ? 'true' : 'false');
+    }
+    catch (error) {
+        console.error(error);
+        setFailed(`Action failed with error: ${error}`);
+    }
+})();
 
 class EventStreamSerde {
     marshaller;

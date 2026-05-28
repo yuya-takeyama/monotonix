@@ -29,6 +29,10 @@ inputs:
     # But some special branches like `main` or `release` are kept for a long time not to be rolled back accidentally.
     default: ${{ startsWith(github.event_name, 'pull_request') && '7d' || '180d' }}
 
+outputs:
+  should-run:
+    description: 'Whether subsequent steps should run. false means a newer or same commit is already running.'
+
 runs:
   using: 'node24'
   main: 'dist/index.js'

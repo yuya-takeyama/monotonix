@@ -1,4 +1,4 @@
-import { warning } from '@actions/core';
+import { notice } from '@actions/core';
 import {
   ConditionalCheckFailedException,
   DynamoDBClient,
@@ -6,35 +6,49 @@ import {
 import { DynamoDBDocumentClient, PutCommand } from '@aws-sdk/lib-dynamodb';
 import { StateItem } from '@monotonix/dynamodb-common';
 import { Job } from '@monotonix/schema';
-import { saveAwsCredentialsIntoState } from './utils';
+import { saveAwsCredentialsIntoState, saveRunningStateClaimed } from './utils';
 
 type runParam = {
   job: Job;
   table: string;
   region: string;
   ttl: number;
+  docClient?: DynamoDBDocumentClient;
+};
+type RunResult = {
+  shouldRun: boolean;
 };
 export const run = async ({
   table,
   region,
   job,
   ttl,
-}: runParam): Promise<void> => {
+  docClient,
+}: runParam): Promise<RunResult> => {
   saveAwsCredentialsIntoState();
 
-  const client = new DynamoDBClient({ region });
-  const docClient = DynamoDBDocumentClient.from(client);
+  const dynamoDbDocClient =
+    docClient ?? DynamoDBDocumentClient.from(new DynamoDBClient({ region }));
   const pk = `STATE#${job.context.dedupe_key}`;
 
   try {
-    await putRunningState({ job, table, docClient, pk, ttl });
+    await putRunningState({
+      job,
+      table,
+      docClient: dynamoDbDocClient,
+      pk,
+      ttl,
+    });
+    saveRunningStateClaimed();
+    return { shouldRun: true };
   } catch (err) {
     if (err instanceof ConditionalCheckFailedException) {
-      warning(
+      notice(
         `${job.context.label}: A job is already running for a newer commit`,
       );
+      return { shouldRun: false };
     }
-    throw err; // Let it fail not to run subsequent steps
+    throw err;
   }
 };
 
