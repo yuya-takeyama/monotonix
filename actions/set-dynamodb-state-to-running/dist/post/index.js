@@ -45660,20 +45660,29 @@ class DynamoDBDocumentClient extends Client {
     }
 }
 
-const runPost = async ({ table, region, job, jobStatus, ttl, }) => {
-    const client = new DynamoDBClient({
-        region,
-        credentials: {
-            accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-            secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-            sessionToken: process.env.AWS_SESSION_TOKEN,
-        },
-    });
-    const docClient = DynamoDBDocumentClient.from(client);
+const runPost = async ({ table, region, job, jobStatus, ttl, runningStateClaimed, docClient, }) => {
+    if (!runningStateClaimed) {
+        return;
+    }
+    const dynamoDbDocClient = docClient ??
+        DynamoDBDocumentClient.from(new DynamoDBClient({
+            region,
+            credentials: {
+                accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+                secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+                sessionToken: process.env.AWS_SESSION_TOKEN,
+            },
+        }));
     const pk = `STATE#${job.context.dedupe_key}`;
     try {
         if (jobStatus === 'success') {
-            await putSuccessState({ job, table, docClient, pk, ttl });
+            await putSuccessState({
+                job,
+                table,
+                docClient: dynamoDbDocClient,
+                pk,
+                ttl,
+            });
         }
     }
     catch (err) {
@@ -45687,7 +45696,12 @@ const runPost = async ({ table, region, job, jobStatus, ttl, }) => {
     }
     finally {
         try {
-            await deleteRunningState({ job, table, docClient, pk });
+            await deleteRunningState({
+                job,
+                table,
+                docClient: dynamoDbDocClient,
+                pk,
+            });
         }
         catch (err) {
             if (err instanceof ConditionalCheckFailedException) {
@@ -45734,6 +45748,10 @@ const deleteRunningState = async ({ job, table, docClient, pk, }) => {
     }));
 };
 
+const RUNNING_STATE_CLAIMED_STATE_KEY = 'MONOTONIX_DYNAMODB_RUNNING_STATE_CLAIMED';
+const getRunningStateClaimed = () => {
+    return getState(RUNNING_STATE_CLAIMED_STATE_KEY) === 'true';
+};
 const parseDuration = (duration) => {
     const regex = /(\d+)(\D+)/g;
     let matches;
@@ -45807,30 +45825,33 @@ const wrapFunctionWithEnv = (originalFunction, tempEnv) => {
 };
 
 const runPostWithAwsCredentials = wrapFunctionWithEnv(runPost, getAwsCredentialsFromState());
-try {
-    const table = getInput('dynamodb-table');
-    const region = getInput('dynamodb-region');
-    const jobJson = getInput('job');
-    const job = JobSchema.parse(JSON.parse(jobJson));
-    const jobStatus = getInput('job-status');
-    if (jobStatus !== 'success' &&
-        jobStatus !== 'failure' &&
-        jobStatus !== 'cancelled') {
-        throw new Error(`Invalid job status: ${jobStatus}`);
+(async () => {
+    try {
+        const table = getInput('dynamodb-table');
+        const region = getInput('dynamodb-region');
+        const jobJson = getInput('job');
+        const job = JobSchema.parse(JSON.parse(jobJson));
+        const jobStatus = getInput('job-status');
+        if (jobStatus !== 'success' &&
+            jobStatus !== 'failure' &&
+            jobStatus !== 'cancelled') {
+            throw new Error(`Invalid job status: ${jobStatus}`);
+        }
+        const ttlDuration = parseDuration(getInput('success-ttl'));
+        const ttl = Math.floor(Date.now() / 1000) + ttlDuration;
+        await runPostWithAwsCredentials({
+            table,
+            region,
+            job,
+            jobStatus,
+            ttl,
+            runningStateClaimed: getRunningStateClaimed(),
+        });
     }
-    const ttlDuration = parseDuration(getInput('success-ttl'));
-    const ttl = Math.floor(Date.now() / 1000) + ttlDuration;
-    runPostWithAwsCredentials({
-        table,
-        region,
-        job,
-        jobStatus,
-        ttl,
-    });
-}
-catch (error) {
-    setFailed(`Action failed with error: ${error}`);
-}
+    catch (error) {
+        setFailed(`Action failed with error: ${error}`);
+    }
+})();
 
 class EventStreamSerde {
     marshaller;

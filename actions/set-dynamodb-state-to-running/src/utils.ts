@@ -1,5 +1,16 @@
 import { getState, saveState } from '@actions/core';
 
+const RUNNING_STATE_CLAIMED_STATE_KEY =
+  'MONOTONIX_DYNAMODB_RUNNING_STATE_CLAIMED';
+
+export const saveRunningStateClaimed = () => {
+  saveState(RUNNING_STATE_CLAIMED_STATE_KEY, 'true');
+};
+
+export const getRunningStateClaimed = () => {
+  return getState(RUNNING_STATE_CLAIMED_STATE_KEY) === 'true';
+};
+
 export const parseDuration = (duration: string): number => {
   const regex = /(\d+)(\D+)/g;
   let matches: RegExpExecArray | null;

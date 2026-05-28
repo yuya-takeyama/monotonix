@@ -17,6 +17,8 @@ type runPostParam = {
   table: string;
   region: string;
   ttl: number;
+  runningStateClaimed: boolean;
+  docClient?: DynamoDBDocumentClient;
 };
 export const runPost = async ({
   table,
@@ -24,21 +26,36 @@ export const runPost = async ({
   job,
   jobStatus,
   ttl,
+  runningStateClaimed,
+  docClient,
 }: runPostParam): Promise<void> => {
-  const client = new DynamoDBClient({
-    region,
-    credentials: {
-      accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
-      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
-      sessionToken: process.env.AWS_SESSION_TOKEN!,
-    },
-  });
-  const docClient = DynamoDBDocumentClient.from(client);
+  if (!runningStateClaimed) {
+    return;
+  }
+
+  const dynamoDbDocClient =
+    docClient ??
+    DynamoDBDocumentClient.from(
+      new DynamoDBClient({
+        region,
+        credentials: {
+          accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
+          secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+          sessionToken: process.env.AWS_SESSION_TOKEN!,
+        },
+      }),
+    );
   const pk = `STATE#${job.context.dedupe_key}`;
 
   try {
     if (jobStatus === 'success') {
-      await putSuccessState({ job, table, docClient, pk, ttl });
+      await putSuccessState({
+        job,
+        table,
+        docClient: dynamoDbDocClient,
+        pk,
+        ttl,
+      });
     }
   } catch (err) {
     if (err instanceof ConditionalCheckFailedException) {
@@ -51,7 +68,12 @@ export const runPost = async ({
     }
   } finally {
     try {
-      await deleteRunningState({ job, table, docClient, pk });
+      await deleteRunningState({
+        job,
+        table,
+        docClient: dynamoDbDocClient,
+        pk,
+      });
     } catch (err) {
       if (err instanceof ConditionalCheckFailedException) {
         notice(`${job.context.label}: A newer commit is already running`);
