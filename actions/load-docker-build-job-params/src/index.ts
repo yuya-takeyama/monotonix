@@ -1,5 +1,12 @@
-import { exportVariable, getInput, setFailed, setOutput } from '@actions/core';
+import {
+  exportVariable,
+  getInput,
+  setFailed,
+  setOutput,
+  warning,
+} from '@actions/core';
 import { context } from '@actions/github';
+import { publishJobsResult, readJobsJsonInput } from '@monotonix/utils';
 import { DateTime } from 'luxon';
 import { loadGlobalConfig } from './config';
 import { run } from './run';
@@ -9,9 +16,14 @@ try {
   const globalConfigFilePath =
     getInput('global-config-file-path') || 'monotonix-global.yaml';
   const globalConfig = loadGlobalConfig(globalConfigFilePath);
-  const jobsJson = getInput('jobs') || process.env.MONOTONIX_JOBS;
+  const jobsJson = readJobsJsonInput({
+    jobs: getInput('jobs'),
+    jobsFile: getInput('jobs-file'),
+  });
   if (!jobsJson) {
-    throw new Error('Input jobs or env $MONOTONIX_JOBS is required');
+    throw new Error(
+      'Input jobs, input jobs-file, env $MONOTONIX_JOBS_FILE, or env $MONOTONIX_JOBS is required',
+    );
   }
   const jobs = InputJobsSchema.parse(JSON.parse(jobsJson));
   const timezone = getInput('timezone');
@@ -22,8 +34,10 @@ try {
 
   const result = run({ globalConfig, jobs, context, timezone });
 
-  setOutput('result', result);
-  exportVariable('MONOTONIX_JOBS', result);
+  publishJobsResult({
+    result,
+    core: { setOutput, exportVariable, warning },
+  });
 } catch (error) {
   console.error(error);
   setFailed(`Action failed with error: ${error}`);

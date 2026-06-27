@@ -1,5 +1,15 @@
 # Change Log
 
+## Unreleased
+
+### Added
+
+- Add file-based jobs handoff with `jobs-file`, `result-file`, and `MONOTONIX_JOBS_FILE`.
+
+### Changed
+
+- Limit legacy `MONOTONIX_JOBS` export to small jobs payloads to avoid oversized GitHub Actions environments.
+
 ## [0.0.8] - 2026-02-01
 
 ### Added

@@ -1,9 +1,9 @@
 import * as os from 'os';
-import os__default, { EOL } from 'os';
+import os__default, { tmpdir, EOL } from 'os';
 import * as crypto from 'crypto';
 import * as fs from 'fs';
-import { promises, existsSync, readFileSync, statSync } from 'fs';
-import 'path';
+import { promises, readFileSync, mkdirSync, writeFileSync, existsSync, statSync } from 'fs';
+import { join } from 'path';
 import http from 'http';
 import https from 'https';
 import 'net';
@@ -28300,6 +28300,14 @@ function setFailed(message) {
 function error(message, properties = {}) {
     issueCommand('error', toCommandProperties(properties), message instanceof Error ? message.toString() : message);
 }
+/**
+ * Adds a warning issue
+ * @param message warning issue message. Errors will be converted to string via toString()
+ * @param properties optional properties to add to the annotation.
+ */
+function warning(message, properties = {}) {
+    issueCommand('warning', toCommandProperties(properties), message instanceof Error ? message.toString() : message);
+}
 
 /** A special constant with type `never` */
 function $constructor(name, initializer, params) {
@@ -32927,6 +32935,47 @@ const JobSchema = object({
     metadata: MetadataSchema.default({}), // Default to empty object
 });
 const JobsSchema = array(JobSchema);
+
+const MONOTONIX_JOBS_ENV = 'MONOTONIX_JOBS';
+const MONOTONIX_JOBS_FILE_ENV = 'MONOTONIX_JOBS_FILE';
+const MONOTONIX_JOBS_LEGACY_ENV_LIMIT_BYTES = 32 * 1024;
+const readJobsJsonInput = ({ jobs, jobsFile, env = process.env, }) => {
+    if (jobs) {
+        return jobs;
+    }
+    const inputFile = jobsFile || env[MONOTONIX_JOBS_FILE_ENV];
+    if (inputFile) {
+        return readFileSync(inputFile, 'utf8');
+    }
+    return env[MONOTONIX_JOBS_ENV];
+};
+const publishJobsResult = ({ result, core, env = process.env, }) => {
+    const resultJson = typeof result === 'string' ? result : JSON.stringify(result);
+    const resultFile = writeJobsResultFile(resultJson, env);
+    core.setOutput('result', resultJson);
+    core.setOutput('result-file', resultFile);
+    core.exportVariable(MONOTONIX_JOBS_FILE_ENV, resultFile);
+    if (Buffer.byteLength(resultJson, 'utf8') <=
+        MONOTONIX_JOBS_LEGACY_ENV_LIMIT_BYTES) {
+        core.warning(`${MONOTONIX_JOBS_ENV} is deprecated. Use ${MONOTONIX_JOBS_FILE_ENV} or the result-file output for action-to-action jobs handoff.`);
+        core.exportVariable(MONOTONIX_JOBS_ENV, resultJson);
+    }
+    else {
+        core.warning(`Skipping ${MONOTONIX_JOBS_ENV} export because the jobs payload exceeds ${MONOTONIX_JOBS_LEGACY_ENV_LIMIT_BYTES} bytes. Use ${MONOTONIX_JOBS_FILE_ENV} or the result-file output instead.`);
+    }
+    return resultFile;
+};
+const writeJobsResultFile = (resultJson, env) => {
+    const baseDir = env.RUNNER_TEMP || tmpdir();
+    const resultDir = join(baseDir, 'monotonix');
+    mkdirSync(resultDir, { recursive: true });
+    const fileName = `jobs-${process.pid}-${Date.now()}-${Math.random()
+        .toString(36)
+        .slice(2)}.json`;
+    const resultFile = join(resultDir, fileName);
+    writeFileSync(resultFile, resultJson, 'utf8');
+    return resultFile;
+};
 
 class Context {
     /**
@@ -37963,17 +38012,22 @@ const run = async ({ githubToken, jobs }) => {
         if (!githubToken) {
             throw new Error('Input github-token or env $GITHUB_TOKEN is required');
         }
-        const jobsJson = getInput('jobs') || process.env.MONOTONIX_JOBS;
+        const jobsJson = readJobsJsonInput({
+            jobs: getInput('jobs'),
+            jobsFile: getInput('jobs-file'),
+        });
         if (!jobsJson) {
-            throw new Error('Input job or env $MONOTONIX_JOBS is required');
+            throw new Error('Input jobs, input jobs-file, env $MONOTONIX_JOBS_FILE, or env $MONOTONIX_JOBS is required');
         }
         const jobs = JobsSchema.parse(JSON.parse(jobsJson));
         const result = await run({
             githubToken,
             jobs,
         });
-        setOutput('result', result);
-        exportVariable('MONOTONIX_JOBS', result);
+        publishJobsResult({
+            result,
+            core: { setOutput, exportVariable, warning },
+        });
     }
     catch (error) {
         console.error(error);

@@ -1,9 +1,9 @@
 import * as os from 'os';
-import os__default from 'os';
+import os__default, { tmpdir } from 'os';
 import * as crypto$1 from 'crypto';
 import * as fs from 'fs';
-import { promises } from 'fs';
-import 'path';
+import { promises, readFileSync, mkdirSync, writeFileSync } from 'fs';
+import { join } from 'path';
 import http from 'http';
 import https from 'https';
 import 'net';
@@ -35,9 +35,9 @@ import 'timers';
 import { createHash, createHmac, getRandomValues, createPrivateKey, createPublicKey, sign } from 'node:crypto';
 import { Buffer as Buffer$1 } from 'buffer';
 import fs$1, { readFile as readFile$1 } from 'node:fs/promises';
-import { ReadStream, lstatSync, fstatSync, promises as promises$1, readFileSync } from 'node:fs';
+import { ReadStream, lstatSync, fstatSync, promises as promises$1, readFileSync as readFileSync$1 } from 'node:fs';
 import { homedir, platform, release } from 'node:os';
-import { sep, join, normalize, dirname } from 'node:path';
+import { sep, join as join$1, normalize, dirname } from 'node:path';
 import { exec } from 'node:child_process';
 import node_https from 'node:https';
 import { versions, env } from 'node:process';
@@ -32956,6 +32956,47 @@ const JobSchema = object({
 });
 const JobsSchema = array(JobSchema);
 
+const MONOTONIX_JOBS_ENV = 'MONOTONIX_JOBS';
+const MONOTONIX_JOBS_FILE_ENV = 'MONOTONIX_JOBS_FILE';
+const MONOTONIX_JOBS_LEGACY_ENV_LIMIT_BYTES = 32 * 1024;
+const readJobsJsonInput = ({ jobs, jobsFile, env = process.env, }) => {
+    if (jobs) {
+        return jobs;
+    }
+    const inputFile = jobsFile || env[MONOTONIX_JOBS_FILE_ENV];
+    if (inputFile) {
+        return readFileSync(inputFile, 'utf8');
+    }
+    return env[MONOTONIX_JOBS_ENV];
+};
+const publishJobsResult = ({ result, core, env = process.env, }) => {
+    const resultJson = typeof result === 'string' ? result : JSON.stringify(result);
+    const resultFile = writeJobsResultFile(resultJson, env);
+    core.setOutput('result', resultJson);
+    core.setOutput('result-file', resultFile);
+    core.exportVariable(MONOTONIX_JOBS_FILE_ENV, resultFile);
+    if (Buffer.byteLength(resultJson, 'utf8') <=
+        MONOTONIX_JOBS_LEGACY_ENV_LIMIT_BYTES) {
+        core.warning(`${MONOTONIX_JOBS_ENV} is deprecated. Use ${MONOTONIX_JOBS_FILE_ENV} or the result-file output for action-to-action jobs handoff.`);
+        core.exportVariable(MONOTONIX_JOBS_ENV, resultJson);
+    }
+    else {
+        core.warning(`Skipping ${MONOTONIX_JOBS_ENV} export because the jobs payload exceeds ${MONOTONIX_JOBS_LEGACY_ENV_LIMIT_BYTES} bytes. Use ${MONOTONIX_JOBS_FILE_ENV} or the result-file output instead.`);
+    }
+    return resultFile;
+};
+const writeJobsResultFile = (resultJson, env) => {
+    const baseDir = env.RUNNER_TEMP || tmpdir();
+    const resultDir = join(baseDir, 'monotonix');
+    mkdirSync(resultDir, { recursive: true });
+    const fileName = `jobs-${process.pid}-${Date.now()}-${Math.random()
+        .toString(36)
+        .slice(2)}.json`;
+    const resultFile = join(resultDir, fileName);
+    writeFileSync(resultFile, resultJson, 'utf8');
+    return resultFile;
+};
+
 const getAllAliases = (name, aliases) => {
     const _aliases = [];
     if (name) {
@@ -35276,7 +35317,7 @@ const getProfileName = (init) => init.profile || process.env[ENV_PROFILE] || DEF
 const getSSOTokenFilepath = (id) => {
     const hasher = createHash("sha1");
     const cacheName = hasher.update(id).digest("hex");
-    return join(getHomeDir(), ".aws", "sso", "cache", `${cacheName}.json`);
+    return join$1(getHomeDir(), ".aws", "sso", "cache", `${cacheName}.json`);
 };
 
 const tokenIntercept = {};
@@ -35309,10 +35350,10 @@ const getConfigData = (data) => Object.entries(data)
 });
 
 const ENV_CONFIG_PATH = "AWS_CONFIG_FILE";
-const getConfigFilepath = () => process.env[ENV_CONFIG_PATH] || join(getHomeDir(), ".aws", "config");
+const getConfigFilepath = () => process.env[ENV_CONFIG_PATH] || join$1(getHomeDir(), ".aws", "config");
 
 const ENV_CREDENTIALS_PATH = "AWS_SHARED_CREDENTIALS_FILE";
-const getCredentialsFilepath = () => process.env[ENV_CREDENTIALS_PATH] || join(getHomeDir(), ".aws", "credentials");
+const getCredentialsFilepath = () => process.env[ENV_CREDENTIALS_PATH] || join$1(getHomeDir(), ".aws", "credentials");
 
 const prefixKeyRegex = /^([\w-]+)\s(["'])?([\w-@\+\.%:/]+)\2$/;
 const profileNameBlockList = ["__proto__", "profile __proto__"];
@@ -35384,11 +35425,11 @@ const loadSharedConfigFiles = async (init = {}) => {
     const relativeHomeDirPrefix = "~/";
     let resolvedFilepath = filepath;
     if (filepath.startsWith(relativeHomeDirPrefix)) {
-        resolvedFilepath = join(homeDir, filepath.slice(2));
+        resolvedFilepath = join$1(homeDir, filepath.slice(2));
     }
     let resolvedConfigFilepath = configFilepath;
     if (configFilepath.startsWith(relativeHomeDirPrefix)) {
-        resolvedConfigFilepath = join(homeDir, configFilepath.slice(2));
+        resolvedConfigFilepath = join$1(homeDir, configFilepath.slice(2));
     }
     const parsedFiles = await Promise.all([
         readFile(resolvedConfigFilepath, {
@@ -39185,7 +39226,7 @@ const getSanitizedDevTypeScriptVersion = (version = "") => {
 };
 
 let tscVersion;
-const TS_PACKAGE_JSON = join("node_modules", "typescript", "package.json");
+const TS_PACKAGE_JSON = join$1("node_modules", "typescript", "package.json");
 const getTypeScriptUserAgentPair = async () => {
     if (tscVersion === null) {
         return undefined;
@@ -39208,7 +39249,7 @@ const getTypeScriptUserAgentPair = async () => {
     let versionFromApp;
     for (const nodeModulesParentDir of nodeModulesParentDirs) {
         try {
-            const appPackageJsonPath = join(nodeModulesParentDir, "package.json");
+            const appPackageJsonPath = join$1(nodeModulesParentDir, "package.json");
             const packageJson = await readFile$1(appPackageJsonPath, "utf-8");
             const { dependencies, devDependencies } = JSON.parse(packageJson);
             const version = devDependencies?.typescript ?? dependencies?.typescript;
@@ -39228,7 +39269,7 @@ const getTypeScriptUserAgentPair = async () => {
     let versionFromNodeModules;
     for (const nodeModulesParentDir of nodeModulesParentDirs) {
         try {
-            const tsPackageJsonPath = join(nodeModulesParentDir, TS_PACKAGE_JSON);
+            const tsPackageJsonPath = join$1(nodeModulesParentDir, TS_PACKAGE_JSON);
             const packageJson = await readFile$1(tsPackageJsonPath, "utf-8");
             const { version } = JSON.parse(packageJson);
             const sanitizedVersion = getSanitizedTypeScriptVersion(version);
@@ -45449,9 +45490,12 @@ const transofrmItems = (items) => {
     try {
         const table = getInput('dynamodb-table');
         const region = getInput('dynamodb-region');
-        const jobsJson = getInput('jobs') || process.env.MONOTONIX_JOBS;
+        const jobsJson = readJobsJsonInput({
+            jobs: getInput('jobs'),
+            jobsFile: getInput('jobs-file'),
+        });
         if (!jobsJson) {
-            throw new Error('Input job or env $MONOTONIX_JOBS is required');
+            throw new Error('Input jobs, input jobs-file, env $MONOTONIX_JOBS_FILE, or env $MONOTONIX_JOBS is required');
         }
         const jobs = JobsSchema.parse(JSON.parse(jobsJson));
         const result = await run({
@@ -45459,8 +45503,10 @@ const transofrmItems = (items) => {
             table,
             region,
         });
-        setOutput('result', result);
-        exportVariable('MONOTONIX_JOBS', result);
+        publishJobsResult({
+            result,
+            core: { setOutput, exportVariable, warning },
+        });
     }
     catch (error) {
         console.error(error);
@@ -47589,10 +47635,10 @@ class LoginCredentialsFetcher {
         await promises$1.writeFile(tokenFilePath, JSON.stringify(token, null, 2), "utf8");
     }
     getTokenFilePath() {
-        const directory = process.env.AWS_LOGIN_CACHE_DIRECTORY ?? join(homedir(), ".aws", "login", "cache");
+        const directory = process.env.AWS_LOGIN_CACHE_DIRECTORY ?? join$1(homedir(), ".aws", "login", "cache");
         const loginSessionBytes = Buffer.from(this.loginSession, "utf8");
         const loginSessionSha256 = createHash("sha256").update(loginSessionBytes).digest("hex");
-        return join(directory, `${loginSessionSha256}.json`);
+        return join$1(directory, `${loginSessionSha256}.json`);
     }
     derToRawSignature(derSignature) {
         let offset = 2;
@@ -47940,7 +47986,7 @@ const fromTokenFile = (init = {}) => async (awsIdentityProperties) => {
     const credentials = await fromWebToken({
         ...init,
         webIdentityToken: externalDataInterceptor?.getTokenRecord?.()[webIdentityTokenFile] ??
-            readFileSync(webIdentityTokenFile, { encoding: "ascii" }),
+            readFileSync$1(webIdentityTokenFile, { encoding: "ascii" }),
         roleArn,
         roleSessionName,
     })(awsIdentityProperties);

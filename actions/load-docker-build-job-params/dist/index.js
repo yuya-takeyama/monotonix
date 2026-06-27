@@ -1,8 +1,8 @@
 import * as os from 'os';
-import os__default, { EOL } from 'os';
+import os__default, { EOL, tmpdir } from 'os';
 import * as crypto from 'crypto';
 import * as fs from 'fs';
-import { promises, existsSync, readFileSync } from 'fs';
+import { promises, existsSync, readFileSync, mkdirSync, writeFileSync } from 'fs';
 import { join, normalize, relative } from 'path';
 import http from 'http';
 import https from 'https';
@@ -28300,6 +28300,14 @@ function setFailed(message) {
 function error(message, properties = {}) {
     issueCommand('error', toCommandProperties(properties), message instanceof Error ? message.toString() : message);
 }
+/**
+ * Adds a warning issue
+ * @param message warning issue message. Errors will be converted to string via toString()
+ * @param properties optional properties to add to the annotation.
+ */
+function warning(message, properties = {}) {
+    issueCommand('warning', toCommandProperties(properties), message instanceof Error ? message.toString() : message);
+}
 
 class Context {
     /**
@@ -33197,6 +33205,81 @@ const defaults = {
 Octokit.plugin(restEndpointMethods, paginateRest).defaults(defaults);
 
 const context = new Context();
+
+/**
+ * Prefix for paths resolved from repository root.
+ * Example: "$repoRoot/apps/shared" resolves to "apps/shared" from repo root.
+ */
+const REPO_ROOT_PREFIX = '$repoRoot/';
+/**
+ * Resolves a path based on its format:
+ * - Paths starting with "$repoRoot/" are resolved from repository root
+ * - All other paths are resolved relative to appPath
+ *
+ * @param inputPath - The path to resolve (e.g., "../..", "$repoRoot/apps/shared")
+ * @param appPath - The base path for relative resolution
+ * @returns The resolved path (relative for $repoRoot/, absolute for relative paths)
+ */
+const resolvePath = (inputPath, appPath) => {
+    if (inputPath.startsWith(REPO_ROOT_PREFIX)) {
+        return inputPath.slice(REPO_ROOT_PREFIX.length);
+    }
+    return join(appPath, inputPath).replace(/\/$/, '');
+};
+const MONOTONIX_JOBS_ENV = 'MONOTONIX_JOBS';
+const MONOTONIX_JOBS_FILE_ENV = 'MONOTONIX_JOBS_FILE';
+const MONOTONIX_JOBS_LEGACY_ENV_LIMIT_BYTES = 32 * 1024;
+const readJobsJsonInput = ({ jobs, jobsFile, env = process.env, }) => {
+    if (jobs) {
+        return jobs;
+    }
+    const inputFile = jobsFile || env[MONOTONIX_JOBS_FILE_ENV];
+    if (inputFile) {
+        return readFileSync(inputFile, 'utf8');
+    }
+    return env[MONOTONIX_JOBS_ENV];
+};
+const publishJobsResult = ({ result, core, env = process.env, }) => {
+    const resultJson = typeof result === 'string' ? result : JSON.stringify(result);
+    const resultFile = writeJobsResultFile(resultJson, env);
+    core.setOutput('result', resultJson);
+    core.setOutput('result-file', resultFile);
+    core.exportVariable(MONOTONIX_JOBS_FILE_ENV, resultFile);
+    if (Buffer.byteLength(resultJson, 'utf8') <=
+        MONOTONIX_JOBS_LEGACY_ENV_LIMIT_BYTES) {
+        core.warning(`${MONOTONIX_JOBS_ENV} is deprecated. Use ${MONOTONIX_JOBS_FILE_ENV} or the result-file output for action-to-action jobs handoff.`);
+        core.exportVariable(MONOTONIX_JOBS_ENV, resultJson);
+    }
+    else {
+        core.warning(`Skipping ${MONOTONIX_JOBS_ENV} export because the jobs payload exceeds ${MONOTONIX_JOBS_LEGACY_ENV_LIMIT_BYTES} bytes. Use ${MONOTONIX_JOBS_FILE_ENV} or the result-file output instead.`);
+    }
+    return resultFile;
+};
+const writeJobsResultFile = (resultJson, env) => {
+    const baseDir = env.RUNNER_TEMP || tmpdir();
+    const resultDir = join(baseDir, 'monotonix');
+    mkdirSync(resultDir, { recursive: true });
+    const fileName = `jobs-${process.pid}-${Date.now()}-${Math.random()
+        .toString(36)
+        .slice(2)}.json`;
+    const resultFile = join(resultDir, fileName);
+    writeFileSync(resultFile, resultJson, 'utf8');
+    return resultFile;
+};
+const extractAppLabel = (appPath, rootDir) => {
+    // Normalize both paths to handle various input formats
+    const normalizedRootDir = normalize(rootDir || '.');
+    const normalizedAppPath = normalize(appPath);
+    // Calculate relative path
+    const relativePath = relative(normalizedRootDir, normalizedAppPath);
+    // If the relative path starts with '..', it means appPath is outside rootDir
+    // This is likely a configuration error
+    if (relativePath.startsWith('..')) {
+        throw new Error(`appPath "${appPath}" is outside of rootDir "${rootDir}". ` +
+            `All app paths must be within the root directory.`);
+    }
+    return relativePath;
+};
 
 // these aren't really private, but nor are they really useful to document
 
@@ -49163,41 +49246,6 @@ function loadGlobalConfig(globalConfigFilePath) {
     return DockerBuildGlobalConfigSchema.parse(load(globalConfigContent));
 }
 
-/**
- * Prefix for paths resolved from repository root.
- * Example: "$repoRoot/apps/shared" resolves to "apps/shared" from repo root.
- */
-const REPO_ROOT_PREFIX = '$repoRoot/';
-/**
- * Resolves a path based on its format:
- * - Paths starting with "$repoRoot/" are resolved from repository root
- * - All other paths are resolved relative to appPath
- *
- * @param inputPath - The path to resolve (e.g., "../..", "$repoRoot/apps/shared")
- * @param appPath - The base path for relative resolution
- * @returns The resolved path (relative for $repoRoot/, absolute for relative paths)
- */
-const resolvePath = (inputPath, appPath) => {
-    if (inputPath.startsWith(REPO_ROOT_PREFIX)) {
-        return inputPath.slice(REPO_ROOT_PREFIX.length);
-    }
-    return join(appPath, inputPath).replace(/\/$/, '');
-};
-const extractAppLabel = (appPath, rootDir) => {
-    // Normalize both paths to handle various input formats
-    const normalizedRootDir = normalize(rootDir || '.');
-    const normalizedAppPath = normalize(appPath);
-    // Calculate relative path
-    const relativePath = relative(normalizedRootDir, normalizedAppPath);
-    // If the relative path starts with '..', it means appPath is outside rootDir
-    // This is likely a configuration error
-    if (relativePath.startsWith('..')) {
-        throw new Error(`appPath "${appPath}" is outside of rootDir "${rootDir}". ` +
-            `All app paths must be within the root directory.`);
-    }
-    return relativePath;
-};
-
 const generateImageReferences = ({ context, globalConfig, inputJob, timezone, }) => {
     const registry = inputJob.configs.docker_build.registry;
     if (registry.type === 'aws') {
@@ -49295,9 +49343,12 @@ function run({ globalConfig, jobs, context, timezone, }) {
 try {
     const globalConfigFilePath = getInput('global-config-file-path') || 'monotonix-global.yaml';
     const globalConfig = loadGlobalConfig(globalConfigFilePath);
-    const jobsJson = getInput('jobs') || process.env.MONOTONIX_JOBS;
+    const jobsJson = readJobsJsonInput({
+        jobs: getInput('jobs'),
+        jobsFile: getInput('jobs-file'),
+    });
     if (!jobsJson) {
-        throw new Error('Input jobs or env $MONOTONIX_JOBS is required');
+        throw new Error('Input jobs, input jobs-file, env $MONOTONIX_JOBS_FILE, or env $MONOTONIX_JOBS is required');
     }
     const jobs = InputJobsSchema.parse(JSON.parse(jobsJson));
     const timezone = getInput('timezone');
@@ -49305,8 +49356,10 @@ try {
         throw new Error(`Invalid timezone: ${timezone}`);
     }
     const result = run({ globalConfig, jobs, context, timezone });
-    setOutput('result', result);
-    exportVariable('MONOTONIX_JOBS', result);
+    publishJobsResult({
+        result,
+        core: { setOutput, exportVariable, warning },
+    });
 }
 catch (error) {
     console.error(error);

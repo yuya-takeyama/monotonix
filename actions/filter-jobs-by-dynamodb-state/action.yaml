@@ -4,6 +4,8 @@ author: 'Yuya Takeyama'
 inputs:
   jobs:
     description: 'Jobs'
+  jobs-file:
+    description: 'Path to a file containing Jobs JSON'
   dynamodb-table:
     description: 'DynamoDB Table'
     required: true
@@ -14,6 +16,8 @@ inputs:
 outputs:
   result:
     description: 'Filtered Jobs'
+  result-file:
+    description: 'Path to a file containing filtered Jobs JSON'
 
 runs:
   using: 'node24'

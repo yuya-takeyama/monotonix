@@ -29,6 +29,9 @@ importers:
       '@monotonix/schema':
         specifier: workspace:*
         version: link:../../packages/schema
+      '@monotonix/utils':
+        specifier: workspace:*
+        version: link:../../packages/utils
     devDependencies:
       '@rollup/plugin-commonjs':
         specifier: 29.0.3
@@ -84,6 +87,9 @@ importers:
       '@monotonix/schema':
         specifier: workspace:*
         version: link:../../packages/schema
+      '@monotonix/utils':
+        specifier: workspace:*
+        version: link:../../packages/utils
       js-yaml:
         specifier: ^4.3.0
         version: 4.3.0

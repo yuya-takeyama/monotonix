@@ -17,6 +17,7 @@
     "@aws-sdk/lib-dynamodb": "3.1075.0",
     "@monotonix/dynamodb-common": "workspace:*",
     "@monotonix/schema": "workspace:*",
+    "@monotonix/utils": "workspace:*",
     "js-yaml": "^4.3.0",
     "zod": "4.3.6"
   },

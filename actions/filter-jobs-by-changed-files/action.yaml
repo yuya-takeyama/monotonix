@@ -7,10 +7,14 @@ inputs:
     default: ${{ github.token }}
   jobs:
     description: 'Jobs'
+  jobs-file:
+    description: 'Path to a file containing Jobs JSON'
 
 outputs:
   result:
     description: 'Filtered Jobs'
+  result-file:
+    description: 'Path to a file containing filtered Jobs JSON'
 
 runs:
   using: 'node24'
