@@ -4,6 +4,8 @@ author: 'Yuya Takeyama'
 inputs:
   jobs:
     description: 'Jobs'
+  jobs-file:
+    description: 'Path to a file containing Jobs JSON'
   global-config-file-path:
     description: 'Global config file path'
     required: true
@@ -15,6 +17,8 @@ inputs:
 outputs:
   result:
     description: 'Jobs'
+  result-file:
+    description: 'Path to a file containing Jobs JSON'
 
 runs:
   using: 'node24'

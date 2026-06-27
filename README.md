@@ -165,7 +165,7 @@ jobs:
       contents: read
       id-token: write
     outputs:
-      jobs: ${{ env.MONOTONIX_JOBS }}
+      jobs: ${{ steps.load-docker-build-job-params.outputs.result }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -186,7 +186,8 @@ jobs:
         with:
           dynamodb-table: monotonix-state
           dynamodb-region: YOUR-REGION
-      - uses: yuya-takeyama/monotonix/actions/load-docker-build-job-params@main
+      - id: load-docker-build-job-params
+        uses: yuya-takeyama/monotonix/actions/load-docker-build-job-params@main
         with:
           global-config-file-path: apps/monotonix-global.yaml
           timezone: Asia/Tokyo # Timezone for semver_datetime tagging
@@ -341,7 +342,7 @@ Monotonix is designed to be extensible beyond Docker builds. You can define any 
      setup:
        runs-on: ubuntu-latest
        outputs:
-         jobs: ${{ env.MONOTONIX_JOBS }}
+         jobs: ${{ steps.filter-jobs-by-dynamodb-state.outputs.result }}
        steps:
          - uses: actions/checkout@v4
            with:
@@ -355,6 +356,11 @@ Monotonix is designed to be extensible beyond Docker builds. You can define any 
            with:
              root-dir: apps
          # ... state management steps (AWS credentials, DynamoDB filtering)
+         - id: filter-jobs-by-dynamodb-state
+           uses: yuya-takeyama/monotonix/actions/filter-jobs-by-dynamodb-state@main
+           with:
+             dynamodb-table: monotonix-state
+             dynamodb-region: YOUR-REGION
 
      execute:
        needs: setup
@@ -386,6 +392,37 @@ The Monotonix actions automatically handle:
 - Job filtering by changed files
 - State tracking in DynamoDB
 - Deduplication across environments
+
+## Jobs I/O Between Actions
+
+Monotonix passes jobs between actions through a temporary file by default. Each
+jobs-producing action writes the JSON payload to `result-file`, exports only the
+file path as `MONOTONIX_JOBS_FILE`, and keeps the `result` output for GitHub
+Actions dynamic matrices.
+
+Use the final setup step output for workflow matrices:
+
+```yaml
+outputs:
+  jobs: ${{ steps.load-docker-build-job-params.outputs.result }}
+```
+
+For custom chaining, prefer `jobs-file`:
+
+```yaml
+- id: load-jobs
+  uses: yuya-takeyama/monotonix/actions/load-jobs@main
+  with:
+    root-dir: apps
+    required-config-keys: 'my_job_type'
+
+- uses: yuya-takeyama/monotonix/actions/filter-jobs-by-changed-files@main
+  with:
+    jobs-file: ${{ steps.load-jobs.outputs.result-file }}
+```
+
+`MONOTONIX_JOBS` is kept only as a legacy compatibility path for small payloads
+and should not be used for setup job outputs.
 
 ## Configuration Reference
 

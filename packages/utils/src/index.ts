@@ -1,3 +1,5 @@
+import { mkdirSync, readFileSync, writeFileSync } from 'fs';
+import { tmpdir } from 'os';
 import { join, normalize, relative } from 'path';
 
 /**
@@ -85,6 +87,91 @@ export const resolveToAbsolutePath = (
     absolutePath,
     relativePath,
   };
+};
+
+export const MONOTONIX_JOBS_ENV = 'MONOTONIX_JOBS';
+export const MONOTONIX_JOBS_FILE_ENV = 'MONOTONIX_JOBS_FILE';
+export const MONOTONIX_JOBS_LEGACY_ENV_LIMIT_BYTES = 32 * 1024;
+
+type JobsJsonInputParams = {
+  jobs?: string;
+  jobsFile?: string;
+  env?: NodeJS.ProcessEnv;
+};
+
+export const readJobsJsonInput = ({
+  jobs,
+  jobsFile,
+  env = process.env,
+}: JobsJsonInputParams): string | undefined => {
+  if (jobs) {
+    return jobs;
+  }
+
+  const inputFile = jobsFile || env[MONOTONIX_JOBS_FILE_ENV];
+  if (inputFile) {
+    return readFileSync(inputFile, 'utf8');
+  }
+
+  return env[MONOTONIX_JOBS_ENV];
+};
+
+type ActionCore = {
+  setOutput: (name: string, value: unknown) => void;
+  exportVariable: (name: string, value: unknown) => void;
+  warning: (message: string) => void;
+};
+
+type PublishJobsResultParams = {
+  result: unknown;
+  core: ActionCore;
+  env?: NodeJS.ProcessEnv;
+};
+
+export const publishJobsResult = ({
+  result,
+  core,
+  env = process.env,
+}: PublishJobsResultParams): string => {
+  const resultJson =
+    typeof result === 'string' ? result : JSON.stringify(result);
+  const resultFile = writeJobsResultFile(resultJson, env);
+
+  core.setOutput('result', resultJson);
+  core.setOutput('result-file', resultFile);
+  core.exportVariable(MONOTONIX_JOBS_FILE_ENV, resultFile);
+
+  if (
+    Buffer.byteLength(resultJson, 'utf8') <=
+    MONOTONIX_JOBS_LEGACY_ENV_LIMIT_BYTES
+  ) {
+    core.warning(
+      `${MONOTONIX_JOBS_ENV} is deprecated. Use ${MONOTONIX_JOBS_FILE_ENV} or the result-file output for action-to-action jobs handoff.`,
+    );
+    core.exportVariable(MONOTONIX_JOBS_ENV, resultJson);
+  } else {
+    core.warning(
+      `Skipping ${MONOTONIX_JOBS_ENV} export because the jobs payload exceeds ${MONOTONIX_JOBS_LEGACY_ENV_LIMIT_BYTES} bytes. Use ${MONOTONIX_JOBS_FILE_ENV} or the result-file output instead.`,
+    );
+  }
+
+  return resultFile;
+};
+
+const writeJobsResultFile = (
+  resultJson: string,
+  env: NodeJS.ProcessEnv,
+): string => {
+  const baseDir = env.RUNNER_TEMP || tmpdir();
+  const resultDir = join(baseDir, 'monotonix');
+  mkdirSync(resultDir, { recursive: true });
+
+  const fileName = `jobs-${process.pid}-${Date.now()}-${Math.random()
+    .toString(36)
+    .slice(2)}.json`;
+  const resultFile = join(resultDir, fileName);
+  writeFileSync(resultFile, resultJson, 'utf8');
+  return resultFile;
 };
 
 export const extractAppLabel = (appPath: string, rootDir: string): string => {

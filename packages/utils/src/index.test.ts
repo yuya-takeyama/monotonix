@@ -1,6 +1,13 @@
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
 import {
   createUnresolvedPath,
   extractAppLabel,
+  MONOTONIX_JOBS_ENV,
+  MONOTONIX_JOBS_FILE_ENV,
+  publishJobsResult,
+  readJobsJsonInput,
   resolvePath,
   resolveToAbsolutePath,
 } from './index';
@@ -205,5 +212,122 @@ describe('resolveToAbsolutePath', () => {
         relativePath: 'apps/web/lib',
       });
     });
+  });
+});
+
+describe('jobs JSON I/O', () => {
+  const createTempDir = () => mkdtempSync(join(tmpdir(), 'monotonix-test-'));
+
+  const createCore = () => ({
+    outputs: new Map<string, unknown>(),
+    exports: new Map<string, unknown>(),
+    warnings: [] as string[],
+    setOutput(name: string, value: unknown) {
+      this.outputs.set(name, value);
+    },
+    exportVariable(name: string, value: unknown) {
+      this.exports.set(name, value);
+    },
+    warning(message: string) {
+      this.warnings.push(message);
+    },
+  });
+
+  it('writes large results to a file without exporting MONOTONIX_JOBS', () => {
+    const tempDir = createTempDir();
+    try {
+      const core = createCore();
+      const result = [{ value: 'x'.repeat(33 * 1024) }];
+
+      const resultFile = publishJobsResult({
+        result,
+        core,
+        env: { RUNNER_TEMP: tempDir },
+      });
+
+      const resultJson = JSON.stringify(result);
+      expect(readFileSync(resultFile, 'utf8')).toBe(resultJson);
+      expect(core.outputs.get('result')).toBe(resultJson);
+      expect(core.outputs.get('result-file')).toBe(resultFile);
+      expect(core.exports.get(MONOTONIX_JOBS_FILE_ENV)).toBe(resultFile);
+      expect(core.exports.has(MONOTONIX_JOBS_ENV)).toBe(false);
+      expect(core.warnings).toEqual([
+        expect.stringContaining(`Skipping ${MONOTONIX_JOBS_ENV} export`),
+      ]);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps legacy MONOTONIX_JOBS export for small results', () => {
+    const tempDir = createTempDir();
+    try {
+      const core = createCore();
+      const result = [{ value: 'small' }];
+
+      publishJobsResult({
+        result,
+        core,
+        env: { RUNNER_TEMP: tempDir },
+      });
+
+      expect(core.exports.get(MONOTONIX_JOBS_ENV)).toBe(JSON.stringify(result));
+      expect(core.exports.has(MONOTONIX_JOBS_FILE_ENV)).toBe(true);
+      expect(core.warnings).toEqual([
+        expect.stringContaining(`${MONOTONIX_JOBS_ENV} is deprecated`),
+      ]);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('reads jobs by explicit input, explicit file, env file, then legacy env', () => {
+    const tempDir = createTempDir();
+    try {
+      const explicitFile = join(tempDir, 'explicit.json');
+      const envFile = join(tempDir, 'env.json');
+      writeFileSync(explicitFile, 'from-explicit-file', 'utf8');
+      writeFileSync(envFile, 'from-env-file', 'utf8');
+
+      expect(
+        readJobsJsonInput({
+          jobs: 'from-input',
+          jobsFile: explicitFile,
+          env: {
+            [MONOTONIX_JOBS_FILE_ENV]: envFile,
+            [MONOTONIX_JOBS_ENV]: 'from-env',
+          },
+        }),
+      ).toBe('from-input');
+
+      expect(
+        readJobsJsonInput({
+          jobsFile: explicitFile,
+          env: {
+            [MONOTONIX_JOBS_FILE_ENV]: envFile,
+            [MONOTONIX_JOBS_ENV]: 'from-env',
+          },
+        }),
+      ).toBe('from-explicit-file');
+
+      expect(
+        readJobsJsonInput({
+          env: {
+            [MONOTONIX_JOBS_FILE_ENV]: envFile,
+            [MONOTONIX_JOBS_ENV]: 'from-env',
+          },
+        }),
+      ).toBe('from-env-file');
+
+      expect(
+        readJobsJsonInput({
+          env: {
+            [MONOTONIX_JOBS_ENV]: 'from-env',
+          },
+        }),
+      ).toBe('from-env');
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
   });
 });

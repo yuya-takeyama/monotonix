@@ -1,5 +1,12 @@
-import { exportVariable, getInput, setFailed, setOutput } from '@actions/core';
+import {
+  exportVariable,
+  getInput,
+  setFailed,
+  setOutput,
+  warning,
+} from '@actions/core';
 import { JobsSchema } from '@monotonix/schema';
+import { publishJobsResult, readJobsJsonInput } from '@monotonix/utils';
 import { run } from './run';
 
 (async () => {
@@ -8,9 +15,14 @@ import { run } from './run';
     if (!githubToken) {
       throw new Error('Input github-token or env $GITHUB_TOKEN is required');
     }
-    const jobsJson = getInput('jobs') || process.env.MONOTONIX_JOBS;
+    const jobsJson = readJobsJsonInput({
+      jobs: getInput('jobs'),
+      jobsFile: getInput('jobs-file'),
+    });
     if (!jobsJson) {
-      throw new Error('Input job or env $MONOTONIX_JOBS is required');
+      throw new Error(
+        'Input jobs, input jobs-file, env $MONOTONIX_JOBS_FILE, or env $MONOTONIX_JOBS is required',
+      );
     }
     const jobs = JobsSchema.parse(JSON.parse(jobsJson));
 
@@ -19,8 +31,10 @@ import { run } from './run';
       jobs,
     });
 
-    setOutput('result', result);
-    exportVariable('MONOTONIX_JOBS', result);
+    publishJobsResult({
+      result,
+      core: { setOutput, exportVariable, warning },
+    });
   } catch (error) {
     console.error(error);
     setFailed(`Action failed with error: ${error}`);

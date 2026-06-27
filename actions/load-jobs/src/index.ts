@@ -1,5 +1,12 @@
-import { exportVariable, getInput, setFailed, setOutput } from '@actions/core';
+import {
+  exportVariable,
+  getInput,
+  setFailed,
+  setOutput,
+  warning,
+} from '@actions/core';
 import { context } from '@actions/github';
+import { publishJobsResult } from '@monotonix/utils';
 import { loadGlobalConfig } from './config';
 import { run } from './run';
 import { EventSchema } from './schema';
@@ -43,8 +50,10 @@ import { MetadataValidator } from './validateMetadata';
       validator.validate(result);
     }
 
-    setOutput('result', result);
-    exportVariable('MONOTONIX_JOBS', result);
+    publishJobsResult({
+      result,
+      core: { setOutput, exportVariable, warning },
+    });
   } catch (error) {
     console.error(error);
     setFailed(`Action failed with error: ${error}`);
