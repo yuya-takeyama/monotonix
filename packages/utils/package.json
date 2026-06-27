@@ -12,12 +12,11 @@
   },
   "scripts": {
     "build": "tsc",
-    "test": "jest"
+    "test": "vitest run --config ../../vitest.config.ts"
   },
   "devDependencies": {
     "@types/node": "24.10.9",
-    "jest": "30.4.2",
-    "ts-jest": "29.4.11",
-    "typescript": "5.9.3"
+    "typescript": "5.9.3",
+    "vitest": "4.1.9"
   }
 }

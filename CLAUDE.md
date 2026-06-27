@@ -120,7 +120,7 @@ Each action follows this pattern:
 
 ### Testing
 
-- Uses Jest with `ts-jest`
+- Uses Vitest
 - Test files: `*.test.ts`
 - Focus on unit testing core logic in `run.ts`
 
