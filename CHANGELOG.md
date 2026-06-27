@@ -2,13 +2,28 @@
 
 ## Unreleased
 
+## [0.0.9] - 2026-06-28
+
 ### Added
 
-- Add file-based jobs handoff with `jobs-file`, `result-file`, and `MONOTONIX_JOBS_FILE`.
+- Add file-based jobs handoff with `jobs-file`, `result-file`, and `MONOTONIX_JOBS_FILE` [#233](https://github.com/yuya-takeyama/monotonix/pull/233)
+- Add Claude Code GitHub Workflow [#224](https://github.com/yuya-takeyama/monotonix/pull/224)
 
 ### Changed
 
-- Limit legacy `MONOTONIX_JOBS` export to small jobs payloads to avoid oversized GitHub Actions environments.
+- Migrate from Jest to Vitest [#234](https://github.com/yuya-takeyama/monotonix/pull/234)
+- Limit legacy `MONOTONIX_JOBS` export to small jobs payloads to avoid oversized GitHub Actions environments [#233](https://github.com/yuya-takeyama/monotonix/pull/233)
+- Update pnpm to v11.9.0 [#235](https://github.com/yuya-takeyama/monotonix/pull/235)
+- Update actions/checkout action to v6 [#200](https://github.com/yuya-takeyama/monotonix/pull/200)
+- Pin GitHub Actions and update pinact to v3.8.0 [#226](https://github.com/yuya-takeyama/monotonix/pull/226)
+- Update dependency aquaproj/aqua to v2.56.6 [#227](https://github.com/yuya-takeyama/monotonix/pull/227)
+- Update dependency aquaproj/aqua-registry to v4.529.0 [#231](https://github.com/yuya-takeyama/monotonix/pull/231), v4.519.0 [#228](https://github.com/yuya-takeyama/monotonix/pull/228)
+- Update dependency suzuki-shunsuke/pinact to v3.10.1 [#229](https://github.com/yuya-takeyama/monotonix/pull/229)
+- Lock file maintenance [#223](https://github.com/yuya-takeyama/monotonix/pull/223)
+
+### Fixed
+
+- Update vulnerable dependencies [#232](https://github.com/yuya-takeyama/monotonix/pull/232)
 
 ## [0.0.8] - 2026-02-01
 
