@@ -7,7 +7,6 @@
       "!**/node_modules",
       "!**/.turbo",
       "!**/coverage",
-      "!**/jest.config.js",
       "!**/tsconfig.json"
     ],
     "ignoreUnknown": true,
