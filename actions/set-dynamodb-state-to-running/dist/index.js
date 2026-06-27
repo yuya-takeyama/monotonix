@@ -1,23 +1,22 @@
 import * as os from 'os';
-import os__default, { homedir, platform, release } from 'os';
+import os__default from 'os';
 import * as crypto$1 from 'crypto';
-import crypto__default, { createHash, createHmac } from 'crypto';
 import * as fs from 'fs';
-import { promises, readFileSync } from 'fs';
-import { sep, join } from 'path';
-import http, { Agent as Agent$1, request as request$3 } from 'http';
-import https, { Agent, request as request$2 } from 'https';
+import { promises } from 'fs';
+import 'path';
+import http from 'http';
+import https from 'https';
 import 'net';
 import require$$1 from 'tls';
 import events$1 from 'events';
 import 'assert';
-import require$$6, { promisify } from 'util';
+import require$$6 from 'util';
 import require$$0$1 from 'node:assert';
 import require$$0$3 from 'node:net';
 import require$$2 from 'node:http';
-import require$$0$2 from 'node:stream';
+import require$$0$2, { Readable, Writable } from 'node:stream';
 import require$$0 from 'node:buffer';
-import require$$0$4 from 'node:util';
+import require$$0$4, { promisify } from 'node:util';
 import require$$7 from 'node:querystring';
 import require$$8 from 'node:events';
 import require$$0$5 from 'node:diagnostics_channel';
@@ -31,18 +30,17 @@ import require$$5$2 from 'node:async_hooks';
 import require$$1$4 from 'node:console';
 import require$$1$5 from 'node:dns';
 import require$$5$3 from 'string_decoder';
-import { exec } from 'child_process';
+import 'child_process';
 import 'timers';
-import { parse as parse$2 } from 'url';
+import { createHash, createHmac, getRandomValues, createPrivateKey, createPublicKey, sign } from 'node:crypto';
 import { Buffer as Buffer$1 } from 'buffer';
-import fs$1, { readFile as readFile$1 } from 'fs/promises';
-import { createHash as createHash$1, createPrivateKey, createPublicKey, sign } from 'node:crypto';
-import { ReadStream, lstatSync, fstatSync, promises as promises$1 } from 'node:fs';
-import { homedir as homedir$1 } from 'node:os';
-import { dirname, join as join$1 } from 'node:path';
-import { Readable, Writable } from 'stream';
-import { readFile as readFile$2 } from 'node:fs/promises';
-import { versions, env } from 'process';
+import fs$1, { readFile as readFile$1 } from 'node:fs/promises';
+import { ReadStream, lstatSync, fstatSync, promises as promises$1, readFileSync } from 'node:fs';
+import { homedir, platform, release } from 'node:os';
+import { sep, join, normalize, dirname } from 'node:path';
+import { exec } from 'node:child_process';
+import node_https from 'node:https';
+import { versions, env } from 'node:process';
 
 // We use any as a valid input type
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -947,6 +945,24 @@ function requireErrors () {
 	  [kSecureProxyConnectionError] = true
 	}
 
+	const kMessageSizeExceededError = Symbol.for('undici.error.UND_ERR_WS_MESSAGE_SIZE_EXCEEDED');
+	class MessageSizeExceededError extends UndiciError {
+	  constructor (message) {
+	    super(message);
+	    this.name = 'MessageSizeExceededError';
+	    this.message = message || 'Max decompressed message size exceeded';
+	    this.code = 'UND_ERR_WS_MESSAGE_SIZE_EXCEEDED';
+	  }
+
+	  static [Symbol.hasInstance] (instance) {
+	    return instance && instance[kMessageSizeExceededError] === true
+	  }
+
+	  get [kMessageSizeExceededError] () {
+	    return true
+	  }
+	}
+
 	errors = {
 	  AbortError,
 	  HTTPParserError,
@@ -970,7 +986,8 @@ function requireErrors () {
 	  ResponseExceededMaxSizeError,
 	  RequestRetryError,
 	  ResponseError,
-	  SecureProxyConnectionError
+	  SecureProxyConnectionError,
+	  MessageSizeExceededError
 	};
 	return errors;
 }
@@ -2271,6 +2288,10 @@ function requireRequest$1 () {
 	      throw new InvalidArgumentError('upgrade must be a string')
 	    }
 
+	    if (upgrade && !isValidHeaderValue(upgrade)) {
+	      throw new InvalidArgumentError('invalid upgrade header')
+	    }
+
 	    if (headersTimeout != null && (!Number.isFinite(headersTimeout) || headersTimeout < 0)) {
 	      throw new InvalidArgumentError('invalid headersTimeout')
 	    }
@@ -2565,13 +2586,19 @@ function requireRequest$1 () {
 	    val = `${val}`;
 	  }
 
-	  if (request.host === null && headerName === 'host') {
+	  if (headerName === 'host') {
+	    if (request.host !== null) {
+	      throw new InvalidArgumentError('duplicate host header')
+	    }
 	    if (typeof val !== 'string') {
 	      throw new InvalidArgumentError('invalid host header')
 	    }
 	    // Consumed by Client
 	    request.host = val;
-	  } else if (request.contentLength === null && headerName === 'content-length') {
+	  } else if (headerName === 'content-length') {
+	    if (request.contentLength !== null) {
+	      throw new InvalidArgumentError('duplicate content-length header')
+	    }
 	    request.contentLength = parseInt(val, 10);
 	    if (!Number.isFinite(request.contentLength)) {
 	      throw new InvalidArgumentError('invalid content-length header')
@@ -2692,15 +2719,24 @@ function requireDispatcherBase () {
 	const kOnDestroyed = Symbol('onDestroyed');
 	const kOnClosed = Symbol('onClosed');
 	const kInterceptedDispatch = Symbol('Intercepted Dispatch');
+	const kWebSocketOptions = Symbol('webSocketOptions');
 
 	class DispatcherBase extends Dispatcher {
-	  constructor () {
+	  constructor (opts) {
 	    super();
 
 	    this[kDestroyed] = false;
 	    this[kOnDestroyed] = null;
 	    this[kClosed] = false;
 	    this[kOnClosed] = [];
+	    this[kWebSocketOptions] = opts?.webSocket ?? {};
+	  }
+
+	  get webSocketOptions () {
+	    return {
+	      maxFragments: this[kWebSocketOptions].maxFragments ?? 131072,
+	      maxPayloadSize: this[kWebSocketOptions].maxPayloadSize ?? 128 * 1024 * 1024
+	    }
 	  }
 
 	  get destroyed () {
@@ -3582,9 +3618,9 @@ var hasRequiredConstants$3;
 function requireConstants$3 () {
 	if (hasRequiredConstants$3) return constants$3;
 	hasRequiredConstants$3 = 1;
-	(function (exports$1) {
-		Object.defineProperty(exports$1, "__esModule", { value: true });
-		exports$1.SPECIAL_HEADERS = exports$1.HEADER_STATE = exports$1.MINOR = exports$1.MAJOR = exports$1.CONNECTION_TOKEN_CHARS = exports$1.HEADER_CHARS = exports$1.TOKEN = exports$1.STRICT_TOKEN = exports$1.HEX = exports$1.URL_CHAR = exports$1.STRICT_URL_CHAR = exports$1.USERINFO_CHARS = exports$1.MARK = exports$1.ALPHANUM = exports$1.NUM = exports$1.HEX_MAP = exports$1.NUM_MAP = exports$1.ALPHA = exports$1.FINISH = exports$1.H_METHOD_MAP = exports$1.METHOD_MAP = exports$1.METHODS_RTSP = exports$1.METHODS_ICE = exports$1.METHODS_HTTP = exports$1.METHODS = exports$1.LENIENT_FLAGS = exports$1.FLAGS = exports$1.TYPE = exports$1.ERROR = void 0;
+	(function (exports) {
+		Object.defineProperty(exports, "__esModule", { value: true });
+		exports.SPECIAL_HEADERS = exports.HEADER_STATE = exports.MINOR = exports.MAJOR = exports.CONNECTION_TOKEN_CHARS = exports.HEADER_CHARS = exports.TOKEN = exports.STRICT_TOKEN = exports.HEX = exports.URL_CHAR = exports.STRICT_URL_CHAR = exports.USERINFO_CHARS = exports.MARK = exports.ALPHANUM = exports.NUM = exports.HEX_MAP = exports.NUM_MAP = exports.ALPHA = exports.FINISH = exports.H_METHOD_MAP = exports.METHOD_MAP = exports.METHODS_RTSP = exports.METHODS_ICE = exports.METHODS_HTTP = exports.METHODS = exports.LENIENT_FLAGS = exports.FLAGS = exports.TYPE = exports.ERROR = void 0;
 		const utils_1 = requireUtils();
 		(function (ERROR) {
 		    ERROR[ERROR["OK"] = 0] = "OK";
@@ -3612,12 +3648,12 @@ function requireConstants$3 () {
 		    ERROR[ERROR["PAUSED_UPGRADE"] = 22] = "PAUSED_UPGRADE";
 		    ERROR[ERROR["PAUSED_H2_UPGRADE"] = 23] = "PAUSED_H2_UPGRADE";
 		    ERROR[ERROR["USER"] = 24] = "USER";
-		})(exports$1.ERROR || (exports$1.ERROR = {}));
+		})(exports.ERROR || (exports.ERROR = {}));
 		(function (TYPE) {
 		    TYPE[TYPE["BOTH"] = 0] = "BOTH";
 		    TYPE[TYPE["REQUEST"] = 1] = "REQUEST";
 		    TYPE[TYPE["RESPONSE"] = 2] = "RESPONSE";
-		})(exports$1.TYPE || (exports$1.TYPE = {}));
+		})(exports.TYPE || (exports.TYPE = {}));
 		(function (FLAGS) {
 		    FLAGS[FLAGS["CONNECTION_KEEP_ALIVE"] = 1] = "CONNECTION_KEEP_ALIVE";
 		    FLAGS[FLAGS["CONNECTION_CLOSE"] = 2] = "CONNECTION_CLOSE";
@@ -3629,12 +3665,12 @@ function requireConstants$3 () {
 		    FLAGS[FLAGS["TRAILING"] = 128] = "TRAILING";
 		    // 1 << 8 is unused
 		    FLAGS[FLAGS["TRANSFER_ENCODING"] = 512] = "TRANSFER_ENCODING";
-		})(exports$1.FLAGS || (exports$1.FLAGS = {}));
+		})(exports.FLAGS || (exports.FLAGS = {}));
 		(function (LENIENT_FLAGS) {
 		    LENIENT_FLAGS[LENIENT_FLAGS["HEADERS"] = 1] = "HEADERS";
 		    LENIENT_FLAGS[LENIENT_FLAGS["CHUNKED_LENGTH"] = 2] = "CHUNKED_LENGTH";
 		    LENIENT_FLAGS[LENIENT_FLAGS["KEEP_ALIVE"] = 4] = "KEEP_ALIVE";
-		})(exports$1.LENIENT_FLAGS || (exports$1.LENIENT_FLAGS = {}));
+		})(exports.LENIENT_FLAGS || (exports.LENIENT_FLAGS = {}));
 		var METHODS;
 		(function (METHODS) {
 		    METHODS[METHODS["DELETE"] = 0] = "DELETE";
@@ -3694,8 +3730,8 @@ function requireConstants$3 () {
 		    METHODS[METHODS["RECORD"] = 44] = "RECORD";
 		    /* RAOP */
 		    METHODS[METHODS["FLUSH"] = 45] = "FLUSH";
-		})(METHODS = exports$1.METHODS || (exports$1.METHODS = {}));
-		exports$1.METHODS_HTTP = [
+		})(METHODS = exports.METHODS || (exports.METHODS = {}));
+		exports.METHODS_HTTP = [
 		    METHODS.DELETE,
 		    METHODS.GET,
 		    METHODS.HEAD,
@@ -3733,10 +3769,10 @@ function requireConstants$3 () {
 		    // TODO(indutny): should we allow it with HTTP?
 		    METHODS.SOURCE,
 		];
-		exports$1.METHODS_ICE = [
+		exports.METHODS_ICE = [
 		    METHODS.SOURCE,
 		];
-		exports$1.METHODS_RTSP = [
+		exports.METHODS_RTSP = [
 		    METHODS.OPTIONS,
 		    METHODS.DESCRIBE,
 		    METHODS.ANNOUNCE,
@@ -3753,59 +3789,59 @@ function requireConstants$3 () {
 		    METHODS.GET,
 		    METHODS.POST,
 		];
-		exports$1.METHOD_MAP = utils_1.enumToMap(METHODS);
-		exports$1.H_METHOD_MAP = {};
-		Object.keys(exports$1.METHOD_MAP).forEach((key) => {
+		exports.METHOD_MAP = utils_1.enumToMap(METHODS);
+		exports.H_METHOD_MAP = {};
+		Object.keys(exports.METHOD_MAP).forEach((key) => {
 		    if (/^H/.test(key)) {
-		        exports$1.H_METHOD_MAP[key] = exports$1.METHOD_MAP[key];
+		        exports.H_METHOD_MAP[key] = exports.METHOD_MAP[key];
 		    }
 		});
 		(function (FINISH) {
 		    FINISH[FINISH["SAFE"] = 0] = "SAFE";
 		    FINISH[FINISH["SAFE_WITH_CB"] = 1] = "SAFE_WITH_CB";
 		    FINISH[FINISH["UNSAFE"] = 2] = "UNSAFE";
-		})(exports$1.FINISH || (exports$1.FINISH = {}));
-		exports$1.ALPHA = [];
+		})(exports.FINISH || (exports.FINISH = {}));
+		exports.ALPHA = [];
 		for (let i = 'A'.charCodeAt(0); i <= 'Z'.charCodeAt(0); i++) {
 		    // Upper case
-		    exports$1.ALPHA.push(String.fromCharCode(i));
+		    exports.ALPHA.push(String.fromCharCode(i));
 		    // Lower case
-		    exports$1.ALPHA.push(String.fromCharCode(i + 0x20));
+		    exports.ALPHA.push(String.fromCharCode(i + 0x20));
 		}
-		exports$1.NUM_MAP = {
+		exports.NUM_MAP = {
 		    0: 0, 1: 1, 2: 2, 3: 3, 4: 4,
 		    5: 5, 6: 6, 7: 7, 8: 8, 9: 9,
 		};
-		exports$1.HEX_MAP = {
+		exports.HEX_MAP = {
 		    0: 0, 1: 1, 2: 2, 3: 3, 4: 4,
 		    5: 5, 6: 6, 7: 7, 8: 8, 9: 9,
 		    A: 0XA, B: 0XB, C: 0XC, D: 0XD, E: 0XE, F: 0XF,
 		    a: 0xa, b: 0xb, c: 0xc, d: 0xd, e: 0xe, f: 0xf,
 		};
-		exports$1.NUM = [
+		exports.NUM = [
 		    '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
 		];
-		exports$1.ALPHANUM = exports$1.ALPHA.concat(exports$1.NUM);
-		exports$1.MARK = ['-', '_', '.', '!', '~', '*', '\'', '(', ')'];
-		exports$1.USERINFO_CHARS = exports$1.ALPHANUM
-		    .concat(exports$1.MARK)
+		exports.ALPHANUM = exports.ALPHA.concat(exports.NUM);
+		exports.MARK = ['-', '_', '.', '!', '~', '*', '\'', '(', ')'];
+		exports.USERINFO_CHARS = exports.ALPHANUM
+		    .concat(exports.MARK)
 		    .concat(['%', ';', ':', '&', '=', '+', '$', ',']);
 		// TODO(indutny): use RFC
-		exports$1.STRICT_URL_CHAR = [
+		exports.STRICT_URL_CHAR = [
 		    '!', '"', '$', '%', '&', '\'',
 		    '(', ')', '*', '+', ',', '-', '.', '/',
 		    ':', ';', '<', '=', '>',
 		    '@', '[', '\\', ']', '^', '_',
 		    '`',
 		    '{', '|', '}', '~',
-		].concat(exports$1.ALPHANUM);
-		exports$1.URL_CHAR = exports$1.STRICT_URL_CHAR
+		].concat(exports.ALPHANUM);
+		exports.URL_CHAR = exports.STRICT_URL_CHAR
 		    .concat(['\t', '\f']);
 		// All characters with 0x80 bit set to 1
 		for (let i = 0x80; i <= 0xff; i++) {
-		    exports$1.URL_CHAR.push(i);
+		    exports.URL_CHAR.push(i);
 		}
-		exports$1.HEX = exports$1.NUM.concat(['a', 'b', 'c', 'd', 'e', 'f', 'A', 'B', 'C', 'D', 'E', 'F']);
+		exports.HEX = exports.NUM.concat(['a', 'b', 'c', 'd', 'e', 'f', 'A', 'B', 'C', 'D', 'E', 'F']);
 		/* Tokens as defined by rfc 2616. Also lowercases them.
 		 *        token       = 1*<any CHAR except CTLs or separators>
 		 *     separators     = "(" | ")" | "<" | ">" | "@"
@@ -3813,27 +3849,27 @@ function requireConstants$3 () {
 		 *                    | "/" | "[" | "]" | "?" | "="
 		 *                    | "{" | "}" | SP | HT
 		 */
-		exports$1.STRICT_TOKEN = [
+		exports.STRICT_TOKEN = [
 		    '!', '#', '$', '%', '&', '\'',
 		    '*', '+', '-', '.',
 		    '^', '_', '`',
 		    '|', '~',
-		].concat(exports$1.ALPHANUM);
-		exports$1.TOKEN = exports$1.STRICT_TOKEN.concat([' ']);
+		].concat(exports.ALPHANUM);
+		exports.TOKEN = exports.STRICT_TOKEN.concat([' ']);
 		/*
 		 * Verify that a char is a valid visible (printable) US-ASCII
 		 * character or %x80-FF
 		 */
-		exports$1.HEADER_CHARS = ['\t'];
+		exports.HEADER_CHARS = ['\t'];
 		for (let i = 32; i <= 255; i++) {
 		    if (i !== 127) {
-		        exports$1.HEADER_CHARS.push(i);
+		        exports.HEADER_CHARS.push(i);
 		    }
 		}
 		// ',' = \x44
-		exports$1.CONNECTION_TOKEN_CHARS = exports$1.HEADER_CHARS.filter((c) => c !== 44);
-		exports$1.MAJOR = exports$1.NUM_MAP;
-		exports$1.MINOR = exports$1.MAJOR;
+		exports.CONNECTION_TOKEN_CHARS = exports.HEADER_CHARS.filter((c) => c !== 44);
+		exports.MAJOR = exports.NUM_MAP;
+		exports.MINOR = exports.MAJOR;
 		var HEADER_STATE;
 		(function (HEADER_STATE) {
 		    HEADER_STATE[HEADER_STATE["GENERAL"] = 0] = "GENERAL";
@@ -3845,8 +3881,8 @@ function requireConstants$3 () {
 		    HEADER_STATE[HEADER_STATE["CONNECTION_CLOSE"] = 6] = "CONNECTION_CLOSE";
 		    HEADER_STATE[HEADER_STATE["CONNECTION_UPGRADE"] = 7] = "CONNECTION_UPGRADE";
 		    HEADER_STATE[HEADER_STATE["TRANSFER_ENCODING_CHUNKED"] = 8] = "TRANSFER_ENCODING_CHUNKED";
-		})(HEADER_STATE = exports$1.HEADER_STATE || (exports$1.HEADER_STATE = {}));
-		exports$1.SPECIAL_HEADERS = {
+		})(HEADER_STATE = exports.HEADER_STATE || (exports.HEADER_STATE = {}));
+		exports.SPECIAL_HEADERS = {
 		    'connection': HEADER_STATE.CONNECTION,
 		    'content-length': HEADER_STATE.CONTENT_LENGTH,
 		    'proxy-connection': HEADER_STATE.CONNECTION,
@@ -8650,6 +8686,9 @@ function requireClientH1 () {
 	const FastBuffer = Buffer[Symbol.species];
 	const addListener = util.addListener;
 	const removeAllListeners = util.removeAllListeners;
+	const kIdleSocketValidation = Symbol('kIdleSocketValidation');
+	const kIdleSocketValidationTimeout = Symbol('kIdleSocketValidationTimeout');
+	const kSocketUsed = Symbol('kSocketUsed');
 
 	let extractBody;
 
@@ -8737,10 +8776,10 @@ function requireClientH1 () {
 	const TIMEOUT_KEEP_ALIVE = 8 | USE_NATIVE_TIMER;
 
 	class Parser {
-	  constructor (client, socket, { exports: exports$1 }) {
+	  constructor (client, socket, { exports }) {
 	    assert(Number.isFinite(client[kMaxHeadersSize]) && client[kMaxHeadersSize] > 0);
 
-	    this.llhttp = exports$1;
+	    this.llhttp = exports;
 	    this.ptr = this.llhttp.llhttp_alloc(constants.TYPE.RESPONSE);
 	    this.client = client;
 	    this.socket = socket;
@@ -8872,27 +8911,69 @@ function requireClientH1 () {
 
 	      const offset = llhttp.llhttp_get_error_pos(this.ptr) - currentBufferPtr;
 
-	      if (ret === constants.ERROR.PAUSED_UPGRADE) {
-	        this.onUpgrade(data.slice(offset));
-	      } else if (ret === constants.ERROR.PAUSED) {
-	        this.paused = true;
-	        socket.unshift(data.slice(offset));
-	      } else if (ret !== constants.ERROR.OK) {
-	        const ptr = llhttp.llhttp_get_error_reason(this.ptr);
-	        let message = '';
-	        /* istanbul ignore else: difficult to make a test case for */
-	        if (ptr) {
-	          const len = new Uint8Array(llhttp.memory.buffer, ptr).indexOf(0);
-	          message =
-	            'Response does not match the HTTP/1.1 protocol (' +
-	            Buffer.from(llhttp.memory.buffer, ptr, len).toString() +
-	            ')';
+	      if (ret !== constants.ERROR.OK) {
+	        const body = data.subarray(offset);
+
+	        if (ret === constants.ERROR.PAUSED_UPGRADE) {
+	          this.onUpgrade(body);
+	        } else if (ret === constants.ERROR.PAUSED) {
+	          this.paused = true;
+	          socket.unshift(body);
+	        } else {
+	          throw this.createError(ret, body)
 	        }
-	        throw new HTTPParserError(message, constants.ERROR[ret], data.slice(offset))
 	      }
 	    } catch (err) {
 	      util.destroy(socket, err);
 	    }
+	  }
+
+	  finish () {
+	    assert(currentParser === null);
+	    assert(this.ptr != null);
+	    assert(!this.paused);
+
+	    const { llhttp } = this;
+
+	    let ret;
+
+	    try {
+	      currentParser = this;
+	      ret = llhttp.llhttp_finish(this.ptr);
+	    } finally {
+	      currentParser = null;
+	    }
+
+	    if (ret === constants.ERROR.OK) {
+	      return null
+	    }
+
+	    if (ret === constants.ERROR.PAUSED || ret === constants.ERROR.PAUSED_UPGRADE) {
+	      this.paused = true;
+	      return null
+	    }
+
+	    return this.createError(ret, EMPTY_BUF)
+	  }
+
+	  createError (ret, data) {
+	    const { llhttp, contentLength, bytesRead } = this;
+
+	    if (contentLength && bytesRead !== parseInt(contentLength, 10)) {
+	      return new ResponseContentLengthMismatchError()
+	    }
+
+	    const ptr = llhttp.llhttp_get_error_reason(this.ptr);
+	    let message = '';
+	    if (ptr) {
+	      const len = new Uint8Array(llhttp.memory.buffer, ptr).indexOf(0);
+	      message =
+	        'Response does not match the HTTP/1.1 protocol (' +
+	        Buffer.from(llhttp.memory.buffer, ptr, len).toString() +
+	        ')';
+	    }
+
+	    return new HTTPParserError(message, constants.ERROR[ret], data)
 	  }
 
 	  destroy () {
@@ -8919,6 +9000,11 @@ function requireClientH1 () {
 
 	    /* istanbul ignore next: difficult to make a test case for */
 	    if (socket.destroyed) {
+	      return -1
+	    }
+
+	    if (client[kRunning] === 0) {
+	      util.destroy(socket, new SocketError('bad response', util.getSocketInfo(socket)));
 	      return -1
 	    }
 
@@ -9022,6 +9108,11 @@ function requireClientH1 () {
 
 	    /* istanbul ignore next: difficult to make a test case for */
 	    if (socket.destroyed) {
+	      return -1
+	    }
+
+	    if (client[kRunning] === 0) {
+	      util.destroy(socket, new SocketError('bad response', util.getSocketInfo(socket)));
 	      return -1
 	    }
 
@@ -9198,6 +9289,7 @@ function requireClientH1 () {
 	    request.onComplete(headers);
 
 	    client[kQueue][client[kRunningIdx]++] = null;
+	    socket[kSocketUsed] = true;
 
 	    if (socket[kWriting]) {
 	      assert(client[kRunning] === 0);
@@ -9256,6 +9348,9 @@ function requireClientH1 () {
 	  socket[kWriting] = false;
 	  socket[kReset] = false;
 	  socket[kBlocking] = false;
+	  socket[kIdleSocketValidation] = 0;
+	  socket[kIdleSocketValidationTimeout] = null;
+	  socket[kSocketUsed] = false;
 	  socket[kParser] = new Parser(client, socket, llhttpInstance);
 
 	  addListener(socket, 'error', function (err) {
@@ -9266,8 +9361,11 @@ function requireClientH1 () {
 	    // On Mac OS, we get an ECONNRESET even if there is a full body to be forwarded
 	    // to the user.
 	    if (err.code === 'ECONNRESET' && parser.statusCode && !parser.shouldKeepAlive) {
-	      // We treat all incoming data so for as a valid response.
-	      parser.onMessageComplete();
+	      const parserErr = parser.finish();
+	      if (parserErr) {
+	        this[kError] = parserErr;
+	        this[kClient][kOnError](parserErr);
+	      }
 	      return
 	    }
 
@@ -9286,8 +9384,10 @@ function requireClientH1 () {
 	    const parser = this[kParser];
 
 	    if (parser.statusCode && !parser.shouldKeepAlive) {
-	      // We treat all incoming data so far as a valid response.
-	      parser.onMessageComplete();
+	      const parserErr = parser.finish();
+	      if (parserErr) {
+	        util.destroy(this, parserErr);
+	      }
 	      return
 	    }
 
@@ -9297,10 +9397,11 @@ function requireClientH1 () {
 	    const client = this[kClient];
 	    const parser = this[kParser];
 
+	    clearIdleSocketValidation(this);
+
 	    if (parser) {
 	      if (!this[kError] && parser.statusCode && !parser.shouldKeepAlive) {
-	        // We treat all incoming data so far as a valid response.
-	        parser.onMessageComplete();
+	        this[kError] = parser.finish() || this[kError];
 	      }
 
 	      this[kParser].destroy();
@@ -9363,7 +9464,7 @@ function requireClientH1 () {
 	      return socket.destroyed
 	    },
 	    busy (request) {
-	      if (socket[kWriting] || socket[kReset] || socket[kBlocking]) {
+	      if (socket[kWriting] || socket[kReset] || socket[kBlocking] || socket[kIdleSocketValidation] === 1) {
 	        return true
 	      }
 
@@ -9401,6 +9502,31 @@ function requireClientH1 () {
 	  }
 	}
 
+	function clearIdleSocketValidation (socket) {
+	  if (socket[kIdleSocketValidationTimeout]) {
+	    clearTimeout(socket[kIdleSocketValidationTimeout]);
+	    socket[kIdleSocketValidationTimeout] = null;
+	  }
+
+	  socket[kIdleSocketValidation] = 0;
+	}
+
+	function scheduleIdleSocketValidation (client, socket) {
+	  socket[kIdleSocketValidation] = 1;
+	  socket[kIdleSocketValidationTimeout] = setTimeout(() => {
+	    socket[kIdleSocketValidationTimeout] = null;
+	    socket[kIdleSocketValidation] = 2;
+
+	    if (client[kSocket] === socket && !socket.destroyed) {
+	      client[kResume]();
+	    }
+	  }, 0);
+	  socket[kIdleSocketValidationTimeout].unref?.();
+	}
+
+	/**
+	 * @param {import('./client.js')} client
+	 */
 	function resumeH1 (client) {
 	  const socket = client[kSocket];
 
@@ -9413,6 +9539,32 @@ function requireClientH1 () {
 	    } else if (socket[kNoRef] && socket.ref) {
 	      socket.ref();
 	      socket[kNoRef] = false;
+	    }
+
+	    if (client[kRunning] === 0 && client[kPending] > 0 && socket[kSocketUsed]) {
+	      if (socket[kIdleSocketValidation] === 0) {
+	        scheduleIdleSocketValidation(client, socket);
+	        socket[kParser].readMore();
+	        if (socket.destroyed) {
+	          return
+	        }
+	        return
+	      }
+
+	      if (socket[kIdleSocketValidation] === 1) {
+	        socket[kParser].readMore();
+	        if (socket.destroyed) {
+	          return
+	        }
+	        return
+	      }
+	    }
+
+	    if (client[kRunning] === 0) {
+	      socket[kParser].readMore();
+	      if (socket.destroyed) {
+	        return
+	      }
 	    }
 
 	    if (client[kSize] === 0) {
@@ -9508,6 +9660,7 @@ function requireClientH1 () {
 	  }
 
 	  const socket = client[kSocket];
+	  clearIdleSocketValidation(socket);
 
 	  const abort = (err) => {
 	    if (request.aborted || request.completed) {
@@ -11078,9 +11231,10 @@ function requireClient () {
 	    autoSelectFamilyAttemptTimeout,
 	    // h2
 	    maxConcurrentStreams,
-	    allowH2
+	    allowH2,
+	    webSocket
 	  } = {}) {
-	    super();
+	    super({ webSocket });
 
 	    if (keepAlive !== undefined) {
 	      throw new InvalidArgumentError('unsupported keepAlive, use pipelining=0 instead')
@@ -11787,8 +11941,8 @@ function requirePoolBase () {
 	const kStats = Symbol('stats');
 
 	class PoolBase extends DispatcherBase {
-	  constructor () {
-	    super();
+	  constructor (opts) {
+	    super(opts);
 
 	    this[kQueue] = new FixedQueue();
 	    this[kClients] = [];
@@ -12007,8 +12161,6 @@ function requirePool () {
 	    allowH2,
 	    ...options
 	  } = {}) {
-	    super();
-
 	    if (connections != null && (!Number.isFinite(connections) || connections < 0)) {
 	      throw new InvalidArgumentError('invalid connections')
 	    }
@@ -12032,6 +12184,8 @@ function requirePool () {
 	        ...connect
 	      });
 	    }
+
+	    super(options);
 
 	    this[kInterceptors] = options.interceptors?.Pool && Array.isArray(options.interceptors.Pool)
 	      ? options.interceptors.Pool
@@ -12326,8 +12480,6 @@ function requireAgent () {
 
 	class Agent extends DispatcherBase {
 	  constructor ({ factory = defaultFactory, maxRedirections = 0, connect, ...options } = {}) {
-	    super();
-
 	    if (typeof factory !== 'function') {
 	      throw new InvalidArgumentError('factory must be a function.')
 	    }
@@ -12339,6 +12491,8 @@ function requireAgent () {
 	    if (!Number.isInteger(maxRedirections) || maxRedirections < 0) {
 	      throw new InvalidArgumentError('maxRedirections must be a positive number')
 	    }
+
+	    super(options);
 
 	    if (connect && typeof connect !== 'function') {
 	      connect = { ...connect };
@@ -23989,32 +24143,25 @@ function requireParse () {
 	    // If the attribute-name case-insensitively matches the string
 	    // "SameSite", the user agent MUST process the cookie-av as follows:
 
-	    // 1. Let enforcement be "Default".
-	    let enforcement = 'Default';
-
 	    const attributeValueLowercase = attributeValue.toLowerCase();
-	    // 2. If cookie-av's attribute-value is a case-insensitive match for
-	    //    "None", set enforcement to "None".
-	    if (attributeValueLowercase.includes('none')) {
-	      enforcement = 'None';
-	    }
 
-	    // 3. If cookie-av's attribute-value is a case-insensitive match for
-	    //    "Strict", set enforcement to "Strict".
-	    if (attributeValueLowercase.includes('strict')) {
-	      enforcement = 'Strict';
+	    // 1. If cookie-av's attribute-value is a case-insensitive match for
+	    //    "None", append an attribute to the cookie-attribute-list with an
+	    //    attribute-name of "SameSite" and an attribute-value of "None".
+	    if (attributeValueLowercase === 'none') {
+	      cookieAttributeList.sameSite = 'None';
+	    } else if (attributeValueLowercase === 'strict') {
+	      // 2. If cookie-av's attribute-value is a case-insensitive match for
+	      //    "Strict", append an attribute to the cookie-attribute-list with
+	      //    an attribute-name of "SameSite" and an attribute-value of
+	      //    "Strict".
+	      cookieAttributeList.sameSite = 'Strict';
+	    } else if (attributeValueLowercase === 'lax') {
+	      // 3. If cookie-av's attribute-value is a case-insensitive match for
+	      //    "Lax", append an attribute to the cookie-attribute-list with an
+	      //    attribute-name of "SameSite" and an attribute-value of "Lax".
+	      cookieAttributeList.sameSite = 'Lax';
 	    }
-
-	    // 4. If cookie-av's attribute-value is a case-insensitive match for
-	    //    "Lax", set enforcement to "Lax".
-	    if (attributeValueLowercase.includes('lax')) {
-	      enforcement = 'Lax';
-	    }
-
-	    // 5. Append an attribute to the cookie-attribute-list with an
-	    //    attribute-name of "SameSite" and an attribute-value of
-	    //    enforcement.
-	    cookieAttributeList.sameSite = enforcement;
 	  } else {
 	    cookieAttributeList.unparsed ??= [];
 
@@ -24928,6 +25075,12 @@ function requireUtil$1 () {
 	 * @param {string} value
 	 */
 	function isValidClientWindowBits (value) {
+	  // Must have at least one character
+	  if (value.length === 0) {
+	    return false
+	  }
+
+	  // Check all characters are ASCII digits
 	  for (let i = 0; i < value.length; i++) {
 	    const byte = value.charCodeAt(i);
 
@@ -24936,7 +25089,9 @@ function requireUtil$1 () {
 	    }
 	  }
 
-	  return true
+	  // Check numeric range: zlib requires windowBits in range 8-15
+	  const num = Number.parseInt(value, 10);
+	  return num >= 8 && num <= 15
 	}
 
 	// https://nodejs.org/api/intl.html#detecting-internationalization-support
@@ -25466,6 +25621,7 @@ function requirePermessageDeflate () {
 
 	const { createInflateRaw, Z_DEFAULT_WINDOWBITS } = require$$1$2;
 	const { isValidClientWindowBits } = requireUtil$1();
+	const { MessageSizeExceededError } = requireErrors();
 
 	const tail = Buffer.from([0x00, 0x00, 0xff, 0xff]);
 	const kBuffer = Symbol('kBuffer');
@@ -25477,17 +25633,29 @@ function requirePermessageDeflate () {
 
 	  #options = {}
 
-	  constructor (extensions) {
+	  #maxPayloadSize = 0
+
+	  /**
+	   * @param {Map<string, string>} extensions
+	   */
+	  constructor (extensions, options) {
 	    this.#options.serverNoContextTakeover = extensions.has('server_no_context_takeover');
 	    this.#options.serverMaxWindowBits = extensions.get('server_max_window_bits');
+
+	    this.#maxPayloadSize = options.maxPayloadSize;
 	  }
 
+	  /**
+	   * Decompress a compressed payload.
+	   * @param {Buffer} chunk Compressed data
+	   * @param {boolean} fin Final fragment flag
+	   * @param {Function} callback Callback function
+	   */
 	  decompress (chunk, fin, callback) {
 	    // An endpoint uses the following algorithm to decompress a message.
 	    // 1.  Append 4 octets of 0x00 0x00 0xff 0xff to the tail end of the
 	    //     payload of the message.
 	    // 2.  Decompress the resulting data using DEFLATE.
-
 	    if (!this.#inflate) {
 	      let windowBits = Z_DEFAULT_WINDOWBITS;
 
@@ -25500,13 +25668,26 @@ function requirePermessageDeflate () {
 	        windowBits = Number.parseInt(this.#options.serverMaxWindowBits);
 	      }
 
-	      this.#inflate = createInflateRaw({ windowBits });
+	      try {
+	        this.#inflate = createInflateRaw({ windowBits });
+	      } catch (err) {
+	        callback(err);
+	        return
+	      }
 	      this.#inflate[kBuffer] = [];
 	      this.#inflate[kLength] = 0;
 
 	      this.#inflate.on('data', (data) => {
-	        this.#inflate[kBuffer].push(data);
 	        this.#inflate[kLength] += data.length;
+
+	        if (this.#maxPayloadSize > 0 && this.#inflate[kLength] > this.#maxPayloadSize) {
+	          callback(new MessageSizeExceededError());
+	          this.#inflate.removeAllListeners();
+	          this.#inflate = null;
+	          return
+	        }
+
+	        this.#inflate[kBuffer].push(data);
 	      });
 
 	      this.#inflate.on('error', (err) => {
@@ -25521,6 +25702,10 @@ function requirePermessageDeflate () {
 	    }
 
 	    this.#inflate.flush(() => {
+	      if (!this.#inflate) {
+	        return
+	      }
+
 	      const full = Buffer.concat(this.#inflate[kBuffer], this.#inflate[kLength]);
 
 	      this.#inflate[kBuffer].length = 0;
@@ -25560,6 +25745,12 @@ function requireReceiver () {
 	const { WebsocketFrameSend } = requireFrame();
 	const { closeWebSocketConnection } = requireConnection();
 	const { PerMessageDeflate } = requirePermessageDeflate();
+	const { MessageSizeExceededError } = requireErrors();
+
+	function failWebsocketConnectionWithCode (ws, code, reason) {
+	  closeWebSocketConnection(ws, code, reason, Buffer.byteLength(reason));
+	  failWebsocketConnection(ws, reason);
+	}
 
 	// This code was influenced by ws released under the MIT license.
 	// Copyright (c) 2011 Einar Otto Stangvik <einaros@gmail.com>
@@ -25568,6 +25759,7 @@ function requireReceiver () {
 
 	class ByteParser extends Writable {
 	  #buffers = []
+	  #fragmentsBytes = 0
 	  #byteOffset = 0
 	  #loop = false
 
@@ -25579,14 +25771,27 @@ function requireReceiver () {
 	  /** @type {Map<string, PerMessageDeflate>} */
 	  #extensions
 
-	  constructor (ws, extensions) {
+	  /** @type {number} */
+	  #maxFragments
+
+	  /** @type {number} */
+	  #maxPayloadSize
+
+	  /**
+	   * @param {import('./websocket').WebSocket} ws
+	   * @param {Map<string, string>|null} extensions
+	   * @param {{ maxFragments?: number, maxPayloadSize?: number }} [options]
+	   */
+	  constructor (ws, extensions, options = {}) {
 	    super();
 
 	    this.ws = ws;
 	    this.#extensions = extensions == null ? new Map() : extensions;
+	    this.#maxFragments = options.maxFragments ?? 0;
+	    this.#maxPayloadSize = options.maxPayloadSize ?? 0;
 
 	    if (this.#extensions.has('permessage-deflate')) {
-	      this.#extensions.set('permessage-deflate', new PerMessageDeflate(extensions));
+	      this.#extensions.set('permessage-deflate', new PerMessageDeflate(extensions, options));
 	    }
 	  }
 
@@ -25600,6 +25805,19 @@ function requireReceiver () {
 	    this.#loop = true;
 
 	    this.run(callback);
+	  }
+
+	  #validatePayloadLength () {
+	    if (
+	      this.#maxPayloadSize > 0 &&
+	      !isControlFrame(this.#info.opcode) &&
+	      this.#info.payloadLength + this.#fragmentsBytes > this.#maxPayloadSize
+	    ) {
+	      failWebsocketConnectionWithCode(this.ws, 1009, 'Payload size exceeds maximum allowed size');
+	      return false
+	    }
+
+	    return true
 	  }
 
 	  /**
@@ -25690,6 +25908,10 @@ function requireReceiver () {
 	        if (payloadLength <= 125) {
 	          this.#info.payloadLength = payloadLength;
 	          this.#state = parserStates.READ_DATA;
+
+	          if (!this.#validatePayloadLength()) {
+	            return
+	          }
 	        } else if (payloadLength === 126) {
 	          this.#state = parserStates.PAYLOADLENGTH_16;
 	        } else if (payloadLength === 127) {
@@ -25714,6 +25936,10 @@ function requireReceiver () {
 
 	        this.#info.payloadLength = buffer.readUInt16BE(0);
 	        this.#state = parserStates.READ_DATA;
+
+	        if (!this.#validatePayloadLength()) {
+	          return
+	        }
 	      } else if (this.#state === parserStates.PAYLOADLENGTH_64) {
 	        if (this.#byteOffset < 8) {
 	          return callback()
@@ -25721,6 +25947,7 @@ function requireReceiver () {
 
 	        const buffer = this.consume(8);
 	        const upper = buffer.readUInt32BE(0);
+	        const lower = buffer.readUInt32BE(4);
 
 	        // 2^31 is the maximum bytes an arraybuffer can contain
 	        // on 32-bit systems. Although, on 64-bit systems, this is
@@ -25728,15 +25955,17 @@ function requireReceiver () {
 	        // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Errors/Invalid_array_length
 	        // https://source.chromium.org/chromium/chromium/src/+/main:v8/src/common/globals.h;drc=1946212ac0100668f14eb9e2843bdd846e510a1e;bpv=1;bpt=1;l=1275
 	        // https://source.chromium.org/chromium/chromium/src/+/main:v8/src/objects/js-array-buffer.h;l=34;drc=1946212ac0100668f14eb9e2843bdd846e510a1e
-	        if (upper > 2 ** 31 - 1) {
+	        if (upper !== 0 || lower > 2 ** 31 - 1) {
 	          failWebsocketConnection(this.ws, 'Received payload length > 2^31 bytes.');
 	          return
 	        }
 
-	        const lower = buffer.readUInt32BE(4);
-
-	        this.#info.payloadLength = (upper << 8) + lower;
+	        this.#info.payloadLength = lower;
 	        this.#state = parserStates.READ_DATA;
+
+	        if (!this.#validatePayloadLength()) {
+	          return
+	        }
 	      } else if (this.#state === parserStates.READ_DATA) {
 	        if (this.#byteOffset < this.#info.payloadLength) {
 	          return callback()
@@ -25749,42 +25978,58 @@ function requireReceiver () {
 	          this.#state = parserStates.INFO;
 	        } else {
 	          if (!this.#info.compressed) {
-	            this.#fragments.push(body);
+	            if (!this.writeFragments(body)) {
+	              return
+	            }
+
+	            if (this.#maxPayloadSize > 0 && this.#fragmentsBytes > this.#maxPayloadSize) {
+	              failWebsocketConnectionWithCode(this.ws, 1009, new MessageSizeExceededError().message);
+	              return
+	            }
 
 	            // If the frame is not fragmented, a message has been received.
 	            // If the frame is fragmented, it will terminate with a fin bit set
 	            // and an opcode of 0 (continuation), therefore we handle that when
 	            // parsing continuation frames, not here.
 	            if (!this.#info.fragmented && this.#info.fin) {
-	              const fullMessage = Buffer.concat(this.#fragments);
-	              websocketMessageReceived(this.ws, this.#info.binaryType, fullMessage);
-	              this.#fragments.length = 0;
+	              websocketMessageReceived(this.ws, this.#info.binaryType, this.consumeFragments());
 	            }
 
 	            this.#state = parserStates.INFO;
 	          } else {
-	            this.#extensions.get('permessage-deflate').decompress(body, this.#info.fin, (error, data) => {
-	              if (error) {
-	                closeWebSocketConnection(this.ws, 1007, error.message, error.message.length);
-	                return
-	              }
+	            this.#extensions.get('permessage-deflate').decompress(
+	              body,
+	              this.#info.fin,
+	              (error, data) => {
+	                if (error) {
+	                  const code = error instanceof MessageSizeExceededError ? 1009 : 1007;
+	                  failWebsocketConnectionWithCode(this.ws, code, error.message);
+	                  return
+	                }
 
-	              this.#fragments.push(data);
+	                if (!this.writeFragments(data)) {
+	                  return
+	                }
 
-	              if (!this.#info.fin) {
-	                this.#state = parserStates.INFO;
+	                if (this.#maxPayloadSize > 0 && this.#fragmentsBytes > this.#maxPayloadSize) {
+	                  failWebsocketConnectionWithCode(this.ws, 1009, new MessageSizeExceededError().message);
+	                  return
+	                }
+
+	                if (!this.#info.fin) {
+	                  this.#state = parserStates.INFO;
+	                  this.#loop = true;
+	                  this.run(callback);
+	                  return
+	                }
+
+	                websocketMessageReceived(this.ws, this.#info.binaryType, this.consumeFragments());
+
 	                this.#loop = true;
+	                this.#state = parserStates.INFO;
 	                this.run(callback);
-	                return
 	              }
-
-	              websocketMessageReceived(this.ws, this.#info.binaryType, Buffer.concat(this.#fragments));
-
-	              this.#loop = true;
-	              this.#state = parserStates.INFO;
-	              this.#fragments.length = 0;
-	              this.run(callback);
-	            });
+	            );
 
 	            this.#loop = false;
 	            break
@@ -25834,6 +26079,35 @@ function requireReceiver () {
 	    this.#byteOffset -= n;
 
 	    return buffer
+	  }
+
+	  writeFragments (fragment) {
+	    if (
+	      this.#maxFragments > 0 &&
+	      this.#fragments.length === this.#maxFragments
+	    ) {
+	      failWebsocketConnectionWithCode(this.ws, 1008, 'Too many message fragments');
+	      return false
+	    }
+
+	    this.#fragmentsBytes += fragment.length;
+	    this.#fragments.push(fragment);
+	    return true
+	  }
+
+	  consumeFragments () {
+	    const fragments = this.#fragments;
+
+	    if (fragments.length === 1) {
+	      this.#fragmentsBytes = 0;
+	      return fragments.shift()
+	    }
+
+	    const output = Buffer.concat(fragments, this.#fragmentsBytes);
+	    this.#fragments = [];
+	    this.#fragmentsBytes = 0;
+
+	    return output
 	  }
 
 	  parseCloseBody (data) {
@@ -26517,11 +26791,18 @@ function requireWebsocket () {
 	   * @see https://websockets.spec.whatwg.org/#feedback-from-the-protocol
 	   */
 	  #onConnectionEstablished (response, parsedExtensions) {
-	    // processResponse is called when the "response’s header list has been received and initialized."
+	    // processResponse is called when the "response's header list has been received and initialized."
 	    // once this happens, the connection is open
 	    this[kResponse] = response;
 
-	    const parser = new ByteParser(this, parsedExtensions);
+	    const webSocketOptions = this[kController]?.dispatcher?.webSocketOptions;
+	    const maxFragments = webSocketOptions?.maxFragments;
+	    const maxPayloadSize = webSocketOptions?.maxPayloadSize;
+
+	    const parser = new ByteParser(this, parsedExtensions, {
+	      maxFragments,
+	      maxPayloadSize
+	    });
 	    parser.on('drain', onParserDrain);
 	    parser.on('error', onParserError.bind(this));
 
@@ -29194,7 +29475,7 @@ class Doc {
     }
 }
 
-const version$3 = {
+const version$2 = {
     major: 4,
     minor: 3,
     patch: 6,
@@ -29205,7 +29486,7 @@ const $ZodType = /*@__PURE__*/ $constructor("$ZodType", (inst, def) => {
     inst ?? (inst = {});
     inst._zod.def = def; // set _def property
     inst._zod.bag = inst._zod.bag || {}; // initialize _bag object
-    inst._zod.version = version$3;
+    inst._zod.version = version$2;
     const checks = [...(inst._zod.def.checks ?? [])];
     // if inst is itself a checks.$ZodCheck, run it as a check
     if (inst._zod.traits.has("$ZodCheck")) {
@@ -32651,6 +32932,288 @@ const JobSchema = object({
     metadata: MetadataSchema.default({}), // Default to empty object
 });
 
+const getAllAliases = (name, aliases) => {
+    const _aliases = [];
+    if (name) {
+        _aliases.push(name);
+    }
+    if (aliases) {
+        for (const alias of aliases) {
+            _aliases.push(alias);
+        }
+    }
+    return _aliases;
+};
+const getMiddlewareNameWithAliases = (name, aliases) => {
+    return `${name || "anonymous"}${aliases && aliases.length > 0 ? ` (a.k.a. ${aliases.join(",")})` : ""}`;
+};
+const constructStack = () => {
+    let absoluteEntries = [];
+    let relativeEntries = [];
+    let identifyOnResolve = false;
+    const entriesNameSet = new Set();
+    const sort = (entries) => entries.sort((a, b) => stepWeights[b.step] - stepWeights[a.step] ||
+        priorityWeights[b.priority || "normal"] - priorityWeights[a.priority || "normal"]);
+    const removeByName = (toRemove) => {
+        let isRemoved = false;
+        const filterCb = (entry) => {
+            const aliases = getAllAliases(entry.name, entry.aliases);
+            if (aliases.includes(toRemove)) {
+                isRemoved = true;
+                for (const alias of aliases) {
+                    entriesNameSet.delete(alias);
+                }
+                return false;
+            }
+            return true;
+        };
+        absoluteEntries = absoluteEntries.filter(filterCb);
+        relativeEntries = relativeEntries.filter(filterCb);
+        return isRemoved;
+    };
+    const removeByReference = (toRemove) => {
+        let isRemoved = false;
+        const filterCb = (entry) => {
+            if (entry.middleware === toRemove) {
+                isRemoved = true;
+                for (const alias of getAllAliases(entry.name, entry.aliases)) {
+                    entriesNameSet.delete(alias);
+                }
+                return false;
+            }
+            return true;
+        };
+        absoluteEntries = absoluteEntries.filter(filterCb);
+        relativeEntries = relativeEntries.filter(filterCb);
+        return isRemoved;
+    };
+    const cloneTo = (toStack) => {
+        absoluteEntries.forEach((entry) => {
+            toStack.add(entry.middleware, { ...entry });
+        });
+        relativeEntries.forEach((entry) => {
+            toStack.addRelativeTo(entry.middleware, { ...entry });
+        });
+        toStack.identifyOnResolve?.(stack.identifyOnResolve());
+        return toStack;
+    };
+    const expandRelativeMiddlewareList = (from) => {
+        const expandedMiddlewareList = [];
+        from.before.forEach((entry) => {
+            if (entry.before.length === 0 && entry.after.length === 0) {
+                expandedMiddlewareList.push(entry);
+            }
+            else {
+                expandedMiddlewareList.push(...expandRelativeMiddlewareList(entry));
+            }
+        });
+        expandedMiddlewareList.push(from);
+        from.after.reverse().forEach((entry) => {
+            if (entry.before.length === 0 && entry.after.length === 0) {
+                expandedMiddlewareList.push(entry);
+            }
+            else {
+                expandedMiddlewareList.push(...expandRelativeMiddlewareList(entry));
+            }
+        });
+        return expandedMiddlewareList;
+    };
+    const getMiddlewareList = (debug = false) => {
+        const normalizedAbsoluteEntries = [];
+        const normalizedRelativeEntries = [];
+        const normalizedEntriesNameMap = {};
+        absoluteEntries.forEach((entry) => {
+            const normalizedEntry = {
+                ...entry,
+                before: [],
+                after: [],
+            };
+            for (const alias of getAllAliases(normalizedEntry.name, normalizedEntry.aliases)) {
+                normalizedEntriesNameMap[alias] = normalizedEntry;
+            }
+            normalizedAbsoluteEntries.push(normalizedEntry);
+        });
+        relativeEntries.forEach((entry) => {
+            const normalizedEntry = {
+                ...entry,
+                before: [],
+                after: [],
+            };
+            for (const alias of getAllAliases(normalizedEntry.name, normalizedEntry.aliases)) {
+                normalizedEntriesNameMap[alias] = normalizedEntry;
+            }
+            normalizedRelativeEntries.push(normalizedEntry);
+        });
+        normalizedRelativeEntries.forEach((entry) => {
+            if (entry.toMiddleware) {
+                const toMiddleware = normalizedEntriesNameMap[entry.toMiddleware];
+                if (toMiddleware === undefined) {
+                    if (debug) {
+                        return;
+                    }
+                    throw new Error(`${entry.toMiddleware} is not found when adding ` +
+                        `${getMiddlewareNameWithAliases(entry.name, entry.aliases)} ` +
+                        `middleware ${entry.relation} ${entry.toMiddleware}`);
+                }
+                if (entry.relation === "after") {
+                    toMiddleware.after.push(entry);
+                }
+                if (entry.relation === "before") {
+                    toMiddleware.before.push(entry);
+                }
+            }
+        });
+        const mainChain = sort(normalizedAbsoluteEntries)
+            .map(expandRelativeMiddlewareList)
+            .reduce((wholeList, expandedMiddlewareList) => {
+            wholeList.push(...expandedMiddlewareList);
+            return wholeList;
+        }, []);
+        return mainChain;
+    };
+    const stack = {
+        add: (middleware, options = {}) => {
+            const { name, override, aliases: _aliases } = options;
+            const entry = {
+                step: "initialize",
+                priority: "normal",
+                middleware,
+                ...options,
+            };
+            const aliases = getAllAliases(name, _aliases);
+            if (aliases.length > 0) {
+                if (aliases.some((alias) => entriesNameSet.has(alias))) {
+                    if (!override)
+                        throw new Error(`Duplicate middleware name '${getMiddlewareNameWithAliases(name, _aliases)}'`);
+                    for (const alias of aliases) {
+                        const toOverrideIndex = absoluteEntries.findIndex((entry) => entry.name === alias || entry.aliases?.some((a) => a === alias));
+                        if (toOverrideIndex === -1) {
+                            continue;
+                        }
+                        const toOverride = absoluteEntries[toOverrideIndex];
+                        if (toOverride.step !== entry.step || entry.priority !== toOverride.priority) {
+                            throw new Error(`"${getMiddlewareNameWithAliases(toOverride.name, toOverride.aliases)}" middleware with ` +
+                                `${toOverride.priority} priority in ${toOverride.step} step cannot ` +
+                                `be overridden by "${getMiddlewareNameWithAliases(name, _aliases)}" middleware with ` +
+                                `${entry.priority} priority in ${entry.step} step.`);
+                        }
+                        absoluteEntries.splice(toOverrideIndex, 1);
+                    }
+                }
+                for (const alias of aliases) {
+                    entriesNameSet.add(alias);
+                }
+            }
+            absoluteEntries.push(entry);
+        },
+        addRelativeTo: (middleware, options) => {
+            const { name, override, aliases: _aliases } = options;
+            const entry = {
+                middleware,
+                ...options,
+            };
+            const aliases = getAllAliases(name, _aliases);
+            if (aliases.length > 0) {
+                if (aliases.some((alias) => entriesNameSet.has(alias))) {
+                    if (!override)
+                        throw new Error(`Duplicate middleware name '${getMiddlewareNameWithAliases(name, _aliases)}'`);
+                    for (const alias of aliases) {
+                        const toOverrideIndex = relativeEntries.findIndex((entry) => entry.name === alias || entry.aliases?.some((a) => a === alias));
+                        if (toOverrideIndex === -1) {
+                            continue;
+                        }
+                        const toOverride = relativeEntries[toOverrideIndex];
+                        if (toOverride.toMiddleware !== entry.toMiddleware || toOverride.relation !== entry.relation) {
+                            throw new Error(`"${getMiddlewareNameWithAliases(toOverride.name, toOverride.aliases)}" middleware ` +
+                                `${toOverride.relation} "${toOverride.toMiddleware}" middleware cannot be overridden ` +
+                                `by "${getMiddlewareNameWithAliases(name, _aliases)}" middleware ${entry.relation} ` +
+                                `"${entry.toMiddleware}" middleware.`);
+                        }
+                        relativeEntries.splice(toOverrideIndex, 1);
+                    }
+                }
+                for (const alias of aliases) {
+                    entriesNameSet.add(alias);
+                }
+            }
+            relativeEntries.push(entry);
+        },
+        clone: () => cloneTo(constructStack()),
+        use: (plugin) => {
+            plugin.applyToStack(stack);
+        },
+        remove: (toRemove) => {
+            if (typeof toRemove === "string")
+                return removeByName(toRemove);
+            else
+                return removeByReference(toRemove);
+        },
+        removeByTag: (toRemove) => {
+            let isRemoved = false;
+            const filterCb = (entry) => {
+                const { tags, name, aliases: _aliases } = entry;
+                if (tags && tags.includes(toRemove)) {
+                    const aliases = getAllAliases(name, _aliases);
+                    for (const alias of aliases) {
+                        entriesNameSet.delete(alias);
+                    }
+                    isRemoved = true;
+                    return false;
+                }
+                return true;
+            };
+            absoluteEntries = absoluteEntries.filter(filterCb);
+            relativeEntries = relativeEntries.filter(filterCb);
+            return isRemoved;
+        },
+        concat: (from) => {
+            const cloned = cloneTo(constructStack());
+            cloned.use(from);
+            cloned.identifyOnResolve(identifyOnResolve || cloned.identifyOnResolve() || (from.identifyOnResolve?.() ?? false));
+            return cloned;
+        },
+        applyToStack: cloneTo,
+        identify: () => {
+            return getMiddlewareList(true).map((mw) => {
+                const step = mw.step ??
+                    mw.relation +
+                        " " +
+                        mw.toMiddleware;
+                return getMiddlewareNameWithAliases(mw.name, mw.aliases) + " - " + step;
+            });
+        },
+        identifyOnResolve(toggle) {
+            if (typeof toggle === "boolean")
+                identifyOnResolve = toggle;
+            return identifyOnResolve;
+        },
+        resolve: (handler, context) => {
+            for (const middleware of getMiddlewareList()
+                .map((entry) => entry.middleware)
+                .reverse()) {
+                handler = middleware(handler, context);
+            }
+            if (identifyOnResolve) {
+                console.log(stack.identify());
+            }
+            return handler;
+        },
+    };
+    return stack;
+};
+const stepWeights = {
+    initialize: 5,
+    serialize: 4,
+    build: 3,
+    finalizeRequest: 2,
+    deserialize: 1,
+};
+const priorityWeights = {
+    high: 3,
+    normal: 2,
+    low: 1,
+};
+
 var EndpointURLScheme;
 (function (EndpointURLScheme) {
     EndpointURLScheme["HTTP"] = "http";
@@ -32676,107 +33239,6 @@ var IniSectionType;
 })(IniSectionType || (IniSectionType = {}));
 
 const getSmithyContext = (context) => context[SMITHY_CONTEXT_KEY] || (context[SMITHY_CONTEXT_KEY] = {});
-
-const normalizeProvider$1 = (input) => {
-    if (typeof input === "function")
-        return input;
-    const promisified = Promise.resolve(input);
-    return () => promisified;
-};
-
-const DEFAULT_ACCOUNT_ID_ENDPOINT_MODE = "preferred";
-const ACCOUNT_ID_ENDPOINT_MODE_VALUES = ["disabled", "preferred", "required"];
-function validateAccountIdEndpointMode(value) {
-    return ACCOUNT_ID_ENDPOINT_MODE_VALUES.includes(value);
-}
-
-const resolveAccountIdEndpointModeConfig = (input) => {
-    const { accountIdEndpointMode } = input;
-    const accountIdEndpointModeProvider = normalizeProvider$1(accountIdEndpointMode ?? DEFAULT_ACCOUNT_ID_ENDPOINT_MODE);
-    return Object.assign(input, {
-        accountIdEndpointMode: async () => {
-            const accIdMode = await accountIdEndpointModeProvider();
-            if (!validateAccountIdEndpointMode(accIdMode)) {
-                throw new Error(`Invalid value for accountIdEndpointMode: ${accIdMode}. Valid values are: "required", "preferred", "disabled".`);
-            }
-            return accIdMode;
-        },
-    });
-};
-
-const err = "Invalid AccountIdEndpointMode value";
-const _throw = (message) => {
-    throw new Error(message);
-};
-const ENV_ACCOUNT_ID_ENDPOINT_MODE = "AWS_ACCOUNT_ID_ENDPOINT_MODE";
-const CONFIG_ACCOUNT_ID_ENDPOINT_MODE = "account_id_endpoint_mode";
-const NODE_ACCOUNT_ID_ENDPOINT_MODE_CONFIG_OPTIONS = {
-    environmentVariableSelector: (env) => {
-        const value = env[ENV_ACCOUNT_ID_ENDPOINT_MODE];
-        if (value && !validateAccountIdEndpointMode(value)) {
-            _throw(err);
-        }
-        return value;
-    },
-    configFileSelector: (profile) => {
-        const value = profile[CONFIG_ACCOUNT_ID_ENDPOINT_MODE];
-        if (value && !validateAccountIdEndpointMode(value)) {
-            _throw(err);
-        }
-        return value;
-    },
-    default: DEFAULT_ACCOUNT_ID_ENDPOINT_MODE,
-};
-
-const ENV_ENDPOINT_DISCOVERY = ["AWS_ENABLE_ENDPOINT_DISCOVERY", "AWS_ENDPOINT_DISCOVERY_ENABLED"];
-const CONFIG_ENDPOINT_DISCOVERY = "endpoint_discovery_enabled";
-const isFalsy = (value) => ["false", "0"].indexOf(value) >= 0;
-const NODE_ENDPOINT_DISCOVERY_CONFIG_OPTIONS = {
-    environmentVariableSelector: (env) => {
-        for (let i = 0; i < ENV_ENDPOINT_DISCOVERY.length; i++) {
-            const envKey = ENV_ENDPOINT_DISCOVERY[i];
-            if (envKey in env) {
-                const value = env[envKey];
-                if (value === "") {
-                    throw Error(`Environment variable ${envKey} can't be empty of undefined, got "${value}"`);
-                }
-                return !isFalsy(value);
-            }
-        }
-    },
-    configFileSelector: (profile) => {
-        if (CONFIG_ENDPOINT_DISCOVERY in profile) {
-            const value = profile[CONFIG_ENDPOINT_DISCOVERY];
-            if (value === undefined) {
-                throw Error(`Shared config entry ${CONFIG_ENDPOINT_DISCOVERY} can't be undefined, got "${value}"`);
-            }
-            return !isFalsy(value);
-        }
-    },
-    default: undefined,
-};
-
-const getHttpHandlerExtensionConfiguration = (runtimeConfig) => {
-    return {
-        setHttpHandler(handler) {
-            runtimeConfig.httpHandler = handler;
-        },
-        httpHandler() {
-            return runtimeConfig.httpHandler;
-        },
-        updateHttpClientConfig(key, value) {
-            runtimeConfig.httpHandler?.updateHttpClientConfig(key, value);
-        },
-        httpHandlerConfigs() {
-            return runtimeConfig.httpHandler.httpHandlerConfigs();
-        },
-    };
-};
-const resolveHttpHandlerRuntimeConfig = (httpHandlerExtensionConfiguration) => {
-    return {
-        httpHandler: httpHandlerExtensionConfiguration.httpHandler(),
-    };
-};
 
 class HttpRequest {
     method;
@@ -32861,6 +33323,6061 @@ class HttpResponse {
         return typeof resp.statusCode === "number" && typeof resp.headers === "object";
     }
 }
+
+const VALID_HOST_LABEL_REGEX = new RegExp(`^(?!.*-$)(?!-)[a-zA-Z0-9-]{1,63}$`);
+const isValidHostLabel = (value, allowSubDomains = false) => {
+    if (!allowSubDomains) {
+        return VALID_HOST_LABEL_REGEX.test(value);
+    }
+    const labels = value.split(".");
+    for (const label of labels) {
+        if (!isValidHostLabel(label)) {
+            return false;
+        }
+    }
+    return true;
+};
+
+const normalizeProvider$1 = (input) => {
+    if (typeof input === "function")
+        return input;
+    const promisified = Promise.resolve(input);
+    return () => promisified;
+};
+
+function parseQueryString(querystring) {
+    const query = {};
+    querystring = querystring.replace(/^\?/, "");
+    if (querystring) {
+        for (const pair of querystring.split("&")) {
+            let [key, value = null] = pair.split("=");
+            key = decodeURIComponent(key);
+            if (value) {
+                value = decodeURIComponent(value);
+            }
+            if (!(key in query)) {
+                query[key] = value;
+            }
+            else if (Array.isArray(query[key])) {
+                query[key].push(value);
+            }
+            else {
+                query[key] = [query[key], value];
+            }
+        }
+    }
+    return query;
+}
+
+const parseUrl = (url) => {
+    if (typeof url === "string") {
+        return parseUrl(new URL(url));
+    }
+    const { hostname, pathname, port, protocol, search } = url;
+    let query;
+    if (search) {
+        query = parseQueryString(search);
+    }
+    return {
+        hostname,
+        port: port ? parseInt(port) : undefined,
+        protocol,
+        path: pathname,
+        query,
+    };
+};
+
+const toEndpointV1 = (endpoint) => {
+    if (typeof endpoint === "object") {
+        if ("url" in endpoint) {
+            const v1Endpoint = parseUrl(endpoint.url);
+            if (endpoint.headers) {
+                v1Endpoint.headers = {};
+                for (const name in endpoint.headers) {
+                    v1Endpoint.headers[name.toLowerCase()] = endpoint.headers[name].join(", ");
+                }
+            }
+            return v1Endpoint;
+        }
+        return endpoint;
+    }
+    return parseUrl(endpoint);
+};
+
+class Client {
+    config;
+    middlewareStack = constructStack();
+    initConfig;
+    handlers;
+    constructor(config) {
+        this.config = config;
+        const { protocol, protocolSettings } = config;
+        if (protocolSettings) {
+            if (typeof protocol === "function") {
+                config.protocol = new protocol(protocolSettings);
+            }
+        }
+    }
+    send(command, optionsOrCb, cb) {
+        const options = typeof optionsOrCb !== "function" ? optionsOrCb : undefined;
+        const callback = typeof optionsOrCb === "function" ? optionsOrCb : cb;
+        const useHandlerCache = options === undefined && this.config.cacheMiddleware === true;
+        let handler;
+        if (useHandlerCache) {
+            if (!this.handlers) {
+                this.handlers = new WeakMap();
+            }
+            const handlers = this.handlers;
+            if (handlers.has(command.constructor)) {
+                handler = handlers.get(command.constructor);
+            }
+            else {
+                handler = command.resolveMiddleware(this.middlewareStack, this.config, options);
+                handlers.set(command.constructor, handler);
+            }
+        }
+        else {
+            delete this.handlers;
+            handler = command.resolveMiddleware(this.middlewareStack, this.config, options);
+        }
+        if (callback) {
+            handler(command)
+                .then((result) => callback(null, result.output), (err) => callback(err))
+                .catch(() => { });
+        }
+        else {
+            return handler(command).then((result) => result.output);
+        }
+    }
+    destroy() {
+        this.config?.requestHandler?.destroy?.();
+        delete this.handlers;
+    }
+}
+
+const deref = (schemaRef) => {
+    if (typeof schemaRef === "function") {
+        return schemaRef();
+    }
+    return schemaRef;
+};
+
+const operation = (namespace, name, traits, input, output) => ({
+    name,
+    namespace,
+    traits,
+    input,
+    output,
+});
+
+const schemaDeserializationMiddleware = (config) => (next, context) => async (args) => {
+    const { response } = await next(args);
+    const { operationSchema } = getSmithyContext(context);
+    const [, ns, n, t, i, o] = operationSchema ?? [];
+    try {
+        const parsed = await config.protocol.deserializeResponse(operation(ns, n, t, i, o), {
+            ...config,
+            ...context,
+        }, response);
+        return {
+            response,
+            output: parsed,
+        };
+    }
+    catch (error) {
+        Object.defineProperty(error, "$response", {
+            value: response,
+            enumerable: false,
+            writable: false,
+            configurable: false,
+        });
+        if (!("$metadata" in error)) {
+            const hint = `Deserialization error: to see the raw response, inspect the hidden field {error}.$response on this object.`;
+            try {
+                error.message += "\n  " + hint;
+            }
+            catch (e) {
+                if (!context.logger || context.logger?.constructor?.name === "NoOpLogger") {
+                    console.warn(hint);
+                }
+                else {
+                    context.logger?.warn?.(hint);
+                }
+            }
+            if (typeof error.$responseBodyText !== "undefined") {
+                if (error.$response) {
+                    error.$response.body = error.$responseBodyText;
+                }
+            }
+            try {
+                if (HttpResponse.isInstance(response)) {
+                    const { headers = {}, statusCode } = response;
+                    const headerEntries = Object.entries(headers);
+                    error.$metadata = {
+                        httpStatusCode: statusCode,
+                        requestId: findHeader(/^x-[\w-]+-request-?id$/, headerEntries),
+                        extendedRequestId: findHeader(/^x-[\w-]+-id-2$/, headerEntries),
+                        cfId: findHeader(/^x-[\w-]+-cf-id$/, headerEntries),
+                    };
+                }
+            }
+            catch (e) {
+            }
+        }
+        throw error;
+    }
+};
+const findHeader = (pattern, headers) => {
+    return (headers.find(([k]) => {
+        return k.match(pattern);
+    }) || [void 0, void 0])[1];
+};
+
+const schemaSerializationMiddleware = (config) => (next, context) => async (args) => {
+    const { operationSchema } = getSmithyContext(context);
+    const [, ns, n, t, i, o] = operationSchema ?? [];
+    const endpoint = context.endpointV2
+        ? async () => toEndpointV1(context.endpointV2)
+        : config.endpoint;
+    const request = await config.protocol.serializeRequest(operation(ns, n, t, i, o), args.input, {
+        ...config,
+        ...context,
+        endpoint,
+    });
+    return next({
+        ...args,
+        request,
+    });
+};
+
+const deserializerMiddlewareOption = {
+    name: "deserializerMiddleware",
+    step: "deserialize",
+    tags: ["DESERIALIZER"],
+    override: true,
+};
+const serializerMiddlewareOption$1 = {
+    name: "serializerMiddleware",
+    step: "serialize",
+    tags: ["SERIALIZER"],
+    override: true,
+};
+function getSchemaSerdePlugin(config) {
+    return {
+        applyToStack: (commandStack) => {
+            commandStack.add(schemaSerializationMiddleware(config), serializerMiddlewareOption$1);
+            commandStack.add(schemaDeserializationMiddleware(config), deserializerMiddlewareOption);
+            config.protocol.setSerdeContext(config);
+        },
+    };
+}
+
+const traitsCache = [];
+function translateTraits(indicator) {
+    if (typeof indicator === "object") {
+        return indicator;
+    }
+    indicator = indicator | 0;
+    if (traitsCache[indicator]) {
+        return traitsCache[indicator];
+    }
+    const traits = {};
+    let i = 0;
+    for (const trait of [
+        "httpLabel",
+        "idempotent",
+        "idempotencyToken",
+        "sensitive",
+        "httpPayload",
+        "httpResponseCode",
+        "httpQueryParams",
+    ]) {
+        if (((indicator >> i++) & 1) === 1) {
+            traits[trait] = 1;
+        }
+    }
+    return (traitsCache[indicator] = traits);
+}
+
+const anno = {
+    it: Symbol.for("@smithy/nor-struct-it"),
+    ns: Symbol.for("@smithy/ns"),
+};
+const simpleSchemaCacheN = [];
+const simpleSchemaCacheS = {};
+class NormalizedSchema {
+    ref;
+    memberName;
+    static symbol = Symbol.for("@smithy/nor");
+    symbol = NormalizedSchema.symbol;
+    name;
+    schema;
+    _isMemberSchema;
+    traits;
+    memberTraits;
+    normalizedTraits;
+    constructor(ref, memberName) {
+        this.ref = ref;
+        this.memberName = memberName;
+        const traitStack = [];
+        let _ref = ref;
+        let schema = ref;
+        this._isMemberSchema = false;
+        while (isMemberSchema(_ref)) {
+            traitStack.push(_ref[1]);
+            _ref = _ref[0];
+            schema = deref(_ref);
+            this._isMemberSchema = true;
+        }
+        if (traitStack.length > 0) {
+            this.memberTraits = {};
+            for (let i = traitStack.length - 1; i >= 0; --i) {
+                const traitSet = traitStack[i];
+                Object.assign(this.memberTraits, translateTraits(traitSet));
+            }
+        }
+        else {
+            this.memberTraits = 0;
+        }
+        if (schema instanceof NormalizedSchema) {
+            const computedMemberTraits = this.memberTraits;
+            Object.assign(this, schema);
+            this.memberTraits = Object.assign({}, computedMemberTraits, schema.getMemberTraits(), this.getMemberTraits());
+            this.normalizedTraits = void 0;
+            this.memberName = memberName ?? schema.memberName;
+            return;
+        }
+        this.schema = deref(schema);
+        if (isStaticSchema(this.schema)) {
+            this.name = `${this.schema[1]}#${this.schema[2]}`;
+            this.traits = this.schema[3];
+        }
+        else {
+            this.name = this.memberName ?? String(schema);
+            this.traits = 0;
+        }
+        if (this._isMemberSchema && !memberName) {
+            throw new Error(`@smithy/core/schema - NormalizedSchema member init ${this.getName(true)} missing member name.`);
+        }
+    }
+    static [Symbol.hasInstance](lhs) {
+        const isPrototype = this.prototype.isPrototypeOf(lhs);
+        if (!isPrototype && typeof lhs === "object" && lhs !== null) {
+            const ns = lhs;
+            return ns.symbol === this.symbol;
+        }
+        return isPrototype;
+    }
+    static of(ref) {
+        const keyAble = typeof ref === "function" || (typeof ref === "object" && ref !== null);
+        if (typeof ref === "number") {
+            if (simpleSchemaCacheN[ref]) {
+                return simpleSchemaCacheN[ref];
+            }
+        }
+        else if (typeof ref === "string") {
+            if (simpleSchemaCacheS[ref]) {
+                return simpleSchemaCacheS[ref];
+            }
+        }
+        else if (keyAble) {
+            if (ref[anno.ns]) {
+                return ref[anno.ns];
+            }
+        }
+        const sc = deref(ref);
+        if (sc instanceof NormalizedSchema) {
+            return sc;
+        }
+        if (isMemberSchema(sc)) {
+            const [ns, traits] = sc;
+            if (ns instanceof NormalizedSchema) {
+                Object.assign(ns.getMergedTraits(), translateTraits(traits));
+                return ns;
+            }
+            throw new Error(`@smithy/core/schema - may not init unwrapped member schema=${JSON.stringify(ref, null, 2)}.`);
+        }
+        const ns = new NormalizedSchema(sc);
+        if (keyAble) {
+            return (ref[anno.ns] = ns);
+        }
+        if (typeof sc === "string") {
+            return (simpleSchemaCacheS[sc] = ns);
+        }
+        if (typeof sc === "number") {
+            return (simpleSchemaCacheN[sc] = ns);
+        }
+        return ns;
+    }
+    getSchema() {
+        const sc = this.schema;
+        if (Array.isArray(sc) && sc[0] === 0) {
+            return sc[4];
+        }
+        return sc;
+    }
+    getName(withNamespace = false) {
+        const { name } = this;
+        const short = !withNamespace && name && name.includes("#");
+        return short ? name.split("#")[1] : name || undefined;
+    }
+    getMemberName() {
+        return this.memberName;
+    }
+    isMemberSchema() {
+        return this._isMemberSchema;
+    }
+    isListSchema() {
+        const sc = this.getSchema();
+        return typeof sc === "number"
+            ? sc >= 64 && sc < 128
+            : sc[0] === 1;
+    }
+    isMapSchema() {
+        const sc = this.getSchema();
+        return typeof sc === "number"
+            ? sc >= 128 && sc <= 0b1111_1111
+            : sc[0] === 2;
+    }
+    isStructSchema() {
+        const sc = this.getSchema();
+        if (typeof sc !== "object") {
+            return false;
+        }
+        const id = sc[0];
+        return (id === 3 ||
+            id === -3 ||
+            id === 4);
+    }
+    isUnionSchema() {
+        const sc = this.getSchema();
+        if (typeof sc !== "object") {
+            return false;
+        }
+        return sc[0] === 4;
+    }
+    isBlobSchema() {
+        const sc = this.getSchema();
+        return sc === 21 || sc === 42;
+    }
+    isTimestampSchema() {
+        const sc = this.getSchema();
+        return (typeof sc === "number" &&
+            sc >= 4 &&
+            sc <= 7);
+    }
+    isUnitSchema() {
+        return this.getSchema() === "unit";
+    }
+    isDocumentSchema() {
+        return this.getSchema() === 15;
+    }
+    isStringSchema() {
+        return this.getSchema() === 0;
+    }
+    isBooleanSchema() {
+        return this.getSchema() === 2;
+    }
+    isNumericSchema() {
+        return this.getSchema() === 1;
+    }
+    isBigIntegerSchema() {
+        return this.getSchema() === 17;
+    }
+    isBigDecimalSchema() {
+        return this.getSchema() === 19;
+    }
+    isStreaming() {
+        const { streaming } = this.getMergedTraits();
+        return !!streaming || this.getSchema() === 42;
+    }
+    isIdempotencyToken() {
+        return !!this.getMergedTraits().idempotencyToken;
+    }
+    getMergedTraits() {
+        return (this.normalizedTraits ??
+            (this.normalizedTraits = {
+                ...this.getOwnTraits(),
+                ...this.getMemberTraits(),
+            }));
+    }
+    getMemberTraits() {
+        return translateTraits(this.memberTraits);
+    }
+    getOwnTraits() {
+        return translateTraits(this.traits);
+    }
+    getKeySchema() {
+        const [isDoc, isMap] = [this.isDocumentSchema(), this.isMapSchema()];
+        if (!isDoc && !isMap) {
+            throw new Error(`@smithy/core/schema - cannot get key for non-map: ${this.getName(true)}`);
+        }
+        const schema = this.getSchema();
+        const memberSchema = isDoc
+            ? 15
+            : schema[4] ?? 0;
+        return member([memberSchema, 0], "key");
+    }
+    getValueSchema() {
+        const sc = this.getSchema();
+        const [isDoc, isMap, isList] = [this.isDocumentSchema(), this.isMapSchema(), this.isListSchema()];
+        const memberSchema = typeof sc === "number"
+            ? 0b0011_1111 & sc
+            : sc && typeof sc === "object" && (isMap || isList)
+                ? sc[3 + sc[0]]
+                : isDoc
+                    ? 15
+                    : void 0;
+        if (memberSchema != null) {
+            return member([memberSchema, 0], isMap ? "value" : "member");
+        }
+        throw new Error(`@smithy/core/schema - ${this.getName(true)} has no value member.`);
+    }
+    getMemberSchema(memberName) {
+        const struct = this.getSchema();
+        if (this.isStructSchema() && struct[4].includes(memberName)) {
+            const i = struct[4].indexOf(memberName);
+            const memberSchema = struct[5][i];
+            return member(isMemberSchema(memberSchema) ? memberSchema : [memberSchema, 0], memberName);
+        }
+        if (this.isDocumentSchema()) {
+            return member([15, 0], memberName);
+        }
+        throw new Error(`@smithy/core/schema - ${this.getName(true)} has no member=${memberName}.`);
+    }
+    getMemberSchemas() {
+        const buffer = {};
+        try {
+            for (const [k, v] of this.structIterator()) {
+                buffer[k] = v;
+            }
+        }
+        catch (ignored) { }
+        return buffer;
+    }
+    getEventStreamMember() {
+        if (this.isStructSchema()) {
+            for (const [memberName, memberSchema] of this.structIterator()) {
+                if (memberSchema.isStreaming() && memberSchema.isStructSchema()) {
+                    return memberName;
+                }
+            }
+        }
+        return "";
+    }
+    *structIterator() {
+        if (this.isUnitSchema()) {
+            return;
+        }
+        if (!this.isStructSchema()) {
+            throw new Error("@smithy/core/schema - cannot iterate non-struct schema.");
+        }
+        const struct = this.getSchema();
+        const z = struct[4].length;
+        let it = struct[anno.it];
+        if (it && z === it.length) {
+            yield* it;
+            return;
+        }
+        it = Array(z);
+        for (let i = 0; i < z; ++i) {
+            const k = struct[4][i];
+            const v = member([struct[5][i], 0], k);
+            yield (it[i] = [k, v]);
+        }
+        struct[anno.it] = it;
+    }
+}
+function member(memberSchema, memberName) {
+    if (memberSchema instanceof NormalizedSchema) {
+        return Object.assign(memberSchema, {
+            memberName,
+            _isMemberSchema: true,
+        });
+    }
+    const internalCtorAccess = NormalizedSchema;
+    return new internalCtorAccess(memberSchema, memberName);
+}
+const isMemberSchema = (sc) => Array.isArray(sc) && sc.length === 2;
+const isStaticSchema = (sc) => Array.isArray(sc) && sc.length >= 5;
+
+class TypeRegistry {
+    namespace;
+    schemas;
+    exceptions;
+    static registries = new Map();
+    constructor(namespace, schemas = new Map(), exceptions = new Map()) {
+        this.namespace = namespace;
+        this.schemas = schemas;
+        this.exceptions = exceptions;
+    }
+    static for(namespace) {
+        if (!TypeRegistry.registries.has(namespace)) {
+            TypeRegistry.registries.set(namespace, new TypeRegistry(namespace));
+        }
+        return TypeRegistry.registries.get(namespace);
+    }
+    copyFrom(other) {
+        const { schemas, exceptions } = this;
+        for (const [k, v] of other.schemas) {
+            if (!schemas.has(k)) {
+                schemas.set(k, v);
+            }
+        }
+        for (const [k, v] of other.exceptions) {
+            if (!exceptions.has(k)) {
+                exceptions.set(k, v);
+            }
+        }
+    }
+    register(shapeId, schema) {
+        const qualifiedName = this.normalizeShapeId(shapeId);
+        for (const r of [this, TypeRegistry.for(qualifiedName.split("#")[0])]) {
+            r.schemas.set(qualifiedName, schema);
+        }
+    }
+    getSchema(shapeId) {
+        const id = this.normalizeShapeId(shapeId);
+        if (!this.schemas.has(id)) {
+            if (!shapeId.includes("#")) {
+                const suffix = "#" + shapeId;
+                const candidates = [];
+                for (const [shapeId, schema] of this.schemas.entries()) {
+                    if (shapeId.endsWith(suffix)) {
+                        candidates.push(schema);
+                    }
+                }
+                if (candidates.length === 1) {
+                    return candidates[0];
+                }
+            }
+            throw new Error(`@smithy/core/schema - schema not found for ${id}`);
+        }
+        return this.schemas.get(id);
+    }
+    registerError(es, ctor) {
+        const $error = es;
+        const ns = $error[1];
+        for (const r of [this, TypeRegistry.for(ns)]) {
+            r.schemas.set(ns + "#" + $error[2], $error);
+            r.exceptions.set($error, ctor);
+        }
+    }
+    getErrorCtor(es) {
+        const $error = es;
+        if (this.exceptions.has($error)) {
+            return this.exceptions.get($error);
+        }
+        const registry = TypeRegistry.for($error[1]);
+        return registry.exceptions.get($error);
+    }
+    getBaseException() {
+        for (const exceptionKey of this.exceptions.keys()) {
+            if (Array.isArray(exceptionKey)) {
+                const [, ns, name] = exceptionKey;
+                const id = ns + "#" + name;
+                if (id.startsWith("smithy.ts.sdk.synthetic.") && id.endsWith("ServiceException")) {
+                    return exceptionKey;
+                }
+            }
+        }
+        return undefined;
+    }
+    find(predicate) {
+        for (const schema of this.schemas.values()) {
+            if (predicate(schema)) {
+                return schema;
+            }
+        }
+        return undefined;
+    }
+    clear() {
+        this.schemas.clear();
+        this.exceptions.clear();
+    }
+    normalizeShapeId(shapeId) {
+        if (shapeId.includes("#")) {
+            return shapeId;
+        }
+        return this.namespace + "#" + shapeId;
+    }
+}
+
+const SENSITIVE_STRING = "***SensitiveInformation***";
+function schemaLogFilter(schema, data) {
+    if (data == null) {
+        return data;
+    }
+    const ns = NormalizedSchema.of(schema);
+    if (ns.getMergedTraits().sensitive) {
+        return SENSITIVE_STRING;
+    }
+    if (ns.isListSchema()) {
+        const isSensitive = !!ns.getValueSchema().getMergedTraits().sensitive;
+        if (isSensitive) {
+            return SENSITIVE_STRING;
+        }
+    }
+    else if (ns.isMapSchema()) {
+        const isSensitive = !!ns.getKeySchema().getMergedTraits().sensitive || !!ns.getValueSchema().getMergedTraits().sensitive;
+        if (isSensitive) {
+            return SENSITIVE_STRING;
+        }
+    }
+    else if (ns.isStructSchema() && typeof data === "object") {
+        const object = data;
+        const newObject = {};
+        for (const [member, memberNs] of ns.structIterator()) {
+            if (object[member] != null) {
+                newObject[member] = schemaLogFilter(memberNs, object[member]);
+            }
+        }
+        return newObject;
+    }
+    return data;
+}
+
+class Command {
+    middlewareStack = constructStack();
+    schema;
+    static classBuilder() {
+        return new ClassBuilder();
+    }
+    resolveMiddlewareWithContext(clientStack, configuration, options, { middlewareFn, clientName, commandName, inputFilterSensitiveLog, outputFilterSensitiveLog, smithyContext, additionalContext, CommandCtor, }) {
+        for (const mw of middlewareFn.bind(this)(CommandCtor, clientStack, configuration, options)) {
+            this.middlewareStack.use(mw);
+        }
+        const stack = clientStack.concat(this.middlewareStack);
+        const { logger } = configuration;
+        const handlerExecutionContext = {
+            logger,
+            clientName,
+            commandName,
+            inputFilterSensitiveLog,
+            outputFilterSensitiveLog,
+            [SMITHY_CONTEXT_KEY]: {
+                commandInstance: this,
+                ...smithyContext,
+            },
+            ...additionalContext,
+        };
+        const { requestHandler } = configuration;
+        let requestOptions = options ?? {};
+        if (smithyContext.eventStream) {
+            requestOptions = {
+                isEventStream: true,
+                ...requestOptions,
+            };
+        }
+        return stack.resolve((request) => requestHandler.handle(request.request, requestOptions), handlerExecutionContext);
+    }
+}
+class ClassBuilder {
+    _init = () => { };
+    _ep = {};
+    _middlewareFn = () => [];
+    _commandName = "";
+    _clientName = "";
+    _additionalContext = {};
+    _smithyContext = {};
+    _inputFilterSensitiveLog = undefined;
+    _outputFilterSensitiveLog = undefined;
+    _serializer = null;
+    _deserializer = null;
+    _operationSchema;
+    init(cb) {
+        this._init = cb;
+    }
+    ep(endpointParameterInstructions) {
+        this._ep = endpointParameterInstructions;
+        return this;
+    }
+    m(middlewareSupplier) {
+        this._middlewareFn = middlewareSupplier;
+        return this;
+    }
+    s(service, operation, smithyContext = {}) {
+        this._smithyContext = {
+            service,
+            operation,
+            ...smithyContext,
+        };
+        return this;
+    }
+    c(additionalContext = {}) {
+        this._additionalContext = additionalContext;
+        return this;
+    }
+    n(clientName, commandName) {
+        this._clientName = clientName;
+        this._commandName = commandName;
+        return this;
+    }
+    f(inputFilter = (_) => _, outputFilter = (_) => _) {
+        this._inputFilterSensitiveLog = inputFilter;
+        this._outputFilterSensitiveLog = outputFilter;
+        return this;
+    }
+    ser(serializer) {
+        this._serializer = serializer;
+        return this;
+    }
+    de(deserializer) {
+        this._deserializer = deserializer;
+        return this;
+    }
+    sc(operation) {
+        this._operationSchema = operation;
+        this._smithyContext.operationSchema = operation;
+        return this;
+    }
+    build() {
+        const closure = this;
+        let CommandRef;
+        return (CommandRef = class extends Command {
+            input;
+            static getEndpointParameterInstructions() {
+                return closure._ep;
+            }
+            constructor(...[input]) {
+                super();
+                this.input = input ?? {};
+                closure._init(this);
+                this.schema = closure._operationSchema;
+            }
+            resolveMiddleware(stack, configuration, options) {
+                const op = closure._operationSchema;
+                const input = op?.[4] ?? op?.input;
+                const output = op?.[5] ?? op?.output;
+                return this.resolveMiddlewareWithContext(stack, configuration, options, {
+                    CommandCtor: CommandRef,
+                    middlewareFn: closure._middlewareFn,
+                    clientName: closure._clientName,
+                    commandName: closure._commandName,
+                    inputFilterSensitiveLog: closure._inputFilterSensitiveLog ?? (op ? schemaLogFilter.bind(null, input) : (_) => _),
+                    outputFilterSensitiveLog: closure._outputFilterSensitiveLog ?? (op ? schemaLogFilter.bind(null, output) : (_) => _),
+                    smithyContext: closure._smithyContext,
+                    additionalContext: closure._additionalContext,
+                });
+            }
+            serialize = closure._serializer;
+            deserialize = closure._deserializer;
+        });
+    }
+}
+
+class ServiceException extends Error {
+    $fault;
+    $response;
+    $retryable;
+    $metadata;
+    constructor(options) {
+        super(options.message);
+        Object.setPrototypeOf(this, Object.getPrototypeOf(this).constructor.prototype);
+        this.name = options.name;
+        this.$fault = options.$fault;
+        this.$metadata = options.$metadata;
+    }
+    static isInstance(value) {
+        if (!value)
+            return false;
+        const candidate = value;
+        return (ServiceException.prototype.isPrototypeOf(candidate) ||
+            (Boolean(candidate.$fault) &&
+                Boolean(candidate.$metadata) &&
+                (candidate.$fault === "client" || candidate.$fault === "server")));
+    }
+    static [Symbol.hasInstance](instance) {
+        if (!instance)
+            return false;
+        const candidate = instance;
+        if (this === ServiceException) {
+            return ServiceException.isInstance(instance);
+        }
+        if (ServiceException.isInstance(instance)) {
+            if (candidate.name && this.name) {
+                return this.prototype.isPrototypeOf(instance) || candidate.name === this.name;
+            }
+            return this.prototype.isPrototypeOf(instance);
+        }
+        return false;
+    }
+}
+const decorateServiceException = (exception, additions = {}) => {
+    Object.entries(additions)
+        .filter(([, v]) => v !== undefined)
+        .forEach(([k, v]) => {
+        if (exception[k] == undefined || exception[k] === "") {
+            exception[k] = v;
+        }
+    });
+    const message = exception.message || exception.Message || "UnknownError";
+    exception.message = message;
+    delete exception.Message;
+    return exception;
+};
+
+const loadConfigsForDefaultMode = (mode) => {
+    switch (mode) {
+        case "standard":
+            return {
+                retryMode: "standard",
+                connectionTimeout: 3100,
+            };
+        case "in-region":
+            return {
+                retryMode: "standard",
+                connectionTimeout: 1100,
+            };
+        case "cross-region":
+            return {
+                retryMode: "standard",
+                connectionTimeout: 3100,
+            };
+        case "mobile":
+            return {
+                retryMode: "standard",
+                connectionTimeout: 30000,
+            };
+        default:
+            return {};
+    }
+};
+
+let warningEmitted = false;
+const emitWarningIfUnsupportedVersion$1 = (version) => {
+    if (version && !warningEmitted && parseInt(version.substring(1, version.indexOf("."))) < 16) {
+        warningEmitted = true;
+    }
+};
+
+const knownAlgorithms = Object.values(AlgorithmId);
+const getChecksumConfiguration = (runtimeConfig) => {
+    const checksumAlgorithms = [];
+    for (const id in AlgorithmId) {
+        const algorithmId = AlgorithmId[id];
+        if (runtimeConfig[algorithmId] === undefined) {
+            continue;
+        }
+        checksumAlgorithms.push({
+            algorithmId: () => algorithmId,
+            checksumConstructor: () => runtimeConfig[algorithmId],
+        });
+    }
+    for (const [id, ChecksumCtor] of Object.entries(runtimeConfig.checksumAlgorithms ?? {})) {
+        checksumAlgorithms.push({
+            algorithmId: () => id,
+            checksumConstructor: () => ChecksumCtor,
+        });
+    }
+    return {
+        addChecksumAlgorithm(algo) {
+            runtimeConfig.checksumAlgorithms = runtimeConfig.checksumAlgorithms ?? {};
+            const id = algo.algorithmId();
+            const ctor = algo.checksumConstructor();
+            if (knownAlgorithms.includes(id)) {
+                runtimeConfig.checksumAlgorithms[id.toUpperCase()] = ctor;
+            }
+            else {
+                runtimeConfig.checksumAlgorithms[id] = ctor;
+            }
+            checksumAlgorithms.push(algo);
+        },
+        checksumAlgorithms() {
+            return checksumAlgorithms;
+        },
+    };
+};
+const resolveChecksumRuntimeConfig = (clientConfig) => {
+    const runtimeConfig = {};
+    clientConfig.checksumAlgorithms().forEach((checksumAlgorithm) => {
+        const id = checksumAlgorithm.algorithmId();
+        if (knownAlgorithms.includes(id)) {
+            runtimeConfig[id] = checksumAlgorithm.checksumConstructor();
+        }
+    });
+    return runtimeConfig;
+};
+
+const getRetryConfiguration = (runtimeConfig) => {
+    return {
+        setRetryStrategy(retryStrategy) {
+            runtimeConfig.retryStrategy = retryStrategy;
+        },
+        retryStrategy() {
+            return runtimeConfig.retryStrategy;
+        },
+    };
+};
+const resolveRetryRuntimeConfig = (retryStrategyConfiguration) => {
+    const runtimeConfig = {};
+    runtimeConfig.retryStrategy = retryStrategyConfiguration.retryStrategy();
+    return runtimeConfig;
+};
+
+const getDefaultExtensionConfiguration = (runtimeConfig) => {
+    return Object.assign(getChecksumConfiguration(runtimeConfig), getRetryConfiguration(runtimeConfig));
+};
+const resolveDefaultRuntimeConfig = (config) => {
+    return Object.assign(resolveChecksumRuntimeConfig(config), resolveRetryRuntimeConfig(config));
+};
+
+const getValueFromTextNode = (obj) => {
+    const textNodeName = "#text";
+    for (const key in obj) {
+        if (Object.prototype.hasOwnProperty.call(obj, key) && obj[key][textNodeName] !== undefined) {
+            obj[key] = obj[key][textNodeName];
+        }
+        else if (typeof obj[key] === "object" && obj[key] !== null) {
+            obj[key] = getValueFromTextNode(obj[key]);
+        }
+    }
+    return obj;
+};
+
+class NoOpLogger {
+    trace() { }
+    debug() { }
+    info() { }
+    warn() { }
+    error() { }
+}
+
+const DEFAULT_ACCOUNT_ID_ENDPOINT_MODE = "preferred";
+const ACCOUNT_ID_ENDPOINT_MODE_VALUES = ["disabled", "preferred", "required"];
+function validateAccountIdEndpointMode(value) {
+    return ACCOUNT_ID_ENDPOINT_MODE_VALUES.includes(value);
+}
+
+const resolveAccountIdEndpointModeConfig = (input) => {
+    const { accountIdEndpointMode } = input;
+    const accountIdEndpointModeProvider = normalizeProvider$1(accountIdEndpointMode ?? DEFAULT_ACCOUNT_ID_ENDPOINT_MODE);
+    return Object.assign(input, {
+        accountIdEndpointMode: async () => {
+            const accIdMode = await accountIdEndpointModeProvider();
+            if (!validateAccountIdEndpointMode(accIdMode)) {
+                throw new Error(`Invalid value for accountIdEndpointMode: ${accIdMode}. Valid values are: "required", "preferred", "disabled".`);
+            }
+            return accIdMode;
+        },
+    });
+};
+
+const err = "Invalid AccountIdEndpointMode value";
+const _throw = (message) => {
+    throw new Error(message);
+};
+const ENV_ACCOUNT_ID_ENDPOINT_MODE = "AWS_ACCOUNT_ID_ENDPOINT_MODE";
+const CONFIG_ACCOUNT_ID_ENDPOINT_MODE = "account_id_endpoint_mode";
+const NODE_ACCOUNT_ID_ENDPOINT_MODE_CONFIG_OPTIONS = {
+    environmentVariableSelector: (env) => {
+        const value = env[ENV_ACCOUNT_ID_ENDPOINT_MODE];
+        if (value && !validateAccountIdEndpointMode(value)) {
+            _throw(err);
+        }
+        return value;
+    },
+    configFileSelector: (profile) => {
+        const value = profile[CONFIG_ACCOUNT_ID_ENDPOINT_MODE];
+        if (value && !validateAccountIdEndpointMode(value)) {
+            _throw(err);
+        }
+        return value;
+    },
+    default: DEFAULT_ACCOUNT_ID_ENDPOINT_MODE,
+};
+
+const state = {
+    warningEmitted: false,
+};
+const emitWarningIfUnsupportedVersion = (version) => {
+    if (version && !state.warningEmitted) {
+        if (process.env.AWS_SDK_JS_NODE_VERSION_SUPPORT_WARNING_DISABLED === "true") {
+            state.warningEmitted = true;
+            return;
+        }
+        const userMajorVersion = parseInt(version.substring(1, version.indexOf(".")));
+        const vv = 22;
+        if (userMajorVersion < vv) {
+            state.warningEmitted = true;
+            process.emitWarning(`NodeVersionSupportWarning: The AWS SDK for JavaScript (v3)
+versions published after the first week of January 2027
+will require node >=${vv}. You are running node ${version}.
+
+To continue receiving updates to AWS services, bug fixes,
+and security updates please upgrade to node >=${vv}.
+
+More information can be found at: https://a.co/c895JFp`);
+        }
+    }
+};
+
+function setCredentialFeature(credentials, feature, value) {
+    if (!credentials.$source) {
+        credentials.$source = {};
+    }
+    credentials.$source[feature] = value;
+    return credentials;
+}
+
+const isStreamingPayload = (request) => request?.body instanceof Readable ||
+    (typeof ReadableStream !== "undefined" && request?.body instanceof ReadableStream);
+
+const isArrayBuffer = (arg) => (typeof ArrayBuffer === "function" && arg instanceof ArrayBuffer) ||
+    Object.prototype.toString.call(arg) === "[object ArrayBuffer]";
+
+const fromArrayBuffer = (input, offset = 0, length = input.byteLength - offset) => {
+    if (!isArrayBuffer(input)) {
+        throw new TypeError(`The "input" argument must be ArrayBuffer. Received type ${typeof input} (${input})`);
+    }
+    return Buffer.from(input, offset, length);
+};
+const fromString$1 = (input, encoding) => {
+    if (typeof input !== "string") {
+        throw new TypeError(`The "input" argument must be of type string. Received type ${typeof input} (${input})`);
+    }
+    return encoding ? Buffer.from(input, encoding) : Buffer.from(input);
+};
+
+const BASE64_REGEX = /^[A-Za-z0-9+/]*={0,2}$/;
+const fromBase64$1 = (input) => {
+    if ((input.length * 3) % 4 !== 0) {
+        throw new TypeError(`Incorrect padding on base64 string.`);
+    }
+    if (!BASE64_REGEX.exec(input)) {
+        throw new TypeError(`Invalid base64 string.`);
+    }
+    const buffer = fromString$1(input, "base64");
+    return new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+};
+
+const fromUtf8$2 = (input) => {
+    const buf = fromString$1(input, "utf8");
+    return new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength / Uint8Array.BYTES_PER_ELEMENT);
+};
+
+const toBase64$1 = (_input) => {
+    let input;
+    if (typeof _input === "string") {
+        input = fromUtf8$2(_input);
+    }
+    else {
+        input = _input;
+    }
+    if (typeof input !== "object" || typeof input.byteOffset !== "number" || typeof input.byteLength !== "number") {
+        throw new Error("@smithy/util-base64: toBase64 encoder function only accepts string | Uint8Array.");
+    }
+    return fromArrayBuffer(input.buffer, input.byteOffset, input.byteLength).toString("base64");
+};
+
+function bindUint8ArrayBlobAdapter(toUtf8, fromUtf8, toBase64, fromBase64) {
+    return class Uint8ArrayBlobAdapter extends Uint8Array {
+        static fromString(source, encoding = "utf-8") {
+            if (typeof source === "string") {
+                if (encoding === "base64") {
+                    return Uint8ArrayBlobAdapter.mutate(fromBase64(source));
+                }
+                return Uint8ArrayBlobAdapter.mutate(fromUtf8(source));
+            }
+            throw new Error(`Unsupported conversion from ${typeof source} to Uint8ArrayBlobAdapter.`);
+        }
+        static mutate(source) {
+            Object.setPrototypeOf(source, Uint8ArrayBlobAdapter.prototype);
+            return source;
+        }
+        transformToString(encoding = "utf-8") {
+            if (encoding === "base64") {
+                return toBase64(this);
+            }
+            return toUtf8(this);
+        }
+    };
+}
+
+const toUtf8$1 = (input) => {
+    if (typeof input === "string") {
+        return input;
+    }
+    if (typeof input !== "object" || typeof input.byteOffset !== "number" || typeof input.byteLength !== "number") {
+        throw new Error("@smithy/util-utf8: toUtf8 encoder function only accepts string | Uint8Array.");
+    }
+    return fromArrayBuffer(input.buffer, input.byteOffset, input.byteLength).toString("utf8");
+};
+
+const decimalToHex = Array.from({ length: 256 }, (_, i) => i.toString(16).padStart(2, "0"));
+function bindV4(getRandomValues) {
+    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+        return () => crypto.randomUUID();
+    }
+    return () => {
+        const rnds = new Uint8Array(16);
+        getRandomValues(rnds);
+        rnds[6] = (rnds[6] & 0x0f) | 0x40;
+        rnds[8] = (rnds[8] & 0x3f) | 0x80;
+        return (decimalToHex[rnds[0]] +
+            decimalToHex[rnds[1]] +
+            decimalToHex[rnds[2]] +
+            decimalToHex[rnds[3]] +
+            "-" +
+            decimalToHex[rnds[4]] +
+            decimalToHex[rnds[5]] +
+            "-" +
+            decimalToHex[rnds[6]] +
+            decimalToHex[rnds[7]] +
+            "-" +
+            decimalToHex[rnds[8]] +
+            decimalToHex[rnds[9]] +
+            "-" +
+            decimalToHex[rnds[10]] +
+            decimalToHex[rnds[11]] +
+            decimalToHex[rnds[12]] +
+            decimalToHex[rnds[13]] +
+            decimalToHex[rnds[14]] +
+            decimalToHex[rnds[15]]);
+    };
+}
+
+const expectNumber = (value) => {
+    if (value === null || value === undefined) {
+        return undefined;
+    }
+    if (typeof value === "string") {
+        const parsed = parseFloat(value);
+        if (!Number.isNaN(parsed)) {
+            if (String(parsed) !== String(value)) {
+                logger.warn(stackTraceWarning(`Expected number but observed string: ${value}`));
+            }
+            return parsed;
+        }
+    }
+    if (typeof value === "number") {
+        return value;
+    }
+    throw new TypeError(`Expected number, got ${typeof value}: ${value}`);
+};
+const MAX_FLOAT = Math.ceil(2 ** 127 * (2 - 2 ** -23));
+const expectFloat32 = (value) => {
+    const expected = expectNumber(value);
+    if (expected !== undefined && !Number.isNaN(expected) && expected !== Infinity && expected !== -Infinity) {
+        if (Math.abs(expected) > MAX_FLOAT) {
+            throw new TypeError(`Expected 32-bit float, got ${value}`);
+        }
+    }
+    return expected;
+};
+const expectLong = (value) => {
+    if (value === null || value === undefined) {
+        return undefined;
+    }
+    if (Number.isInteger(value) && !Number.isNaN(value)) {
+        return value;
+    }
+    throw new TypeError(`Expected integer, got ${typeof value}: ${value}`);
+};
+const expectShort = (value) => expectSizedInt(value, 16);
+const expectByte = (value) => expectSizedInt(value, 8);
+const expectSizedInt = (value, size) => {
+    const expected = expectLong(value);
+    if (expected !== undefined && castInt(expected, size) !== expected) {
+        throw new TypeError(`Expected ${size}-bit integer, got ${value}`);
+    }
+    return expected;
+};
+const castInt = (value, size) => {
+    switch (size) {
+        case 32:
+            return Int32Array.of(value)[0];
+        case 16:
+            return Int16Array.of(value)[0];
+        case 8:
+            return Int8Array.of(value)[0];
+    }
+};
+const strictParseDouble = (value) => {
+    if (typeof value == "string") {
+        return expectNumber(parseNumber(value));
+    }
+    return expectNumber(value);
+};
+const strictParseFloat32 = (value) => {
+    if (typeof value == "string") {
+        return expectFloat32(parseNumber(value));
+    }
+    return expectFloat32(value);
+};
+const NUMBER_REGEX = /(-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?)|(-?Infinity)|(NaN)/g;
+const parseNumber = (value) => {
+    const matches = value.match(NUMBER_REGEX);
+    if (matches === null || matches[0].length !== value.length) {
+        throw new TypeError(`Expected real number, got implicit NaN`);
+    }
+    return parseFloat(value);
+};
+const strictParseShort = (value) => {
+    if (typeof value === "string") {
+        return expectShort(parseNumber(value));
+    }
+    return expectShort(value);
+};
+const strictParseByte = (value) => {
+    if (typeof value === "string") {
+        return expectByte(parseNumber(value));
+    }
+    return expectByte(value);
+};
+const stackTraceWarning = (message) => {
+    return String(new TypeError(message).stack || message)
+        .split("\n")
+        .slice(0, 5)
+        .filter((s) => !s.includes("stackTraceWarning"))
+        .join("\n");
+};
+const logger = {
+    warn: console.warn,
+};
+
+const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+function dateToUtcString(date) {
+    const year = date.getUTCFullYear();
+    const month = date.getUTCMonth();
+    const dayOfWeek = date.getUTCDay();
+    const dayOfMonthInt = date.getUTCDate();
+    const hoursInt = date.getUTCHours();
+    const minutesInt = date.getUTCMinutes();
+    const secondsInt = date.getUTCSeconds();
+    const dayOfMonthString = dayOfMonthInt < 10 ? `0${dayOfMonthInt}` : `${dayOfMonthInt}`;
+    const hoursString = hoursInt < 10 ? `0${hoursInt}` : `${hoursInt}`;
+    const minutesString = minutesInt < 10 ? `0${minutesInt}` : `${minutesInt}`;
+    const secondsString = secondsInt < 10 ? `0${secondsInt}` : `${secondsInt}`;
+    return `${DAYS[dayOfWeek]}, ${dayOfMonthString} ${MONTHS[month]} ${year} ${hoursString}:${minutesString}:${secondsString} GMT`;
+}
+const RFC3339 = new RegExp(/^(\d{4})-(\d{2})-(\d{2})[tT](\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?[zZ]$/);
+const parseRfc3339DateTime = (value) => {
+    if (value === null || value === undefined) {
+        return undefined;
+    }
+    if (typeof value !== "string") {
+        throw new TypeError("RFC-3339 date-times must be expressed as strings");
+    }
+    const match = RFC3339.exec(value);
+    if (!match) {
+        throw new TypeError("Invalid RFC-3339 date-time value");
+    }
+    const [_, yearStr, monthStr, dayStr, hours, minutes, seconds, fractionalMilliseconds] = match;
+    const year = strictParseShort(stripLeadingZeroes(yearStr));
+    const month = parseDateValue(monthStr, "month", 1, 12);
+    const day = parseDateValue(dayStr, "day", 1, 31);
+    return buildDate(year, month, day, { hours, minutes, seconds, fractionalMilliseconds });
+};
+const RFC3339_WITH_OFFSET$1 = new RegExp(/^(\d{4})-(\d{2})-(\d{2})[tT](\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?(([-+]\d{2}\:\d{2})|[zZ])$/);
+const parseRfc3339DateTimeWithOffset = (value) => {
+    if (value === null || value === undefined) {
+        return undefined;
+    }
+    if (typeof value !== "string") {
+        throw new TypeError("RFC-3339 date-times must be expressed as strings");
+    }
+    const match = RFC3339_WITH_OFFSET$1.exec(value);
+    if (!match) {
+        throw new TypeError("Invalid RFC-3339 date-time value");
+    }
+    const [_, yearStr, monthStr, dayStr, hours, minutes, seconds, fractionalMilliseconds, offsetStr] = match;
+    const year = strictParseShort(stripLeadingZeroes(yearStr));
+    const month = parseDateValue(monthStr, "month", 1, 12);
+    const day = parseDateValue(dayStr, "day", 1, 31);
+    const date = buildDate(year, month, day, { hours, minutes, seconds, fractionalMilliseconds });
+    if (offsetStr.toUpperCase() != "Z") {
+        date.setTime(date.getTime() - parseOffsetToMilliseconds(offsetStr));
+    }
+    return date;
+};
+const IMF_FIXDATE$1 = new RegExp(/^(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun), (\d{2}) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{4}) (\d{1,2}):(\d{2}):(\d{2})(?:\.(\d+))? GMT$/);
+const RFC_850_DATE$1 = new RegExp(/^(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday), (\d{2})-(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)-(\d{2}) (\d{1,2}):(\d{2}):(\d{2})(?:\.(\d+))? GMT$/);
+const ASC_TIME$1 = new RegExp(/^(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) ( [1-9]|\d{2}) (\d{1,2}):(\d{2}):(\d{2})(?:\.(\d+))? (\d{4})$/);
+const parseRfc7231DateTime = (value) => {
+    if (value === null || value === undefined) {
+        return undefined;
+    }
+    if (typeof value !== "string") {
+        throw new TypeError("RFC-7231 date-times must be expressed as strings");
+    }
+    let match = IMF_FIXDATE$1.exec(value);
+    if (match) {
+        const [_, dayStr, monthStr, yearStr, hours, minutes, seconds, fractionalMilliseconds] = match;
+        return buildDate(strictParseShort(stripLeadingZeroes(yearStr)), parseMonthByShortName(monthStr), parseDateValue(dayStr, "day", 1, 31), { hours, minutes, seconds, fractionalMilliseconds });
+    }
+    match = RFC_850_DATE$1.exec(value);
+    if (match) {
+        const [_, dayStr, monthStr, yearStr, hours, minutes, seconds, fractionalMilliseconds] = match;
+        return adjustRfc850Year(buildDate(parseTwoDigitYear(yearStr), parseMonthByShortName(monthStr), parseDateValue(dayStr, "day", 1, 31), {
+            hours,
+            minutes,
+            seconds,
+            fractionalMilliseconds,
+        }));
+    }
+    match = ASC_TIME$1.exec(value);
+    if (match) {
+        const [_, monthStr, dayStr, hours, minutes, seconds, fractionalMilliseconds, yearStr] = match;
+        return buildDate(strictParseShort(stripLeadingZeroes(yearStr)), parseMonthByShortName(monthStr), parseDateValue(dayStr.trimLeft(), "day", 1, 31), { hours, minutes, seconds, fractionalMilliseconds });
+    }
+    throw new TypeError("Invalid RFC-7231 date-time value");
+};
+const parseEpochTimestamp = (value) => {
+    if (value === null || value === undefined) {
+        return undefined;
+    }
+    let valueAsDouble;
+    if (typeof value === "number") {
+        valueAsDouble = value;
+    }
+    else if (typeof value === "string") {
+        valueAsDouble = strictParseDouble(value);
+    }
+    else if (typeof value === "object" && value.tag === 1) {
+        valueAsDouble = value.value;
+    }
+    else {
+        throw new TypeError("Epoch timestamps must be expressed as floating point numbers or their string representation");
+    }
+    if (Number.isNaN(valueAsDouble) || valueAsDouble === Infinity || valueAsDouble === -Infinity) {
+        throw new TypeError("Epoch timestamps must be valid, non-Infinite, non-NaN numerics");
+    }
+    return new Date(Math.round(valueAsDouble * 1000));
+};
+const buildDate = (year, month, day, time) => {
+    const adjustedMonth = month - 1;
+    validateDayOfMonth(year, adjustedMonth, day);
+    return new Date(Date.UTC(year, adjustedMonth, day, parseDateValue(time.hours, "hour", 0, 23), parseDateValue(time.minutes, "minute", 0, 59), parseDateValue(time.seconds, "seconds", 0, 60), parseMilliseconds(time.fractionalMilliseconds)));
+};
+const parseTwoDigitYear = (value) => {
+    const thisYear = new Date().getUTCFullYear();
+    const valueInThisCentury = Math.floor(thisYear / 100) * 100 + strictParseShort(stripLeadingZeroes(value));
+    if (valueInThisCentury < thisYear) {
+        return valueInThisCentury + 100;
+    }
+    return valueInThisCentury;
+};
+const FIFTY_YEARS_IN_MILLIS = 50 * 365 * 24 * 60 * 60 * 1000;
+const adjustRfc850Year = (input) => {
+    if (input.getTime() - new Date().getTime() > FIFTY_YEARS_IN_MILLIS) {
+        return new Date(Date.UTC(input.getUTCFullYear() - 100, input.getUTCMonth(), input.getUTCDate(), input.getUTCHours(), input.getUTCMinutes(), input.getUTCSeconds(), input.getUTCMilliseconds()));
+    }
+    return input;
+};
+const parseMonthByShortName = (value) => {
+    const monthIdx = MONTHS.indexOf(value);
+    if (monthIdx < 0) {
+        throw new TypeError(`Invalid month: ${value}`);
+    }
+    return monthIdx + 1;
+};
+const DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+const validateDayOfMonth = (year, month, day) => {
+    let maxDays = DAYS_IN_MONTH[month];
+    if (month === 1 && isLeapYear(year)) {
+        maxDays = 29;
+    }
+    if (day > maxDays) {
+        throw new TypeError(`Invalid day for ${MONTHS[month]} in ${year}: ${day}`);
+    }
+};
+const isLeapYear = (year) => {
+    return year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+};
+const parseDateValue = (value, type, lower, upper) => {
+    const dateVal = strictParseByte(stripLeadingZeroes(value));
+    if (dateVal < lower || dateVal > upper) {
+        throw new TypeError(`${type} must be between ${lower} and ${upper}, inclusive`);
+    }
+    return dateVal;
+};
+const parseMilliseconds = (value) => {
+    if (value === null || value === undefined) {
+        return 0;
+    }
+    return strictParseFloat32("0." + value) * 1000;
+};
+const parseOffsetToMilliseconds = (value) => {
+    const directionStr = value[0];
+    let direction = 1;
+    if (directionStr == "+") {
+        direction = 1;
+    }
+    else if (directionStr == "-") {
+        direction = -1;
+    }
+    else {
+        throw new TypeError(`Offset direction, ${directionStr}, must be "+" or "-"`);
+    }
+    const hour = Number(value.substring(1, 3));
+    const minute = Number(value.substring(4, 6));
+    return direction * (hour * 60 + minute) * 60 * 1000;
+};
+const stripLeadingZeroes = (value) => {
+    let idx = 0;
+    while (idx < value.length - 1 && value.charAt(idx) === "0") {
+        idx++;
+    }
+    if (idx === 0) {
+        return value;
+    }
+    return value.slice(idx);
+};
+
+const LazyJsonString = function LazyJsonString(val) {
+    const str = Object.assign(new String(val), {
+        deserializeJSON() {
+            return JSON.parse(String(val));
+        },
+        toString() {
+            return String(val);
+        },
+        toJSON() {
+            return String(val);
+        },
+    });
+    return str;
+};
+LazyJsonString.from = (object) => {
+    if (object && typeof object === "object" && (object instanceof LazyJsonString || "deserializeJSON" in object)) {
+        return object;
+    }
+    else if (typeof object === "string" || Object.getPrototypeOf(object) === String.prototype) {
+        return LazyJsonString(String(object));
+    }
+    return LazyJsonString(JSON.stringify(object));
+};
+LazyJsonString.fromObject = LazyJsonString.from;
+
+function quoteHeader(part) {
+    if (part.includes(",") || part.includes('"')) {
+        part = `"${part.replace(/"/g, '\\"')}"`;
+    }
+    return part;
+}
+
+const ddd = `(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)(?:[ne|u?r]?s?day)?`;
+const mmm = `(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)`;
+const time = `(\\d?\\d):(\\d{2}):(\\d{2})(?:\\.(\\d+))?`;
+const date = `(\\d?\\d)`;
+const year = `(\\d{4})`;
+const RFC3339_WITH_OFFSET = new RegExp(/^(\d{4})-(\d\d)-(\d\d)[tT](\d\d):(\d\d):(\d\d)(\.(\d+))?(([-+]\d\d:\d\d)|[zZ])$/);
+const IMF_FIXDATE = new RegExp(`^${ddd}, ${date} ${mmm} ${year} ${time} GMT$`);
+const RFC_850_DATE = new RegExp(`^${ddd}, ${date}-${mmm}-(\\d\\d) ${time} GMT$`);
+const ASC_TIME = new RegExp(`^${ddd} ${mmm} ( [1-9]|\\d\\d) ${time} ${year}$`);
+const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const _parseEpochTimestamp = (value) => {
+    if (value == null) {
+        return void 0;
+    }
+    let num = NaN;
+    if (typeof value === "number") {
+        num = value;
+    }
+    else if (typeof value === "string") {
+        if (!/^-?\d*\.?\d+$/.test(value)) {
+            throw new TypeError(`parseEpochTimestamp - numeric string invalid.`);
+        }
+        num = Number.parseFloat(value);
+    }
+    else if (typeof value === "object" && value.tag === 1) {
+        num = value.value;
+    }
+    if (isNaN(num) || Math.abs(num) === Infinity) {
+        throw new TypeError("Epoch timestamps must be valid finite numbers.");
+    }
+    return new Date(Math.round(num * 1000));
+};
+const _parseRfc3339DateTimeWithOffset = (value) => {
+    if (value == null) {
+        return void 0;
+    }
+    if (typeof value !== "string") {
+        throw new TypeError("RFC3339 timestamps must be strings");
+    }
+    const matches = RFC3339_WITH_OFFSET.exec(value);
+    if (!matches) {
+        throw new TypeError(`Invalid RFC3339 timestamp format ${value}`);
+    }
+    const [, yearStr, monthStr, dayStr, hours, minutes, seconds, , ms, offsetStr] = matches;
+    range(monthStr, 1, 12);
+    range(dayStr, 1, 31);
+    range(hours, 0, 23);
+    range(minutes, 0, 59);
+    range(seconds, 0, 60);
+    const date = new Date(Date.UTC(Number(yearStr), Number(monthStr) - 1, Number(dayStr), Number(hours), Number(minutes), Number(seconds), Number(ms) ? Math.round(parseFloat(`0.${ms}`) * 1000) : 0));
+    date.setUTCFullYear(Number(yearStr));
+    if (offsetStr.toUpperCase() != "Z") {
+        const [, sign, offsetH, offsetM] = /([+-])(\d\d):(\d\d)/.exec(offsetStr) || [void 0, "+", 0, 0];
+        const scalar = sign === "-" ? 1 : -1;
+        date.setTime(date.getTime() + scalar * (Number(offsetH) * 60 * 60 * 1000 + Number(offsetM) * 60 * 1000));
+    }
+    return date;
+};
+const _parseRfc7231DateTime = (value) => {
+    if (value == null) {
+        return void 0;
+    }
+    if (typeof value !== "string") {
+        throw new TypeError("RFC7231 timestamps must be strings.");
+    }
+    let day;
+    let month;
+    let year;
+    let hour;
+    let minute;
+    let second;
+    let fraction;
+    let matches;
+    if ((matches = IMF_FIXDATE.exec(value))) {
+        [, day, month, year, hour, minute, second, fraction] = matches;
+    }
+    else if ((matches = RFC_850_DATE.exec(value))) {
+        [, day, month, year, hour, minute, second, fraction] = matches;
+        year = (Number(year) + 1900).toString();
+    }
+    else if ((matches = ASC_TIME.exec(value))) {
+        [, month, day, hour, minute, second, fraction, year] = matches;
+    }
+    if (year && second) {
+        const timestamp = Date.UTC(Number(year), months.indexOf(month), Number(day), Number(hour), Number(minute), Number(second), fraction ? Math.round(parseFloat(`0.${fraction}`) * 1000) : 0);
+        range(day, 1, 31);
+        range(hour, 0, 23);
+        range(minute, 0, 59);
+        range(second, 0, 60);
+        const date = new Date(timestamp);
+        date.setUTCFullYear(Number(year));
+        return date;
+    }
+    throw new TypeError(`Invalid RFC7231 date-time value ${value}.`);
+};
+function range(v, min, max) {
+    const _v = Number(v);
+    if (_v < min || _v > max) {
+        throw new Error(`Value ${_v} out of range [${min}, ${max}]`);
+    }
+}
+
+function splitEvery(value, delimiter, numDelimiters) {
+    if (!Number.isInteger(numDelimiters)) {
+        throw new Error("Invalid number of delimiters (" + numDelimiters + ") for splitEvery.");
+    }
+    const segments = value.split(delimiter);
+    const compoundSegments = [];
+    let currentSegment = "";
+    for (let i = 0; i < segments.length; i++) {
+        if (currentSegment === "") {
+            currentSegment = segments[i];
+        }
+        else {
+            currentSegment += delimiter + segments[i];
+        }
+        if ((i + 1) % numDelimiters === 0) {
+            compoundSegments.push(currentSegment);
+            currentSegment = "";
+        }
+    }
+    if (currentSegment !== "") {
+        compoundSegments.push(currentSegment);
+    }
+    return compoundSegments;
+}
+
+const splitHeader = (value) => {
+    const z = value.length;
+    const values = [];
+    let withinQuotes = false;
+    let prevChar = undefined;
+    let anchor = 0;
+    for (let i = 0; i < z; ++i) {
+        const char = value[i];
+        switch (char) {
+            case `"`:
+                if (prevChar !== "\\") {
+                    withinQuotes = !withinQuotes;
+                }
+                break;
+            case ",":
+                if (!withinQuotes) {
+                    values.push(value.slice(anchor, i));
+                    anchor = i + 1;
+                }
+                break;
+        }
+        prevChar = char;
+    }
+    values.push(value.slice(anchor));
+    return values.map((v) => {
+        v = v.trim();
+        const z = v.length;
+        if (z < 2) {
+            return v;
+        }
+        if (v[0] === `"` && v[z - 1] === `"`) {
+            v = v.slice(1, z - 1);
+        }
+        return v.replace(/\\"/g, '"');
+    });
+};
+
+const format = /^-?\d*(\.\d+)?$/;
+class NumericValue {
+    string;
+    type;
+    constructor(string, type) {
+        this.string = string;
+        this.type = type;
+        if (!format.test(string)) {
+            throw new Error(`@smithy/core/serde - NumericValue must only contain [0-9], at most one decimal point ".", and an optional negation prefix "-".`);
+        }
+    }
+    toString() {
+        return this.string;
+    }
+    static [Symbol.hasInstance](object) {
+        if (!object || typeof object !== "object") {
+            return false;
+        }
+        const _nv = object;
+        return NumericValue.prototype.isPrototypeOf(object) || (_nv.type === "bigDecimal" && format.test(_nv.string));
+    }
+}
+
+const SHORT_TO_HEX = {};
+const HEX_TO_SHORT = {};
+for (let i = 0; i < 256; i++) {
+    let encodedByte = i.toString(16).toLowerCase();
+    if (encodedByte.length === 1) {
+        encodedByte = `0${encodedByte}`;
+    }
+    SHORT_TO_HEX[i] = encodedByte;
+    HEX_TO_SHORT[encodedByte] = i;
+}
+function fromHex(encoded) {
+    if (encoded.length % 2 !== 0) {
+        throw new Error("Hex encoded strings must have an even number length");
+    }
+    const out = new Uint8Array(encoded.length / 2);
+    for (let i = 0; i < encoded.length; i += 2) {
+        const encodedByte = encoded.slice(i, i + 2).toLowerCase();
+        if (encodedByte in HEX_TO_SHORT) {
+            out[i / 2] = HEX_TO_SHORT[encodedByte];
+        }
+        else {
+            throw new Error(`Cannot decode unrecognized sequence ${encodedByte} as hexadecimal`);
+        }
+    }
+    return out;
+}
+function toHex(bytes) {
+    let out = "";
+    for (let i = 0; i < bytes.byteLength; i++) {
+        out += SHORT_TO_HEX[bytes[i]];
+    }
+    return out;
+}
+
+const calculateBodyLength = (body) => {
+    if (!body) {
+        return 0;
+    }
+    if (typeof body === "string") {
+        return Buffer.byteLength(body);
+    }
+    else if (typeof body.byteLength === "number") {
+        return body.byteLength;
+    }
+    else if (typeof body.size === "number") {
+        return body.size;
+    }
+    else if (typeof body.start === "number" && typeof body.end === "number") {
+        return body.end + 1 - body.start;
+    }
+    else if (body instanceof ReadStream) {
+        if (body.path != null) {
+            return lstatSync(body.path).size;
+        }
+        else if (typeof body.fd === "number") {
+            return fstatSync(body.fd).size;
+        }
+    }
+    throw new Error(`Body Length computation failed for ${body}`);
+};
+
+const toUint8Array = (data) => {
+    if (typeof data === "string") {
+        return fromUtf8$2(data);
+    }
+    if (ArrayBuffer.isView(data)) {
+        return new Uint8Array(data.buffer, data.byteOffset, data.byteLength / Uint8Array.BYTES_PER_ELEMENT);
+    }
+    return new Uint8Array(data);
+};
+
+class ProviderError extends Error {
+    name = "ProviderError";
+    tryNextLink;
+    constructor(message, options = true) {
+        let logger;
+        let tryNextLink = true;
+        if (typeof options === "boolean") {
+            logger = undefined;
+            tryNextLink = options;
+        }
+        else if (options != null && typeof options === "object") {
+            logger = options.logger;
+            tryNextLink = options.tryNextLink ?? true;
+        }
+        super(message);
+        this.tryNextLink = tryNextLink;
+        Object.setPrototypeOf(this, ProviderError.prototype);
+        logger?.debug?.(`@smithy/property-provider ${tryNextLink ? "->" : "(!)"} ${message}`);
+    }
+    static from(error, options = true) {
+        return Object.assign(new this(error.message, options), error);
+    }
+}
+
+class CredentialsProviderError extends ProviderError {
+    name = "CredentialsProviderError";
+    constructor(message, options = true) {
+        super(message, options);
+        Object.setPrototypeOf(this, CredentialsProviderError.prototype);
+    }
+}
+
+class TokenProviderError extends ProviderError {
+    name = "TokenProviderError";
+    constructor(message, options = true) {
+        super(message, options);
+        Object.setPrototypeOf(this, TokenProviderError.prototype);
+    }
+}
+
+const chain = (...providers) => async () => {
+    if (providers.length === 0) {
+        throw new ProviderError("No providers in chain");
+    }
+    let lastProviderError;
+    for (const provider of providers) {
+        try {
+            const credentials = await provider();
+            return credentials;
+        }
+        catch (err) {
+            lastProviderError = err;
+            if (err?.tryNextLink) {
+                continue;
+            }
+            throw err;
+        }
+    }
+    throw lastProviderError;
+};
+
+const fromValue = (staticValue) => () => Promise.resolve(staticValue);
+
+const memoize = (provider, isExpired, requiresRefresh) => {
+    let resolved;
+    let pending;
+    let hasResult;
+    let isConstant = false;
+    const coalesceProvider = async () => {
+        if (!pending) {
+            pending = provider();
+        }
+        try {
+            resolved = await pending;
+            hasResult = true;
+            isConstant = false;
+        }
+        finally {
+            pending = undefined;
+        }
+        return resolved;
+    };
+    {
+        return async (options) => {
+            if (!hasResult || options?.forceRefresh) {
+                resolved = await coalesceProvider();
+            }
+            return resolved;
+        };
+    }
+};
+
+const booleanSelector = (obj, key, type) => {
+    if (!(key in obj))
+        return undefined;
+    if (obj[key] === "true")
+        return true;
+    if (obj[key] === "false")
+        return false;
+    throw new Error(`Cannot load ${type} "${key}". Expected "true" or "false", got ${obj[key]}.`);
+};
+
+var SelectorType;
+(function (SelectorType) {
+    SelectorType["ENV"] = "env";
+    SelectorType["CONFIG"] = "shared config entry";
+})(SelectorType || (SelectorType = {}));
+
+const homeDirCache = {};
+const getHomeDirCacheKey = () => {
+    if (process && process.geteuid) {
+        return `${process.geteuid()}`;
+    }
+    return "DEFAULT";
+};
+const getHomeDir = () => {
+    const { HOME, USERPROFILE, HOMEPATH, HOMEDRIVE = `C:${sep}` } = process.env;
+    if (HOME)
+        return HOME;
+    if (USERPROFILE)
+        return USERPROFILE;
+    if (HOMEPATH)
+        return `${HOMEDRIVE}${HOMEPATH}`;
+    const homeDirCacheKey = getHomeDirCacheKey();
+    if (!homeDirCache[homeDirCacheKey])
+        homeDirCache[homeDirCacheKey] = homedir();
+    return homeDirCache[homeDirCacheKey];
+};
+
+const ENV_PROFILE = "AWS_PROFILE";
+const DEFAULT_PROFILE = "default";
+const getProfileName = (init) => init.profile || process.env[ENV_PROFILE] || DEFAULT_PROFILE;
+
+const getSSOTokenFilepath = (id) => {
+    const hasher = createHash("sha1");
+    const cacheName = hasher.update(id).digest("hex");
+    return join(getHomeDir(), ".aws", "sso", "cache", `${cacheName}.json`);
+};
+
+const tokenIntercept = {};
+const getSSOTokenFromFile = async (id) => {
+    if (tokenIntercept[id]) {
+        return tokenIntercept[id];
+    }
+    const ssoTokenFilepath = getSSOTokenFilepath(id);
+    const ssoTokenText = await readFile$1(ssoTokenFilepath, "utf8");
+    return JSON.parse(ssoTokenText);
+};
+
+const CONFIG_PREFIX_SEPARATOR = ".";
+
+const getConfigData = (data) => Object.entries(data)
+    .filter(([key]) => {
+    const indexOfSeparator = key.indexOf(CONFIG_PREFIX_SEPARATOR);
+    if (indexOfSeparator === -1) {
+        return false;
+    }
+    return Object.values(IniSectionType).includes(key.substring(0, indexOfSeparator));
+})
+    .reduce((acc, [key, value]) => {
+    const indexOfSeparator = key.indexOf(CONFIG_PREFIX_SEPARATOR);
+    const updatedKey = key.substring(0, indexOfSeparator) === IniSectionType.PROFILE ? key.substring(indexOfSeparator + 1) : key;
+    acc[updatedKey] = value;
+    return acc;
+}, {
+    ...(data.default && { default: data.default }),
+});
+
+const ENV_CONFIG_PATH = "AWS_CONFIG_FILE";
+const getConfigFilepath = () => process.env[ENV_CONFIG_PATH] || join(getHomeDir(), ".aws", "config");
+
+const ENV_CREDENTIALS_PATH = "AWS_SHARED_CREDENTIALS_FILE";
+const getCredentialsFilepath = () => process.env[ENV_CREDENTIALS_PATH] || join(getHomeDir(), ".aws", "credentials");
+
+const prefixKeyRegex = /^([\w-]+)\s(["'])?([\w-@\+\.%:/]+)\2$/;
+const profileNameBlockList = ["__proto__", "profile __proto__"];
+const parseIni = (iniData) => {
+    const map = {};
+    let currentSection;
+    let currentSubSection;
+    for (const iniLine of iniData.split(/\r?\n/)) {
+        const trimmedLine = iniLine.split(/(^|\s)[;#]/)[0].trim();
+        const isSection = trimmedLine[0] === "[" && trimmedLine[trimmedLine.length - 1] === "]";
+        if (isSection) {
+            currentSection = undefined;
+            currentSubSection = undefined;
+            const sectionName = trimmedLine.substring(1, trimmedLine.length - 1);
+            const matches = prefixKeyRegex.exec(sectionName);
+            if (matches) {
+                const [, prefix, , name] = matches;
+                if (Object.values(IniSectionType).includes(prefix)) {
+                    currentSection = [prefix, name].join(CONFIG_PREFIX_SEPARATOR);
+                }
+            }
+            else {
+                currentSection = sectionName;
+            }
+            if (profileNameBlockList.includes(sectionName)) {
+                throw new Error(`Found invalid profile name "${sectionName}"`);
+            }
+        }
+        else if (currentSection) {
+            const indexOfEqualsSign = trimmedLine.indexOf("=");
+            if (![0, -1].includes(indexOfEqualsSign)) {
+                const [name, value] = [
+                    trimmedLine.substring(0, indexOfEqualsSign).trim(),
+                    trimmedLine.substring(indexOfEqualsSign + 1).trim(),
+                ];
+                if (value === "") {
+                    currentSubSection = name;
+                }
+                else {
+                    if (currentSubSection && iniLine.trimStart() === iniLine) {
+                        currentSubSection = undefined;
+                    }
+                    map[currentSection] = map[currentSection] || {};
+                    const key = currentSubSection ? [currentSubSection, name].join(CONFIG_PREFIX_SEPARATOR) : name;
+                    map[currentSection][key] = value;
+                }
+            }
+        }
+    }
+    return map;
+};
+
+const filePromises = {};
+const fileIntercept = {};
+const readFile = (path, options) => {
+    if (fileIntercept[path] !== undefined) {
+        return fileIntercept[path];
+    }
+    if (!filePromises[path] || options?.ignoreCache) {
+        filePromises[path] = readFile$1(path, "utf8");
+    }
+    return filePromises[path];
+};
+
+const swallowError$1 = () => ({});
+const loadSharedConfigFiles = async (init = {}) => {
+    const { filepath = getCredentialsFilepath(), configFilepath = getConfigFilepath() } = init;
+    const homeDir = getHomeDir();
+    const relativeHomeDirPrefix = "~/";
+    let resolvedFilepath = filepath;
+    if (filepath.startsWith(relativeHomeDirPrefix)) {
+        resolvedFilepath = join(homeDir, filepath.slice(2));
+    }
+    let resolvedConfigFilepath = configFilepath;
+    if (configFilepath.startsWith(relativeHomeDirPrefix)) {
+        resolvedConfigFilepath = join(homeDir, configFilepath.slice(2));
+    }
+    const parsedFiles = await Promise.all([
+        readFile(resolvedConfigFilepath, {
+            ignoreCache: init.ignoreCache,
+        })
+            .then(parseIni)
+            .then(getConfigData)
+            .catch(swallowError$1),
+        readFile(resolvedFilepath, {
+            ignoreCache: init.ignoreCache,
+        })
+            .then(parseIni)
+            .catch(swallowError$1),
+    ]);
+    return {
+        configFile: parsedFiles[0],
+        credentialsFile: parsedFiles[1],
+    };
+};
+
+const getSsoSessionData = (data) => Object.entries(data)
+    .filter(([key]) => key.startsWith(IniSectionType.SSO_SESSION + CONFIG_PREFIX_SEPARATOR))
+    .reduce((acc, [key, value]) => ({ ...acc, [key.substring(key.indexOf(CONFIG_PREFIX_SEPARATOR) + 1)]: value }), {});
+
+const swallowError = () => ({});
+const loadSsoSessionData = async (init = {}) => readFile(init.configFilepath ?? getConfigFilepath())
+    .then(parseIni)
+    .then(getSsoSessionData)
+    .catch(swallowError);
+
+const mergeConfigFiles = (...files) => {
+    const merged = {};
+    for (const file of files) {
+        for (const [key, values] of Object.entries(file)) {
+            if (merged[key] !== undefined) {
+                Object.assign(merged[key], values);
+            }
+            else {
+                merged[key] = values;
+            }
+        }
+    }
+    return merged;
+};
+
+const parseKnownFiles = async (init) => {
+    const parsedFiles = await loadSharedConfigFiles(init);
+    return mergeConfigFiles(parsedFiles.configFile, parsedFiles.credentialsFile);
+};
+
+const externalDataInterceptor = {
+    getFileRecord() {
+        return fileIntercept;
+    },
+    interceptFile(path, contents) {
+        fileIntercept[path] = Promise.resolve(contents);
+    },
+    getTokenRecord() {
+        return tokenIntercept;
+    },
+    interceptToken(id, contents) {
+        tokenIntercept[id] = contents;
+    },
+};
+
+function getSelectorName(functionString) {
+    try {
+        const constants = new Set(Array.from(functionString.match(/([A-Z_]){3,}/g) ?? []));
+        constants.delete("CONFIG");
+        constants.delete("CONFIG_PREFIX_SEPARATOR");
+        constants.delete("ENV");
+        return [...constants].join(", ");
+    }
+    catch (e) {
+        return functionString;
+    }
+}
+
+const fromEnv$1 = (envVarSelector, options) => async () => {
+    try {
+        const config = envVarSelector(process.env, options);
+        if (config === undefined) {
+            throw new Error();
+        }
+        return config;
+    }
+    catch (e) {
+        throw new CredentialsProviderError(e.message || `Not found in ENV: ${getSelectorName(envVarSelector.toString())}`, { logger: options?.logger });
+    }
+};
+
+const fromSharedConfigFiles = (configSelector, { preferredFile = "config", ...init } = {}) => async () => {
+    const profile = getProfileName(init);
+    const { configFile, credentialsFile } = await loadSharedConfigFiles(init);
+    const profileFromCredentials = credentialsFile[profile] || {};
+    const profileFromConfig = configFile[profile] || {};
+    const mergedProfile = preferredFile === "config"
+        ? { ...profileFromCredentials, ...profileFromConfig }
+        : { ...profileFromConfig, ...profileFromCredentials };
+    try {
+        const cfgFile = preferredFile === "config" ? configFile : credentialsFile;
+        const configValue = configSelector(mergedProfile, cfgFile);
+        if (configValue === undefined) {
+            throw new Error();
+        }
+        return configValue;
+    }
+    catch (e) {
+        throw new CredentialsProviderError(e.message || `Not found in config files w/ profile [${profile}]: ${getSelectorName(configSelector.toString())}`, { logger: init.logger });
+    }
+};
+
+const isFunction = (func) => typeof func === "function";
+const fromStatic = (defaultValue) => isFunction(defaultValue) ? async () => await defaultValue() : fromValue(defaultValue);
+
+const loadConfig = ({ environmentVariableSelector, configFileSelector, default: defaultValue }, configuration = {}) => {
+    const { signingName, logger } = configuration;
+    const envOptions = { signingName, logger };
+    return memoize(chain(fromEnv$1(environmentVariableSelector, envOptions), fromSharedConfigFiles(configFileSelector, configuration), fromStatic(defaultValue)));
+};
+
+const ENV_USE_DUALSTACK_ENDPOINT = "AWS_USE_DUALSTACK_ENDPOINT";
+const CONFIG_USE_DUALSTACK_ENDPOINT = "use_dualstack_endpoint";
+const NODE_USE_DUALSTACK_ENDPOINT_CONFIG_OPTIONS = {
+    environmentVariableSelector: (env) => booleanSelector(env, ENV_USE_DUALSTACK_ENDPOINT, SelectorType.ENV),
+    configFileSelector: (profile) => booleanSelector(profile, CONFIG_USE_DUALSTACK_ENDPOINT, SelectorType.CONFIG),
+    default: false,
+};
+
+const ENV_USE_FIPS_ENDPOINT = "AWS_USE_FIPS_ENDPOINT";
+const CONFIG_USE_FIPS_ENDPOINT = "use_fips_endpoint";
+const NODE_USE_FIPS_ENDPOINT_CONFIG_OPTIONS = {
+    environmentVariableSelector: (env) => booleanSelector(env, ENV_USE_FIPS_ENDPOINT, SelectorType.ENV),
+    configFileSelector: (profile) => booleanSelector(profile, CONFIG_USE_FIPS_ENDPOINT, SelectorType.CONFIG),
+    default: false,
+};
+
+const REGION_ENV_NAME = "AWS_REGION";
+const REGION_INI_NAME = "region";
+const NODE_REGION_CONFIG_OPTIONS = {
+    environmentVariableSelector: (env) => env[REGION_ENV_NAME],
+    configFileSelector: (profile) => profile[REGION_INI_NAME],
+    default: () => {
+        throw new Error("Region is missing");
+    },
+};
+const NODE_REGION_CONFIG_FILE_OPTIONS = {
+    preferredFile: "credentials",
+};
+
+const validRegions = new Set();
+const checkRegion = (region, check = isValidHostLabel) => {
+    if (!validRegions.has(region) && !check(region)) {
+        if (region === "*") {
+            console.warn(`@smithy/config-resolver WARN - Please use the caller region instead of "*". See "sigv4a" in https://github.com/aws/aws-sdk-js-v3/blob/main/supplemental-docs/CLIENTS.md.`);
+        }
+        else {
+            throw new Error(`Region not accepted: region="${region}" is not a valid hostname component.`);
+        }
+    }
+    else {
+        validRegions.add(region);
+    }
+};
+
+const isFipsRegion = (region) => typeof region === "string" && (region.startsWith("fips-") || region.endsWith("-fips"));
+
+const getRealRegion = (region) => isFipsRegion(region)
+    ? ["fips-aws-global", "aws-fips"].includes(region)
+        ? "us-east-1"
+        : region.replace(/fips-(dkr-|prod-)?|-fips/, "")
+    : region;
+
+const resolveRegionConfig = (input) => {
+    const { region, useFipsEndpoint } = input;
+    if (!region) {
+        throw new Error("Region is missing");
+    }
+    return Object.assign(input, {
+        region: async () => {
+            const providedRegion = typeof region === "function" ? await region() : region;
+            const realRegion = getRealRegion(providedRegion);
+            checkRegion(realRegion);
+            return realRegion;
+        },
+        useFipsEndpoint: async () => {
+            const providedRegion = typeof region === "string" ? region : await region();
+            if (isFipsRegion(providedRegion)) {
+                return true;
+            }
+            return typeof useFipsEndpoint !== "function" ? Promise.resolve(!!useFipsEndpoint) : useFipsEndpoint();
+        },
+    });
+};
+
+const AWS_EXECUTION_ENV = "AWS_EXECUTION_ENV";
+const AWS_REGION_ENV = "AWS_REGION";
+const AWS_DEFAULT_REGION_ENV = "AWS_DEFAULT_REGION";
+const ENV_IMDS_DISABLED$1 = "AWS_EC2_METADATA_DISABLED";
+const DEFAULTS_MODE_OPTIONS = ["in-region", "cross-region", "mobile", "standard", "legacy"];
+const IMDS_REGION_PATH = "/latest/meta-data/placement/region";
+
+const AWS_DEFAULTS_MODE_ENV = "AWS_DEFAULTS_MODE";
+const AWS_DEFAULTS_MODE_CONFIG = "defaults_mode";
+const NODE_DEFAULTS_MODE_CONFIG_OPTIONS = {
+    environmentVariableSelector: (env) => {
+        return env[AWS_DEFAULTS_MODE_ENV];
+    },
+    configFileSelector: (profile) => {
+        return profile[AWS_DEFAULTS_MODE_CONFIG];
+    },
+    default: "legacy",
+};
+
+const resolveDefaultsModeConfig = ({ region = loadConfig(NODE_REGION_CONFIG_OPTIONS), defaultsMode = loadConfig(NODE_DEFAULTS_MODE_CONFIG_OPTIONS), } = {}) => memoize(async () => {
+    const mode = typeof defaultsMode === "function" ? await defaultsMode() : defaultsMode;
+    switch (mode?.toLowerCase()) {
+        case "auto":
+            return resolveNodeDefaultsModeAuto(region);
+        case "in-region":
+        case "cross-region":
+        case "mobile":
+        case "standard":
+        case "legacy":
+            return Promise.resolve(mode?.toLocaleLowerCase());
+        case undefined:
+            return Promise.resolve("legacy");
+        default:
+            throw new Error(`Invalid parameter for "defaultsMode", expect ${DEFAULTS_MODE_OPTIONS.join(", ")}, got ${mode}`);
+    }
+});
+const resolveNodeDefaultsModeAuto = async (clientRegion) => {
+    if (clientRegion) {
+        const resolvedRegion = typeof clientRegion === "function" ? await clientRegion() : clientRegion;
+        const inferredRegion = await inferPhysicalRegion();
+        if (!inferredRegion) {
+            return "standard";
+        }
+        if (resolvedRegion === inferredRegion) {
+            return "in-region";
+        }
+        else {
+            return "cross-region";
+        }
+    }
+    return "standard";
+};
+const inferPhysicalRegion = async () => {
+    if (process.env[AWS_EXECUTION_ENV] && (process.env[AWS_REGION_ENV] || process.env[AWS_DEFAULT_REGION_ENV])) {
+        return process.env[AWS_REGION_ENV] ?? process.env[AWS_DEFAULT_REGION_ENV];
+    }
+    if (!process.env[ENV_IMDS_DISABLED$1]) {
+        try {
+            const endpoint = await getImdsEndpoint();
+            return (await imdsHttpGet({ hostname: endpoint.hostname, path: IMDS_REGION_PATH })).toString();
+        }
+        catch (e) {
+        }
+    }
+};
+const getImdsEndpoint = async () => {
+    const envEndpoint = process.env.AWS_EC2_METADATA_SERVICE_ENDPOINT;
+    if (envEndpoint) {
+        const url = new URL(envEndpoint);
+        return { hostname: url.hostname, path: url.pathname };
+    }
+    const envMode = process.env.AWS_EC2_METADATA_SERVICE_ENDPOINT_MODE;
+    if (envMode === "IPv6") {
+        return { hostname: "fd00:ec2::254", path: "/" };
+    }
+    return { hostname: "169.254.169.254", path: "/" };
+};
+const imdsHttpGet = async ({ hostname, path }) => {
+    const { request } = await import('node:http');
+    return new Promise((resolve, reject) => {
+        const req = request({
+            method: "GET",
+            hostname: hostname.replace(/^\[(.+)]$/, "$1"),
+            path,
+            timeout: 1000,
+            signal: AbortSignal.timeout(1000),
+        });
+        req.on("error", (err) => {
+            reject(err);
+            req.destroy();
+        });
+        req.on("timeout", () => {
+            reject(new Error("TimeoutError from instance metadata service"));
+            req.destroy();
+        });
+        req.on("response", (res) => {
+            const { statusCode = 400 } = res;
+            if (statusCode < 200 || 300 <= statusCode) {
+                reject(Object.assign(new Error("Error response received from instance metadata service"), { statusCode }));
+                req.destroy();
+                return;
+            }
+            const chunks = [];
+            res.on("data", (chunk) => chunks.push(chunk));
+            res.on("end", () => {
+                resolve(Buffer.concat(chunks));
+                req.destroy();
+            });
+        });
+        req.end();
+    });
+};
+
+const ENV_ENDPOINT_URL = "AWS_ENDPOINT_URL";
+const CONFIG_ENDPOINT_URL = "endpoint_url";
+const getEndpointUrlConfig = (serviceId) => ({
+    environmentVariableSelector: (env) => {
+        const serviceSuffixParts = serviceId.split(" ").map((w) => w.toUpperCase());
+        const serviceEndpointUrl = env[[ENV_ENDPOINT_URL, ...serviceSuffixParts].join("_")];
+        if (serviceEndpointUrl)
+            return serviceEndpointUrl;
+        const endpointUrl = env[ENV_ENDPOINT_URL];
+        if (endpointUrl)
+            return endpointUrl;
+        return undefined;
+    },
+    configFileSelector: (profile, config) => {
+        if (config && profile.services) {
+            const servicesSection = config[["services", profile.services].join(CONFIG_PREFIX_SEPARATOR)];
+            if (servicesSection) {
+                const servicePrefixParts = serviceId.split(" ").map((w) => w.toLowerCase());
+                const endpointUrl = servicesSection[[servicePrefixParts.join("_"), CONFIG_ENDPOINT_URL].join(CONFIG_PREFIX_SEPARATOR)];
+                if (endpointUrl)
+                    return endpointUrl;
+            }
+        }
+        const endpointUrl = profile[CONFIG_ENDPOINT_URL];
+        if (endpointUrl)
+            return endpointUrl;
+        return undefined;
+    },
+    default: undefined,
+});
+
+const getEndpointFromConfig = async (serviceId) => loadConfig(getEndpointUrlConfig(serviceId ?? ""))();
+
+const resolveParamsForS3 = async (endpointParams) => {
+    const bucket = endpointParams?.Bucket || "";
+    if (typeof endpointParams.Bucket === "string") {
+        endpointParams.Bucket = bucket.replace(/#/g, encodeURIComponent("#")).replace(/\?/g, encodeURIComponent("?"));
+    }
+    if (isArnBucketName(bucket)) {
+        if (endpointParams.ForcePathStyle === true) {
+            throw new Error("Path-style addressing cannot be used with ARN buckets");
+        }
+    }
+    else if (!isDnsCompatibleBucketName(bucket) ||
+        (bucket.indexOf(".") !== -1 && !String(endpointParams.Endpoint).startsWith("http:")) ||
+        bucket.toLowerCase() !== bucket ||
+        bucket.length < 3) {
+        endpointParams.ForcePathStyle = true;
+    }
+    if (endpointParams.DisableMultiRegionAccessPoints) {
+        endpointParams.disableMultiRegionAccessPoints = true;
+        endpointParams.DisableMRAP = true;
+    }
+    return endpointParams;
+};
+const DOMAIN_PATTERN = /^[a-z0-9][a-z0-9\.\-]{1,61}[a-z0-9]$/;
+const IP_ADDRESS_PATTERN = /(\d+\.){3}\d+/;
+const DOTS_PATTERN = /\.\./;
+const isDnsCompatibleBucketName = (bucketName) => DOMAIN_PATTERN.test(bucketName) && !IP_ADDRESS_PATTERN.test(bucketName) && !DOTS_PATTERN.test(bucketName);
+const isArnBucketName = (bucketName) => {
+    const [arn, partition, service, , , bucket] = bucketName.split(":");
+    const isArn = arn === "arn" && bucketName.split(":").length >= 6;
+    const isValidArn = Boolean(isArn && partition && service && bucket);
+    if (isArn && !isValidArn) {
+        throw new Error(`Invalid ARN: ${bucketName} was an invalid ARN.`);
+    }
+    return isValidArn;
+};
+
+const createConfigValueProvider = (configKey, canonicalEndpointParamKey, config, isClientContextParam = false) => {
+    const configProvider = async () => {
+        let configValue;
+        if (isClientContextParam) {
+            const clientContextParams = config.clientContextParams;
+            const nestedValue = clientContextParams?.[configKey];
+            configValue = nestedValue ?? config[configKey] ?? config[canonicalEndpointParamKey];
+        }
+        else {
+            configValue = config[configKey] ?? config[canonicalEndpointParamKey];
+        }
+        if (typeof configValue === "function") {
+            return configValue();
+        }
+        return configValue;
+    };
+    if (configKey === "credentialScope" || canonicalEndpointParamKey === "CredentialScope") {
+        return async () => {
+            const credentials = typeof config.credentials === "function" ? await config.credentials() : config.credentials;
+            const configValue = credentials?.credentialScope ?? credentials?.CredentialScope;
+            return configValue;
+        };
+    }
+    if (configKey === "accountId" || canonicalEndpointParamKey === "AccountId") {
+        return async () => {
+            const credentials = typeof config.credentials === "function" ? await config.credentials() : config.credentials;
+            const configValue = credentials?.accountId ?? credentials?.AccountId;
+            return configValue;
+        };
+    }
+    if (configKey === "endpoint" || canonicalEndpointParamKey === "endpoint") {
+        return async () => {
+            if (config.isCustomEndpoint === false) {
+                return undefined;
+            }
+            const endpoint = await configProvider();
+            if (endpoint && typeof endpoint === "object") {
+                if ("url" in endpoint) {
+                    return endpoint.url.href;
+                }
+                if ("hostname" in endpoint) {
+                    const { protocol, hostname, port, path } = endpoint;
+                    return `${protocol}//${hostname}${port ? ":" + port : ""}${path}`;
+                }
+            }
+            return endpoint;
+        };
+    }
+    return configProvider;
+};
+
+function bindGetEndpointFromInstructions(getEndpointFromConfig) {
+    return async (commandInput, instructionsSupplier, clientConfig, context) => {
+        if (!clientConfig.isCustomEndpoint) {
+            let endpointFromConfig;
+            if (clientConfig.serviceConfiguredEndpoint) {
+                endpointFromConfig = await clientConfig.serviceConfiguredEndpoint();
+            }
+            else {
+                endpointFromConfig = await getEndpointFromConfig(clientConfig.serviceId);
+            }
+            if (endpointFromConfig) {
+                clientConfig.endpoint = () => Promise.resolve(toEndpointV1(endpointFromConfig));
+                clientConfig.isCustomEndpoint = true;
+            }
+        }
+        const endpointParams = await resolveParams(commandInput, instructionsSupplier, clientConfig);
+        if (typeof clientConfig.endpointProvider !== "function") {
+            throw new Error("config.endpointProvider is not set.");
+        }
+        const endpoint = clientConfig.endpointProvider(endpointParams, context);
+        if (clientConfig.isCustomEndpoint && clientConfig.endpoint) {
+            const customEndpoint = await clientConfig.endpoint();
+            if (customEndpoint?.headers) {
+                endpoint.headers ??= {};
+                for (const [name, value] of Object.entries(customEndpoint.headers)) {
+                    endpoint.headers[name] = Array.isArray(value) ? value : [value];
+                }
+            }
+        }
+        return endpoint;
+    };
+}
+const resolveParams = async (commandInput, instructionsSupplier, clientConfig) => {
+    const endpointParams = {};
+    const instructions = instructionsSupplier?.getEndpointParameterInstructions?.() || {};
+    for (const [name, instruction] of Object.entries(instructions)) {
+        switch (instruction.type) {
+            case "staticContextParams":
+                endpointParams[name] = instruction.value;
+                break;
+            case "contextParams":
+                endpointParams[name] = commandInput[instruction.name];
+                break;
+            case "clientContextParams":
+            case "builtInParams":
+                endpointParams[name] = await createConfigValueProvider(instruction.name, name, clientConfig, instruction.type !== "builtInParams")();
+                break;
+            case "operationContextParams":
+                endpointParams[name] = instruction.get(commandInput);
+                break;
+            default:
+                throw new Error("Unrecognized endpoint parameter instruction: " + JSON.stringify(instruction));
+        }
+    }
+    if (Object.keys(instructions).length === 0) {
+        Object.assign(endpointParams, clientConfig);
+    }
+    if (String(clientConfig.serviceId).toLowerCase() === "s3") {
+        await resolveParamsForS3(endpointParams);
+    }
+    return endpointParams;
+};
+
+function setFeature$1(context, feature, value) {
+    if (!context.__smithy_context) {
+        context.__smithy_context = { features: {} };
+    }
+    else if (!context.__smithy_context.features) {
+        context.__smithy_context.features = {};
+    }
+    context.__smithy_context.features[feature] = value;
+}
+function bindEndpointMiddleware(getEndpointFromConfig) {
+    const getEndpointFromInstructions = bindGetEndpointFromInstructions(getEndpointFromConfig);
+    return ({ config, instructions, }) => {
+        return (next, context) => async (args) => {
+            if (config.isCustomEndpoint) {
+                setFeature$1(context, "ENDPOINT_OVERRIDE", "N");
+            }
+            const endpoint = await getEndpointFromInstructions(args.input, {
+                getEndpointParameterInstructions() {
+                    return instructions;
+                },
+            }, { ...config }, context);
+            context.endpointV2 = endpoint;
+            context.authSchemes = endpoint.properties?.authSchemes;
+            const authScheme = context.authSchemes?.[0];
+            if (authScheme) {
+                context["signing_region"] = authScheme.signingRegion;
+                context["signing_service"] = authScheme.signingName;
+                const smithyContext = getSmithyContext(context);
+                const httpAuthOption = smithyContext?.selectedHttpAuthScheme?.httpAuthOption;
+                if (httpAuthOption) {
+                    httpAuthOption.signingProperties = Object.assign(httpAuthOption.signingProperties || {}, {
+                        signing_region: authScheme.signingRegion,
+                        signingRegion: authScheme.signingRegion,
+                        signing_service: authScheme.signingName,
+                        signingName: authScheme.signingName,
+                        signingRegionSet: authScheme.signingRegionSet,
+                    }, authScheme.properties);
+                }
+            }
+            return next({
+                ...args,
+            });
+        };
+    };
+}
+
+const serializerMiddlewareOption = {
+    name: "serializerMiddleware"};
+const endpointMiddlewareOptions = {
+    step: "serialize",
+    tags: ["ENDPOINT_PARAMETERS", "ENDPOINT_V2", "ENDPOINT"],
+    name: "endpointV2Middleware",
+    override: true,
+    relation: "before",
+    toMiddleware: serializerMiddlewareOption.name,
+};
+function bindGetEndpointPlugin(getEndpointFromConfig) {
+    const endpointMiddleware = bindEndpointMiddleware(getEndpointFromConfig);
+    return (config, instructions) => ({
+        applyToStack: (clientStack) => {
+            clientStack.addRelativeTo(endpointMiddleware({
+                config,
+                instructions,
+            }), endpointMiddlewareOptions);
+        },
+    });
+}
+
+function bindResolveEndpointConfig(getEndpointFromConfig) {
+    return (input) => {
+        const tls = input.tls ?? true;
+        const { endpoint, useDualstackEndpoint, useFipsEndpoint } = input;
+        const customEndpointProvider = endpoint != null ? async () => toEndpointV1(await normalizeProvider$1(endpoint)()) : undefined;
+        const isCustomEndpoint = !!endpoint;
+        const resolvedConfig = Object.assign(input, {
+            endpoint: customEndpointProvider,
+            tls,
+            isCustomEndpoint,
+            useDualstackEndpoint: normalizeProvider$1(useDualstackEndpoint ?? false),
+            useFipsEndpoint: normalizeProvider$1(useFipsEndpoint ?? false),
+        });
+        let configuredEndpointPromise = undefined;
+        resolvedConfig.serviceConfiguredEndpoint = async () => {
+            if (input.serviceId && !configuredEndpointPromise) {
+                configuredEndpointPromise = getEndpointFromConfig(input.serviceId);
+            }
+            return configuredEndpointPromise;
+        };
+        return resolvedConfig;
+    };
+}
+
+class BinaryDecisionDiagram {
+    nodes;
+    root;
+    conditions;
+    results;
+    constructor(bdd, root, conditions, results) {
+        this.nodes = bdd;
+        this.root = root;
+        this.conditions = conditions;
+        this.results = results;
+    }
+    static from(bdd, root, conditions, results) {
+        return new BinaryDecisionDiagram(bdd, root, conditions, results);
+    }
+}
+
+let EndpointCache$1 = class EndpointCache {
+    capacity;
+    data = new Map();
+    parameters = [];
+    constructor({ size, params }) {
+        this.capacity = size ?? 50;
+        if (params) {
+            this.parameters = params;
+        }
+    }
+    get(endpointParams, resolver) {
+        const key = this.hash(endpointParams);
+        if (key === false) {
+            return resolver();
+        }
+        if (!this.data.has(key)) {
+            if (this.data.size > this.capacity + 10) {
+                const keys = this.data.keys();
+                let i = 0;
+                while (true) {
+                    const { value, done } = keys.next();
+                    this.data.delete(value);
+                    if (done || ++i > 10) {
+                        break;
+                    }
+                }
+            }
+            this.data.set(key, resolver());
+        }
+        return this.data.get(key);
+    }
+    size() {
+        return this.data.size;
+    }
+    hash(endpointParams) {
+        let buffer = "";
+        const { parameters } = this;
+        if (parameters.length === 0) {
+            return false;
+        }
+        for (const param of parameters) {
+            const val = String(endpointParams[param] ?? "");
+            if (val.includes("|;")) {
+                return false;
+            }
+            buffer += val + "|;";
+        }
+        return buffer;
+    }
+};
+
+class EndpointError extends Error {
+    constructor(message) {
+        super(message);
+        this.name = "EndpointError";
+    }
+}
+
+const debugId = "endpoints";
+
+function toDebugString(input) {
+    if (typeof input !== "object" || input == null) {
+        return input;
+    }
+    if ("ref" in input) {
+        return `$${toDebugString(input.ref)}`;
+    }
+    if ("fn" in input) {
+        return `${input.fn}(${(input.argv || []).map(toDebugString).join(", ")})`;
+    }
+    return JSON.stringify(input, null, 2);
+}
+
+const customEndpointFunctions = {};
+
+const booleanEquals = (value1, value2) => value1 === value2;
+
+function coalesce(...args) {
+    for (const arg of args) {
+        if (arg != null) {
+            return arg;
+        }
+    }
+    return undefined;
+}
+
+const getAttrPathList = (path) => {
+    const parts = path.split(".");
+    const pathList = [];
+    for (const part of parts) {
+        const squareBracketIndex = part.indexOf("[");
+        if (squareBracketIndex !== -1) {
+            if (part.indexOf("]") !== part.length - 1) {
+                throw new EndpointError(`Path: '${path}' does not end with ']'`);
+            }
+            const arrayIndex = part.slice(squareBracketIndex + 1, -1);
+            if (Number.isNaN(parseInt(arrayIndex))) {
+                throw new EndpointError(`Invalid array index: '${arrayIndex}' in path: '${path}'`);
+            }
+            if (squareBracketIndex !== 0) {
+                pathList.push(part.slice(0, squareBracketIndex));
+            }
+            pathList.push(arrayIndex);
+        }
+        else {
+            pathList.push(part);
+        }
+    }
+    return pathList;
+};
+
+const getAttr = (value, path) => getAttrPathList(path).reduce((acc, index) => {
+    if (typeof acc !== "object") {
+        throw new EndpointError(`Index '${index}' in '${path}' not found in '${JSON.stringify(value)}'`);
+    }
+    else if (Array.isArray(acc)) {
+        const i = parseInt(index);
+        return acc[i < 0 ? acc.length + i : i];
+    }
+    return acc[index];
+}, value);
+
+const isSet = (value) => value != null;
+
+function ite(condition, trueValue, falseValue) {
+    return condition ? trueValue : falseValue;
+}
+
+const not = (value) => !value;
+
+const IP_V4_REGEX = new RegExp(`^(?:25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]\\d|\\d)(?:\\.(?:25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]\\d|\\d)){3}$`);
+const isIpAddress = (value) => IP_V4_REGEX.test(value) || (value.startsWith("[") && value.endsWith("]"));
+
+const DEFAULT_PORTS = {
+    [EndpointURLScheme.HTTP]: 80,
+    [EndpointURLScheme.HTTPS]: 443,
+};
+const parseURL = (value) => {
+    const whatwgURL = (() => {
+        try {
+            if (value instanceof URL) {
+                return value;
+            }
+            if (typeof value === "object" && "hostname" in value) {
+                const { hostname, port, protocol = "", path = "", query = {} } = value;
+                const url = new URL(`${protocol}//${hostname}${port ? `:${port}` : ""}${path}`);
+                url.search = Object.entries(query)
+                    .map(([k, v]) => `${k}=${v}`)
+                    .join("&");
+                return url;
+            }
+            return new URL(value);
+        }
+        catch (error) {
+            return null;
+        }
+    })();
+    if (!whatwgURL) {
+        console.error(`Unable to parse ${JSON.stringify(value)} as a whatwg URL.`);
+        return null;
+    }
+    const urlString = whatwgURL.href;
+    const { host, hostname, pathname, protocol, search } = whatwgURL;
+    if (search) {
+        return null;
+    }
+    const scheme = protocol.slice(0, -1);
+    if (!Object.values(EndpointURLScheme).includes(scheme)) {
+        return null;
+    }
+    const isIp = isIpAddress(hostname);
+    const inputContainsDefaultPort = urlString.includes(`${host}:${DEFAULT_PORTS[scheme]}`) ||
+        (typeof value === "string" && value.includes(`${host}:${DEFAULT_PORTS[scheme]}`));
+    const authority = `${host}${inputContainsDefaultPort ? `:${DEFAULT_PORTS[scheme]}` : ``}`;
+    return {
+        scheme,
+        authority,
+        path: pathname,
+        normalizedPath: pathname.endsWith("/") ? pathname : `${pathname}/`,
+        isIp,
+    };
+};
+
+function split(value, delimiter, limit) {
+    if (limit === 1) {
+        return [value];
+    }
+    if (value === "") {
+        return [""];
+    }
+    const parts = value.split(delimiter);
+    if (limit === 0) {
+        return parts;
+    }
+    return parts.slice(0, limit - 1).concat(parts.slice(1).join(delimiter));
+}
+
+const stringEquals = (value1, value2) => value1 === value2;
+
+const substring = (input, start, stop, reverse) => {
+    if (input == null || start >= stop || input.length < stop || /[^\u0000-\u007f]/.test(input)) {
+        return null;
+    }
+    if (!reverse) {
+        return input.substring(start, stop);
+    }
+    return input.substring(input.length - stop, input.length - start);
+};
+
+const uriEncode = (value) => encodeURIComponent(value).replace(/[!*'()]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
+
+const endpointFunctions = {
+    booleanEquals,
+    coalesce,
+    getAttr,
+    isSet,
+    isValidHostLabel,
+    ite,
+    not,
+    parseURL,
+    split,
+    stringEquals,
+    substring,
+    uriEncode,
+};
+
+const evaluateTemplate = (template, options) => {
+    const evaluatedTemplateArr = [];
+    const { referenceRecord, endpointParams } = options;
+    let currentIndex = 0;
+    while (currentIndex < template.length) {
+        const openingBraceIndex = template.indexOf("{", currentIndex);
+        if (openingBraceIndex === -1) {
+            evaluatedTemplateArr.push(template.slice(currentIndex));
+            break;
+        }
+        evaluatedTemplateArr.push(template.slice(currentIndex, openingBraceIndex));
+        const closingBraceIndex = template.indexOf("}", openingBraceIndex);
+        if (closingBraceIndex === -1) {
+            evaluatedTemplateArr.push(template.slice(openingBraceIndex));
+            break;
+        }
+        if (template[openingBraceIndex + 1] === "{" && template[closingBraceIndex + 1] === "}") {
+            evaluatedTemplateArr.push(template.slice(openingBraceIndex + 1, closingBraceIndex));
+            currentIndex = closingBraceIndex + 2;
+        }
+        const parameterName = template.substring(openingBraceIndex + 1, closingBraceIndex);
+        if (parameterName.includes("#")) {
+            const [refName, attrName] = parameterName.split("#");
+            evaluatedTemplateArr.push(getAttr((referenceRecord[refName] ?? endpointParams[refName]), attrName));
+        }
+        else {
+            evaluatedTemplateArr.push((referenceRecord[parameterName] ?? endpointParams[parameterName]));
+        }
+        currentIndex = closingBraceIndex + 1;
+    }
+    return evaluatedTemplateArr.join("");
+};
+
+const getReferenceValue = ({ ref }, options) => {
+    return options.referenceRecord[ref] ?? options.endpointParams[ref];
+};
+
+const evaluateExpression = (obj, keyName, options) => {
+    if (typeof obj === "string") {
+        return evaluateTemplate(obj, options);
+    }
+    else if (obj["fn"]) {
+        return group$1.callFunction(obj, options);
+    }
+    else if (obj["ref"]) {
+        return getReferenceValue(obj, options);
+    }
+    throw new EndpointError(`'${keyName}': ${String(obj)} is not a string, function or reference.`);
+};
+const callFunction = ({ fn, argv }, options) => {
+    const evaluatedArgs = Array(argv.length);
+    for (let i = 0; i < evaluatedArgs.length; ++i) {
+        const arg = argv[i];
+        if (typeof arg === "boolean" || typeof arg === "number") {
+            evaluatedArgs[i] = arg;
+        }
+        else {
+            evaluatedArgs[i] = group$1.evaluateExpression(arg, "arg", options);
+        }
+    }
+    const namespaceSeparatorIndex = fn.indexOf(".");
+    if (namespaceSeparatorIndex !== -1) {
+        const namespaceFunctions = customEndpointFunctions[fn.slice(0, namespaceSeparatorIndex)];
+        const customFunction = namespaceFunctions?.[fn.slice(namespaceSeparatorIndex + 1)];
+        if (typeof customFunction === "function") {
+            return customFunction(...evaluatedArgs);
+        }
+    }
+    const callable = endpointFunctions[fn];
+    if (typeof callable === "function") {
+        return callable(...evaluatedArgs);
+    }
+    throw new Error(`function ${fn} not loaded in endpointFunctions.`);
+};
+const group$1 = {
+    evaluateExpression,
+    callFunction,
+};
+
+const evaluateCondition = (condition, options) => {
+    const { assign } = condition;
+    if (assign && assign in options.referenceRecord) {
+        throw new EndpointError(`'${assign}' is already defined in Reference Record.`);
+    }
+    const value = callFunction(condition, options);
+    options.logger?.debug?.(`${debugId} evaluateCondition: ${toDebugString(condition)} = ${toDebugString(value)}`);
+    const result = value === "" ? true : !!value;
+    if (assign != null) {
+        return { result, toAssign: { name: assign, value } };
+    }
+    return { result };
+};
+
+const getEndpointHeaders = (headers, options) => Object.entries(headers ?? {}).reduce((acc, [headerKey, headerVal]) => {
+    acc[headerKey] = headerVal.map((headerValEntry) => {
+        const processedExpr = evaluateExpression(headerValEntry, "Header value entry", options);
+        if (typeof processedExpr !== "string") {
+            throw new EndpointError(`Header '${headerKey}' value '${processedExpr}' is not a string`);
+        }
+        return processedExpr;
+    });
+    return acc;
+}, {});
+
+const getEndpointProperties = (properties, options) => Object.entries(properties).reduce((acc, [propertyKey, propertyVal]) => {
+    acc[propertyKey] = group.getEndpointProperty(propertyVal, options);
+    return acc;
+}, {});
+const getEndpointProperty = (property, options) => {
+    if (Array.isArray(property)) {
+        return property.map((propertyEntry) => getEndpointProperty(propertyEntry, options));
+    }
+    switch (typeof property) {
+        case "string":
+            return evaluateTemplate(property, options);
+        case "object":
+            if (property === null) {
+                throw new EndpointError(`Unexpected endpoint property: ${property}`);
+            }
+            return group.getEndpointProperties(property, options);
+        case "boolean":
+            return property;
+        default:
+            throw new EndpointError(`Unexpected endpoint property type: ${typeof property}`);
+    }
+};
+const group = {
+    getEndpointProperty,
+    getEndpointProperties,
+};
+
+const getEndpointUrl = (endpointUrl, options) => {
+    const expression = evaluateExpression(endpointUrl, "Endpoint URL", options);
+    if (typeof expression === "string") {
+        try {
+            return new URL(expression);
+        }
+        catch (error) {
+            console.error(`Failed to construct URL with ${expression}`, error);
+            throw error;
+        }
+    }
+    throw new EndpointError(`Endpoint URL must be a string, got ${typeof expression}`);
+};
+
+const RESULT = 100_000_000;
+const decideEndpoint = (bdd, options) => {
+    const { nodes, root, results, conditions } = bdd;
+    let ref = root;
+    const referenceRecord = {};
+    const closure = {
+        referenceRecord,
+        endpointParams: options.endpointParams,
+        logger: options.logger,
+    };
+    while (ref !== 1 && ref !== -1 && ref < RESULT) {
+        const node_i = 3 * (Math.abs(ref) - 1);
+        const [condition_i, highRef, lowRef] = [nodes[node_i], nodes[node_i + 1], nodes[node_i + 2]];
+        const [fn, argv, assign] = conditions[condition_i];
+        const evaluation = evaluateCondition({ fn, assign, argv }, closure);
+        if (evaluation.toAssign) {
+            const { name, value } = evaluation.toAssign;
+            referenceRecord[name] = value;
+        }
+        ref = ref >= 0 === evaluation.result ? highRef : lowRef;
+    }
+    if (ref >= RESULT) {
+        const result = results[ref - RESULT];
+        if (result[0] === -1) {
+            const [, errorExpression] = result;
+            throw new EndpointError(evaluateExpression(errorExpression, "Error", closure));
+        }
+        const [url, properties, headers] = result;
+        return {
+            url: getEndpointUrl(url, closure),
+            properties: getEndpointProperties(properties, closure),
+            headers: getEndpointHeaders(headers ?? {}, closure),
+        };
+    }
+    throw new EndpointError(`No matching endpoint.`);
+};
+
+const resolveEndpointConfig = bindResolveEndpointConfig(getEndpointFromConfig);
+const getEndpointPlugin = bindGetEndpointPlugin(getEndpointFromConfig);
+
+class Hash {
+    algorithmIdentifier;
+    secret;
+    hash;
+    constructor(algorithmIdentifier, secret) {
+        this.algorithmIdentifier = algorithmIdentifier;
+        this.secret = secret;
+        this.reset();
+    }
+    update(toHash, encoding) {
+        this.hash.update(toUint8Array(castSourceData(toHash, encoding)));
+    }
+    digest() {
+        return Promise.resolve(this.hash.digest());
+    }
+    reset() {
+        this.hash = this.secret
+            ? createHmac(this.algorithmIdentifier, castSourceData(this.secret))
+            : createHash(this.algorithmIdentifier);
+    }
+}
+function castSourceData(toCast, encoding) {
+    if (Buffer.isBuffer(toCast)) {
+        return toCast;
+    }
+    if (typeof toCast === "string") {
+        return fromString$1(toCast, encoding);
+    }
+    if (ArrayBuffer.isView(toCast)) {
+        return fromArrayBuffer(toCast.buffer, toCast.byteOffset, toCast.byteLength);
+    }
+    return fromArrayBuffer(toCast);
+}
+
+const isReadableStream = (stream) => typeof ReadableStream === "function" &&
+    (stream?.constructor?.name === ReadableStream.name || stream instanceof ReadableStream);
+
+const fromUtf8$1 = (input) => new TextEncoder().encode(input);
+
+const chars = `ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/`;
+const alphabetByEncoding = Object.entries(chars).reduce((acc, [i, c]) => {
+    acc[c] = Number(i);
+    return acc;
+}, {});
+const alphabetByValue = chars.split("");
+const bitsPerLetter = 6;
+const bitsPerByte = 8;
+const maxLetterValue = 0b111111;
+
+function toBase64(_input) {
+    let input;
+    if (typeof _input === "string") {
+        input = fromUtf8$1(_input);
+    }
+    else {
+        input = _input;
+    }
+    const isArrayLike = typeof input === "object" && typeof input.length === "number";
+    const isUint8Array = typeof input === "object" &&
+        typeof input.byteOffset === "number" &&
+        typeof input.byteLength === "number";
+    if (!isArrayLike && !isUint8Array) {
+        throw new Error("@smithy/util-base64: toBase64 encoder function only accepts string | Uint8Array.");
+    }
+    let str = "";
+    for (let i = 0; i < input.length; i += 3) {
+        let bits = 0;
+        let bitLength = 0;
+        for (let j = i, limit = Math.min(i + 3, input.length); j < limit; j++) {
+            bits |= input[j] << ((limit - j - 1) * bitsPerByte);
+            bitLength += bitsPerByte;
+        }
+        const bitClusterCount = Math.ceil(bitLength / bitsPerLetter);
+        bits <<= bitClusterCount * bitsPerLetter - bitLength;
+        for (let k = 1; k <= bitClusterCount; k++) {
+            const offset = (bitClusterCount - k) * bitsPerLetter;
+            str += alphabetByValue[(bits & (maxLetterValue << offset)) >> offset];
+        }
+        str += "==".slice(0, 4 - bitClusterCount);
+    }
+    return str;
+}
+
+const toUtf8 = (input) => {
+    if (typeof input === "string") {
+        return input;
+    }
+    if (typeof input !== "object" || typeof input.byteOffset !== "number" || typeof input.byteLength !== "number") {
+        throw new Error("@smithy/util-utf8: toUtf8 encoder function only accepts string | Uint8Array.");
+    }
+    return new TextDecoder("utf-8").decode(input);
+};
+
+const fromBase64 = (input) => {
+    let totalByteLength = (input.length / 4) * 3;
+    if (input.slice(-2) === "==") {
+        totalByteLength -= 2;
+    }
+    else if (input.slice(-1) === "=") {
+        totalByteLength--;
+    }
+    const out = new ArrayBuffer(totalByteLength);
+    const dataView = new DataView(out);
+    for (let i = 0; i < input.length; i += 4) {
+        let bits = 0;
+        let bitLength = 0;
+        for (let j = i, limit = i + 3; j <= limit; j++) {
+            if (input[j] !== "=") {
+                if (!(input[j] in alphabetByEncoding)) {
+                    throw new TypeError(`Invalid character ${input[j]} in base64 string.`);
+                }
+                bits |= alphabetByEncoding[input[j]] << ((limit - j) * bitsPerLetter);
+                bitLength += bitsPerLetter;
+            }
+            else {
+                bits >>= bitsPerLetter;
+            }
+        }
+        const chunkOffset = (i / 4) * 3;
+        bits >>= bitLength % bitsPerByte;
+        const byteLength = Math.floor(bitLength / bitsPerByte);
+        for (let k = 0; k < byteLength; k++) {
+            const offset = (byteLength - k - 1) * bitsPerByte;
+            dataView.setUint8(chunkOffset + k, (bits & (255 << offset)) >> offset);
+        }
+    }
+    return new Uint8Array(out);
+};
+
+const streamCollector$2 = async (stream) => {
+    if ((typeof Blob === "function" && stream instanceof Blob) || stream.constructor?.name === "Blob") {
+        if (Blob.prototype.arrayBuffer !== undefined) {
+            return new Uint8Array(await stream.arrayBuffer());
+        }
+        return collectBlob(stream);
+    }
+    return collectStream(stream);
+};
+async function collectBlob(blob) {
+    const base64 = await readToBase64(blob);
+    const arrayBuffer = fromBase64(base64);
+    return new Uint8Array(arrayBuffer);
+}
+async function collectStream(stream) {
+    const chunks = [];
+    const reader = stream.getReader();
+    let isDone = false;
+    let length = 0;
+    while (!isDone) {
+        const { done, value } = await reader.read();
+        if (value) {
+            chunks.push(value);
+            length += value.length;
+        }
+        isDone = done;
+    }
+    const collected = new Uint8Array(length);
+    let offset = 0;
+    for (const chunk of chunks) {
+        collected.set(chunk, offset);
+        offset += chunk.length;
+    }
+    return collected;
+}
+function readToBase64(blob) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            if (reader.readyState !== 2) {
+                return reject(new Error("Reader aborted too early"));
+            }
+            const result = (reader.result ?? "");
+            const commaIndex = result.indexOf(",");
+            const dataOffset = commaIndex > -1 ? commaIndex + 1 : result.length;
+            resolve(result.substring(dataOffset));
+        };
+        reader.onabort = () => reject(new Error("Read aborted"));
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(blob);
+    });
+}
+
+const ERR_MSG_STREAM_HAS_BEEN_TRANSFORMED$1 = "The stream has already been transformed.";
+const sdkStreamMixin$1 = (stream) => {
+    if (!isBlobInstance(stream) && !isReadableStream(stream)) {
+        const name = stream?.__proto__?.constructor?.name || stream;
+        throw new Error(`Unexpected stream implementation, expect Blob or ReadableStream, got ${name}`);
+    }
+    let transformed = false;
+    const transformToByteArray = async () => {
+        if (transformed) {
+            throw new Error(ERR_MSG_STREAM_HAS_BEEN_TRANSFORMED$1);
+        }
+        transformed = true;
+        return await streamCollector$2(stream);
+    };
+    const blobToWebStream = (blob) => {
+        if (typeof blob.stream !== "function") {
+            throw new Error("Cannot transform payload Blob to web stream. Please make sure the Blob.stream() is polyfilled.\n" +
+                "If you are using React Native, this API is not yet supported, see: https://react-native.canny.io/feature-requests/p/fetch-streaming-body");
+        }
+        return blob.stream();
+    };
+    return Object.assign(stream, {
+        transformToByteArray: transformToByteArray,
+        transformToString: async (encoding) => {
+            const buf = await transformToByteArray();
+            if (encoding === "base64") {
+                return toBase64(buf);
+            }
+            else if (encoding === "hex") {
+                return toHex(buf);
+            }
+            else if (encoding === undefined || encoding === "utf8" || encoding === "utf-8") {
+                return toUtf8(buf);
+            }
+            else if (typeof TextDecoder === "function") {
+                return new TextDecoder(encoding).decode(buf);
+            }
+            else {
+                throw new Error("TextDecoder is not available, please make sure polyfill is provided.");
+            }
+        },
+        transformToWebStream: () => {
+            if (transformed) {
+                throw new Error(ERR_MSG_STREAM_HAS_BEEN_TRANSFORMED$1);
+            }
+            transformed = true;
+            if (isBlobInstance(stream)) {
+                return blobToWebStream(stream);
+            }
+            else if (isReadableStream(stream)) {
+                return stream;
+            }
+            else {
+                throw new Error(`Cannot transform payload to web stream, got ${stream}`);
+            }
+        },
+    });
+};
+const isBlobInstance = (stream) => typeof Blob === "function" && stream instanceof Blob;
+
+let Collector$1 = class Collector extends Writable {
+    bufferedBytes = [];
+    _write(chunk, encoding, callback) {
+        this.bufferedBytes.push(chunk);
+        callback();
+    }
+};
+const isReadableStreamInstance$1 = (stream) => typeof ReadableStream === "function" && stream instanceof ReadableStream;
+async function collectReadableStream$1(stream) {
+    const chunks = [];
+    const reader = stream.getReader();
+    let isDone = false;
+    let length = 0;
+    while (!isDone) {
+        const { done, value } = await reader.read();
+        if (value) {
+            chunks.push(value);
+            length += value.length;
+        }
+        isDone = done;
+    }
+    const collected = new Uint8Array(length);
+    let offset = 0;
+    for (const chunk of chunks) {
+        collected.set(chunk, offset);
+        offset += chunk.length;
+    }
+    return collected;
+}
+const streamCollector$1 = (stream) => {
+    if (isReadableStreamInstance$1(stream)) {
+        return collectReadableStream$1(stream);
+    }
+    return new Promise((resolve, reject) => {
+        const collector = new Collector$1();
+        stream.pipe(collector);
+        stream.on("error", (err) => {
+            collector.end();
+            reject(err);
+        });
+        collector.on("error", reject);
+        collector.on("finish", function () {
+            const bytes = new Uint8Array(Buffer.concat(this.bufferedBytes));
+            resolve(bytes);
+        });
+    });
+};
+
+const ERR_MSG_STREAM_HAS_BEEN_TRANSFORMED = "The stream has already been transformed.";
+const sdkStreamMixin = (stream) => {
+    if (!(stream instanceof Readable)) {
+        try {
+            return sdkStreamMixin$1(stream);
+        }
+        catch (e) {
+            const name = stream?.__proto__?.constructor?.name || stream;
+            throw new Error(`Unexpected stream implementation, expect Stream.Readable instance, got ${name}`);
+        }
+    }
+    let transformed = false;
+    const transformToByteArray = async () => {
+        if (transformed) {
+            throw new Error(ERR_MSG_STREAM_HAS_BEEN_TRANSFORMED);
+        }
+        transformed = true;
+        return await streamCollector$1(stream);
+    };
+    return Object.assign(stream, {
+        transformToByteArray,
+        transformToString: async (encoding) => {
+            const buf = await transformToByteArray();
+            if (encoding === undefined || Buffer.isEncoding(encoding)) {
+                return fromArrayBuffer(buf.buffer, buf.byteOffset, buf.byteLength).toString(encoding);
+            }
+            else {
+                const decoder = new TextDecoder(encoding);
+                return decoder.decode(buf);
+            }
+        },
+        transformToWebStream: () => {
+            if (transformed) {
+                throw new Error(ERR_MSG_STREAM_HAS_BEEN_TRANSFORMED);
+            }
+            if (stream.readableFlowing !== null) {
+                throw new Error("The stream has been consumed by other callbacks.");
+            }
+            if (typeof Readable.toWeb !== "function") {
+                throw new Error("Readable.toWeb() is not supported. Please ensure a polyfill is available.");
+            }
+            transformed = true;
+            return Readable.toWeb(stream);
+        },
+    });
+};
+
+class Uint8ArrayBlobAdapter extends bindUint8ArrayBlobAdapter(toUtf8$1, fromUtf8$2, toBase64$1, fromBase64$1) {
+}
+const _getRandomValues = getRandomValues;
+const v4 = bindV4(_getRandomValues);
+const generateIdempotencyToken = v4;
+
+const collectBody = async (streamBody = new Uint8Array(), context) => {
+    if (streamBody instanceof Uint8Array) {
+        return Uint8ArrayBlobAdapter.mutate(streamBody);
+    }
+    if (!streamBody) {
+        return Uint8ArrayBlobAdapter.mutate(new Uint8Array());
+    }
+    const fromContext = context.streamCollector(streamBody);
+    return Uint8ArrayBlobAdapter.mutate(await fromContext);
+};
+
+function extendedEncodeURIComponent(str) {
+    return encodeURIComponent(str).replace(/[!'()*]/g, function (c) {
+        return "%" + c.charCodeAt(0).toString(16).toUpperCase();
+    });
+}
+
+class SerdeContext {
+    serdeContext;
+    setSerdeContext(serdeContext) {
+        this.serdeContext = serdeContext;
+    }
+}
+
+class HttpProtocol extends SerdeContext {
+    options;
+    compositeErrorRegistry;
+    constructor(options) {
+        super();
+        this.options = options;
+        this.compositeErrorRegistry = TypeRegistry.for(options.defaultNamespace);
+        for (const etr of options.errorTypeRegistries ?? []) {
+            this.compositeErrorRegistry.copyFrom(etr);
+        }
+    }
+    getRequestType() {
+        return HttpRequest;
+    }
+    getResponseType() {
+        return HttpResponse;
+    }
+    setSerdeContext(serdeContext) {
+        this.serdeContext = serdeContext;
+        this.serializer.setSerdeContext(serdeContext);
+        this.deserializer.setSerdeContext(serdeContext);
+        if (this.getPayloadCodec()) {
+            this.getPayloadCodec().setSerdeContext(serdeContext);
+        }
+    }
+    updateServiceEndpoint(request, endpoint) {
+        if ("url" in endpoint) {
+            request.protocol = endpoint.url.protocol;
+            request.hostname = endpoint.url.hostname;
+            request.port = endpoint.url.port ? Number(endpoint.url.port) : undefined;
+            request.path = endpoint.url.pathname;
+            request.fragment = endpoint.url.hash || void 0;
+            request.username = endpoint.url.username || void 0;
+            request.password = endpoint.url.password || void 0;
+            if (!request.query) {
+                request.query = {};
+            }
+            for (const [k, v] of endpoint.url.searchParams.entries()) {
+                request.query[k] = v;
+            }
+            if (endpoint.headers) {
+                for (const name in endpoint.headers) {
+                    request.headers[name] = endpoint.headers[name].join(", ");
+                }
+            }
+            return request;
+        }
+        else {
+            request.protocol = endpoint.protocol;
+            request.hostname = endpoint.hostname;
+            request.port = endpoint.port ? Number(endpoint.port) : undefined;
+            request.path = endpoint.path;
+            request.query = {
+                ...endpoint.query,
+            };
+            if (endpoint.headers) {
+                for (const name in endpoint.headers) {
+                    request.headers[name] = endpoint.headers[name];
+                }
+            }
+            return request;
+        }
+    }
+    setHostPrefix(request, operationSchema, input) {
+        if (this.serdeContext?.disableHostPrefix) {
+            return;
+        }
+        const inputNs = NormalizedSchema.of(operationSchema.input);
+        const opTraits = translateTraits(operationSchema.traits ?? {});
+        if (opTraits.endpoint) {
+            let hostPrefix = opTraits.endpoint?.[0];
+            if (typeof hostPrefix === "string") {
+                for (const [name, member] of inputNs.structIterator()) {
+                    if (!member.getMergedTraits().hostLabel) {
+                        continue;
+                    }
+                    const replacement = input[name];
+                    if (typeof replacement !== "string") {
+                        throw new Error(`@smithy/core/schema - ${name} in input must be a string as hostLabel.`);
+                    }
+                    hostPrefix = hostPrefix.replace(`{${name}}`, replacement);
+                }
+                request.hostname = hostPrefix + request.hostname;
+            }
+        }
+    }
+    deserializeMetadata(output) {
+        return {
+            httpStatusCode: output.statusCode,
+            requestId: output.headers["x-amzn-requestid"] ?? output.headers["x-amzn-request-id"] ?? output.headers["x-amz-request-id"],
+            extendedRequestId: output.headers["x-amz-id-2"],
+            cfId: output.headers["x-amz-cf-id"],
+        };
+    }
+    async serializeEventStream({ eventStream, requestSchema, initialRequest, }) {
+        const eventStreamSerde = await this.loadEventStreamCapability();
+        return eventStreamSerde.serializeEventStream({
+            eventStream,
+            requestSchema,
+            initialRequest,
+        });
+    }
+    async deserializeEventStream({ response, responseSchema, initialResponseContainer, }) {
+        const eventStreamSerde = await this.loadEventStreamCapability();
+        return eventStreamSerde.deserializeEventStream({
+            response,
+            responseSchema,
+            initialResponseContainer,
+        });
+    }
+    async loadEventStreamCapability() {
+        const { EventStreamSerde, eventStreamSerdeProvider } = await Promise.resolve().then(function () { return index$9; });
+        const marshaller = this.resolveEventStreamMarshaller(eventStreamSerdeProvider);
+        return new EventStreamSerde({
+            marshaller,
+            serializer: this.serializer,
+            deserializer: this.deserializer,
+            serdeContext: this.serdeContext,
+            defaultContentType: this.getDefaultContentType(),
+        });
+    }
+    resolveEventStreamMarshaller(importedProvider) {
+        const context = this.serdeContext;
+        if (context.eventStreamMarshaller) {
+            return context.eventStreamMarshaller;
+        }
+        return importedProvider(this.serdeContext);
+    }
+    getDefaultContentType() {
+        throw new Error(`@smithy/core/protocols - ${this.constructor.name} getDefaultContentType() implementation missing.`);
+    }
+    async deserializeHttpMessage(schema, context, response, arg4, arg5) {
+        return [];
+    }
+    getEventStreamMarshaller() {
+        const context = this.serdeContext;
+        if (!context.eventStreamMarshaller) {
+            throw new Error("@smithy/core - HttpProtocol: eventStreamMarshaller missing in serdeContext.");
+        }
+        return context.eventStreamMarshaller;
+    }
+}
+
+class HttpBindingProtocol extends HttpProtocol {
+    async serializeRequest(operationSchema, _input, context) {
+        const input = _input && typeof _input === "object" ? _input : {};
+        const serializer = this.serializer;
+        const query = {};
+        const headers = {};
+        const endpoint = await context.endpoint();
+        const ns = NormalizedSchema.of(operationSchema?.input);
+        const payloadMemberNames = [];
+        const payloadMemberSchemas = [];
+        let hasNonHttpBindingMember = false;
+        let payload;
+        const request = new HttpRequest({
+            protocol: "",
+            hostname: "",
+            port: undefined,
+            path: "",
+            fragment: undefined,
+            query: query,
+            headers: headers,
+            body: undefined,
+        });
+        if (endpoint) {
+            this.updateServiceEndpoint(request, endpoint);
+            this.setHostPrefix(request, operationSchema, input);
+            const opTraits = translateTraits(operationSchema.traits);
+            if (opTraits.http) {
+                request.method = opTraits.http[0];
+                const [path, search] = opTraits.http[1].split("?");
+                if (request.path == "/") {
+                    request.path = path;
+                }
+                else {
+                    request.path += path;
+                }
+                const traitSearchParams = new URLSearchParams(search ?? "");
+                for (const [key, value] of traitSearchParams) {
+                    query[key] = value;
+                }
+            }
+        }
+        for (const [memberName, memberNs] of ns.structIterator()) {
+            const memberTraits = memberNs.getMergedTraits() ?? {};
+            const inputMemberValue = input[memberName];
+            if (inputMemberValue == null && !memberNs.isIdempotencyToken()) {
+                if (memberTraits.httpLabel) {
+                    if (request.path.includes(`{${memberName}+}`) || request.path.includes(`{${memberName}}`)) {
+                        throw new Error(`No value provided for input HTTP label: ${memberName}.`);
+                    }
+                }
+                continue;
+            }
+            if (memberTraits.httpPayload) {
+                const isStreaming = memberNs.isStreaming();
+                if (isStreaming) {
+                    const isEventStream = memberNs.isStructSchema();
+                    if (isEventStream) {
+                        if (input[memberName]) {
+                            payload = await this.serializeEventStream({
+                                eventStream: input[memberName],
+                                requestSchema: ns,
+                            });
+                        }
+                    }
+                    else {
+                        payload = inputMemberValue;
+                    }
+                }
+                else {
+                    serializer.write(memberNs, inputMemberValue);
+                    payload = serializer.flush();
+                }
+            }
+            else if (memberTraits.httpLabel) {
+                serializer.write(memberNs, inputMemberValue);
+                const replacement = serializer.flush();
+                if (request.path.includes(`{${memberName}+}`)) {
+                    request.path = request.path.replace(`{${memberName}+}`, replacement.split("/").map(extendedEncodeURIComponent).join("/"));
+                }
+                else if (request.path.includes(`{${memberName}}`)) {
+                    request.path = request.path.replace(`{${memberName}}`, extendedEncodeURIComponent(replacement));
+                }
+            }
+            else if (memberTraits.httpHeader) {
+                serializer.write(memberNs, inputMemberValue);
+                headers[memberTraits.httpHeader.toLowerCase()] = String(serializer.flush());
+            }
+            else if (typeof memberTraits.httpPrefixHeaders === "string") {
+                for (const key in inputMemberValue) {
+                    const val = inputMemberValue[key];
+                    const amalgam = memberTraits.httpPrefixHeaders + key;
+                    serializer.write([memberNs.getValueSchema(), { httpHeader: amalgam }], val);
+                    headers[amalgam.toLowerCase()] = serializer.flush();
+                }
+            }
+            else if (memberTraits.httpQuery || memberTraits.httpQueryParams) {
+                this.serializeQuery(memberNs, inputMemberValue, query);
+            }
+            else {
+                hasNonHttpBindingMember = true;
+                payloadMemberNames.push(memberName);
+                payloadMemberSchemas.push(memberNs);
+            }
+        }
+        if (hasNonHttpBindingMember && input) {
+            const [namespace, name] = (ns.getName(true) ?? "#Unknown").split("#");
+            const requiredMembers = ns.getSchema()[6];
+            const payloadSchema = [
+                3,
+                namespace,
+                name,
+                ns.getMergedTraits(),
+                payloadMemberNames,
+                payloadMemberSchemas,
+                undefined,
+            ];
+            if (requiredMembers) {
+                payloadSchema[6] = requiredMembers;
+            }
+            else {
+                payloadSchema.pop();
+            }
+            serializer.write(payloadSchema, input);
+            payload = serializer.flush();
+        }
+        request.headers = headers;
+        request.query = query;
+        request.body = payload;
+        return request;
+    }
+    serializeQuery(ns, data, query) {
+        const serializer = this.serializer;
+        const traits = ns.getMergedTraits();
+        if (traits.httpQueryParams) {
+            for (const key in data) {
+                if (!(key in query)) {
+                    const val = data[key];
+                    const valueSchema = ns.getValueSchema();
+                    Object.assign(valueSchema.getMergedTraits(), {
+                        ...traits,
+                        httpQuery: key,
+                        httpQueryParams: undefined,
+                    });
+                    this.serializeQuery(valueSchema, val, query);
+                }
+            }
+            return;
+        }
+        if (ns.isListSchema()) {
+            const sparse = !!ns.getMergedTraits().sparse;
+            const buffer = [];
+            for (const item of data) {
+                serializer.write([ns.getValueSchema(), traits], item);
+                const serializable = serializer.flush();
+                if (sparse || serializable !== undefined) {
+                    buffer.push(serializable);
+                }
+            }
+            query[traits.httpQuery] = buffer;
+        }
+        else {
+            serializer.write([ns, traits], data);
+            query[traits.httpQuery] = serializer.flush();
+        }
+    }
+    async deserializeResponse(operationSchema, context, response) {
+        const deserializer = this.deserializer;
+        const ns = NormalizedSchema.of(operationSchema.output);
+        const dataObject = {};
+        if (response.statusCode >= 300) {
+            const bytes = await collectBody(response.body, context);
+            if (bytes.byteLength > 0) {
+                Object.assign(dataObject, await deserializer.read(15, bytes));
+            }
+            await this.handleError(operationSchema, context, response, dataObject, this.deserializeMetadata(response));
+            throw new Error("@smithy/core/protocols - HTTP Protocol error handler failed to throw.");
+        }
+        for (const header in response.headers) {
+            const value = response.headers[header];
+            delete response.headers[header];
+            response.headers[header.toLowerCase()] = value;
+        }
+        const nonHttpBindingMembers = await this.deserializeHttpMessage(ns, context, response, dataObject);
+        if (nonHttpBindingMembers.length) {
+            const bytes = await collectBody(response.body, context);
+            if (bytes.byteLength > 0) {
+                const dataFromBody = await deserializer.read(ns, bytes);
+                for (const member of nonHttpBindingMembers) {
+                    if (dataFromBody[member] != null) {
+                        dataObject[member] = dataFromBody[member];
+                    }
+                }
+            }
+        }
+        else if (nonHttpBindingMembers.discardResponseBody) {
+            await collectBody(response.body, context);
+        }
+        dataObject.$metadata = this.deserializeMetadata(response);
+        return dataObject;
+    }
+    async deserializeHttpMessage(schema, context, response, arg4, arg5) {
+        let dataObject;
+        if (arg4 instanceof Set) {
+            dataObject = arg5;
+        }
+        else {
+            dataObject = arg4;
+        }
+        let discardResponseBody = true;
+        const deserializer = this.deserializer;
+        const ns = NormalizedSchema.of(schema);
+        const nonHttpBindingMembers = [];
+        for (const [memberName, memberSchema] of ns.structIterator()) {
+            const memberTraits = memberSchema.getMemberTraits();
+            if (memberTraits.httpPayload) {
+                discardResponseBody = false;
+                const isStreaming = memberSchema.isStreaming();
+                if (isStreaming) {
+                    const isEventStream = memberSchema.isStructSchema();
+                    if (isEventStream) {
+                        dataObject[memberName] = await this.deserializeEventStream({
+                            response,
+                            responseSchema: ns,
+                        });
+                    }
+                    else {
+                        dataObject[memberName] = sdkStreamMixin(response.body);
+                    }
+                }
+                else if (response.body) {
+                    const bytes = await collectBody(response.body, context);
+                    if (bytes.byteLength > 0) {
+                        dataObject[memberName] = await deserializer.read(memberSchema, bytes);
+                    }
+                }
+            }
+            else if (memberTraits.httpHeader) {
+                const key = String(memberTraits.httpHeader).toLowerCase();
+                const value = response.headers[key];
+                if (null != value) {
+                    if (memberSchema.isListSchema()) {
+                        const headerListValueSchema = memberSchema.getValueSchema();
+                        headerListValueSchema.getMergedTraits().httpHeader = key;
+                        let sections;
+                        if (headerListValueSchema.isTimestampSchema() &&
+                            headerListValueSchema.getSchema() === 4) {
+                            sections = splitEvery(value, ",", 2);
+                        }
+                        else {
+                            sections = splitHeader(value);
+                        }
+                        const list = [];
+                        for (const section of sections) {
+                            list.push(await deserializer.read(headerListValueSchema, section.trim()));
+                        }
+                        dataObject[memberName] = list;
+                    }
+                    else {
+                        dataObject[memberName] = await deserializer.read(memberSchema, value);
+                    }
+                }
+            }
+            else if (memberTraits.httpPrefixHeaders !== undefined) {
+                dataObject[memberName] = {};
+                for (const header in response.headers) {
+                    if (header.startsWith(memberTraits.httpPrefixHeaders)) {
+                        const value = response.headers[header];
+                        const valueSchema = memberSchema.getValueSchema();
+                        valueSchema.getMergedTraits().httpHeader = header;
+                        dataObject[memberName][header.slice(memberTraits.httpPrefixHeaders.length)] = await deserializer.read(valueSchema, value);
+                    }
+                }
+            }
+            else if (memberTraits.httpResponseCode) {
+                dataObject[memberName] = response.statusCode;
+            }
+            else {
+                nonHttpBindingMembers.push(memberName);
+            }
+        }
+        nonHttpBindingMembers.discardResponseBody = discardResponseBody;
+        return nonHttpBindingMembers;
+    }
+}
+
+class RpcProtocol extends HttpProtocol {
+    async serializeRequest(operationSchema, _input, context) {
+        const serializer = this.serializer;
+        const query = {};
+        const headers = {};
+        const endpoint = await context.endpoint();
+        const ns = NormalizedSchema.of(operationSchema?.input);
+        const schema = ns.getSchema();
+        let payload;
+        const input = _input && typeof _input === "object" ? _input : {};
+        const request = new HttpRequest({
+            protocol: "",
+            hostname: "",
+            port: undefined,
+            path: "/",
+            fragment: undefined,
+            query: query,
+            headers: headers,
+            body: undefined,
+        });
+        if (endpoint) {
+            this.updateServiceEndpoint(request, endpoint);
+            this.setHostPrefix(request, operationSchema, input);
+        }
+        if (input) {
+            const eventStreamMember = ns.getEventStreamMember();
+            if (eventStreamMember) {
+                if (input[eventStreamMember]) {
+                    const initialRequest = {};
+                    for (const [memberName, memberSchema] of ns.structIterator()) {
+                        if (memberName !== eventStreamMember && input[memberName]) {
+                            serializer.write(memberSchema, input[memberName]);
+                            initialRequest[memberName] = serializer.flush();
+                        }
+                    }
+                    payload = await this.serializeEventStream({
+                        eventStream: input[eventStreamMember],
+                        requestSchema: ns,
+                        initialRequest,
+                    });
+                }
+            }
+            else {
+                serializer.write(schema, input);
+                payload = serializer.flush();
+            }
+        }
+        request.headers = Object.assign(request.headers, headers);
+        request.query = query;
+        request.body = payload;
+        request.method = "POST";
+        return request;
+    }
+    async deserializeResponse(operationSchema, context, response) {
+        const deserializer = this.deserializer;
+        const ns = NormalizedSchema.of(operationSchema.output);
+        const dataObject = {};
+        if (response.statusCode >= 300) {
+            const bytes = await collectBody(response.body, context);
+            if (bytes.byteLength > 0) {
+                Object.assign(dataObject, await deserializer.read(15, bytes));
+            }
+            await this.handleError(operationSchema, context, response, dataObject, this.deserializeMetadata(response));
+            throw new Error("@smithy/core/protocols - RPC Protocol error handler failed to throw.");
+        }
+        for (const header in response.headers) {
+            const value = response.headers[header];
+            delete response.headers[header];
+            response.headers[header.toLowerCase()] = value;
+        }
+        const eventStreamMember = ns.getEventStreamMember();
+        if (eventStreamMember) {
+            dataObject[eventStreamMember] = await this.deserializeEventStream({
+                response,
+                responseSchema: ns,
+                initialResponseContainer: dataObject,
+            });
+        }
+        else {
+            const bytes = await collectBody(response.body, context);
+            if (bytes.byteLength > 0) {
+                Object.assign(dataObject, await deserializer.read(ns, bytes));
+            }
+        }
+        dataObject.$metadata = this.deserializeMetadata(response);
+        return dataObject;
+    }
+}
+
+function determineTimestampFormat(ns, settings) {
+    if (settings.timestampFormat.useTrait) {
+        if (ns.isTimestampSchema() &&
+            (ns.getSchema() === 5 ||
+                ns.getSchema() === 6 ||
+                ns.getSchema() === 7)) {
+            return ns.getSchema();
+        }
+    }
+    const { httpLabel, httpPrefixHeaders, httpHeader, httpQuery } = ns.getMergedTraits();
+    const bindingFormat = settings.httpBindings
+        ? typeof httpPrefixHeaders === "string" || Boolean(httpHeader)
+            ? 6
+            : Boolean(httpQuery) || Boolean(httpLabel)
+                ? 5
+                : undefined
+        : undefined;
+    return bindingFormat ?? settings.timestampFormat.default;
+}
+
+class FromStringShapeDeserializer extends SerdeContext {
+    settings;
+    constructor(settings) {
+        super();
+        this.settings = settings;
+    }
+    read(_schema, data) {
+        const ns = NormalizedSchema.of(_schema);
+        if (ns.isListSchema()) {
+            return splitHeader(data).map((item) => this.read(ns.getValueSchema(), item));
+        }
+        if (ns.isBlobSchema()) {
+            return (this.serdeContext?.base64Decoder ?? fromBase64$1)(data);
+        }
+        if (ns.isTimestampSchema()) {
+            const format = determineTimestampFormat(ns, this.settings);
+            switch (format) {
+                case 5:
+                    return _parseRfc3339DateTimeWithOffset(data);
+                case 6:
+                    return _parseRfc7231DateTime(data);
+                case 7:
+                    return _parseEpochTimestamp(data);
+                default:
+                    console.warn("Missing timestamp format, parsing value with Date constructor:", data);
+                    return new Date(data);
+            }
+        }
+        if (ns.isStringSchema()) {
+            const mediaType = ns.getMergedTraits().mediaType;
+            let intermediateValue = data;
+            if (mediaType) {
+                if (ns.getMergedTraits().httpHeader) {
+                    intermediateValue = this.base64ToUtf8(intermediateValue);
+                }
+                const isJson = mediaType === "application/json" || mediaType.endsWith("+json");
+                if (isJson) {
+                    intermediateValue = LazyJsonString.from(intermediateValue);
+                }
+                return intermediateValue;
+            }
+        }
+        if (ns.isNumericSchema()) {
+            return Number(data);
+        }
+        if (ns.isBigIntegerSchema()) {
+            return BigInt(data);
+        }
+        if (ns.isBigDecimalSchema()) {
+            return new NumericValue(data, "bigDecimal");
+        }
+        if (ns.isBooleanSchema()) {
+            return String(data).toLowerCase() === "true";
+        }
+        return data;
+    }
+    base64ToUtf8(base64String) {
+        return (this.serdeContext?.utf8Encoder ?? toUtf8$1)((this.serdeContext?.base64Decoder ?? fromBase64$1)(base64String));
+    }
+}
+
+class HttpInterceptingShapeDeserializer extends SerdeContext {
+    codecDeserializer;
+    stringDeserializer;
+    constructor(codecDeserializer, codecSettings) {
+        super();
+        this.codecDeserializer = codecDeserializer;
+        this.stringDeserializer = new FromStringShapeDeserializer(codecSettings);
+    }
+    setSerdeContext(serdeContext) {
+        this.stringDeserializer.setSerdeContext(serdeContext);
+        this.codecDeserializer.setSerdeContext(serdeContext);
+        this.serdeContext = serdeContext;
+    }
+    read(schema, data) {
+        const ns = NormalizedSchema.of(schema);
+        const traits = ns.getMergedTraits();
+        const toString = this.serdeContext?.utf8Encoder ?? toUtf8$1;
+        if (traits.httpHeader || traits.httpResponseCode) {
+            return this.stringDeserializer.read(ns, toString(data));
+        }
+        if (traits.httpPayload) {
+            if (ns.isBlobSchema()) {
+                const toBytes = this.serdeContext?.utf8Decoder ?? fromUtf8$2;
+                if (typeof data === "string") {
+                    return toBytes(data);
+                }
+                return data;
+            }
+            else if (ns.isStringSchema()) {
+                if ("byteLength" in data) {
+                    return toString(data);
+                }
+                return data;
+            }
+        }
+        return this.codecDeserializer.read(ns, data);
+    }
+}
+
+class ToStringShapeSerializer extends SerdeContext {
+    settings;
+    stringBuffer = "";
+    constructor(settings) {
+        super();
+        this.settings = settings;
+    }
+    write(schema, value) {
+        const ns = NormalizedSchema.of(schema);
+        switch (typeof value) {
+            case "object":
+                if (value === null) {
+                    this.stringBuffer = "null";
+                    return;
+                }
+                if (ns.isTimestampSchema()) {
+                    if (!(value instanceof Date)) {
+                        throw new Error(`@smithy/core/protocols - received non-Date value ${value} when schema expected Date in ${ns.getName(true)}`);
+                    }
+                    const format = determineTimestampFormat(ns, this.settings);
+                    switch (format) {
+                        case 5:
+                            this.stringBuffer = value.toISOString().replace(".000Z", "Z");
+                            break;
+                        case 6:
+                            this.stringBuffer = dateToUtcString(value);
+                            break;
+                        case 7:
+                            this.stringBuffer = String(value.getTime() / 1000);
+                            break;
+                        default:
+                            console.warn("Missing timestamp format, using epoch seconds", value);
+                            this.stringBuffer = String(value.getTime() / 1000);
+                    }
+                    return;
+                }
+                if (ns.isBlobSchema() && "byteLength" in value) {
+                    this.stringBuffer = (this.serdeContext?.base64Encoder ?? toBase64$1)(value);
+                    return;
+                }
+                if (ns.isListSchema() && Array.isArray(value)) {
+                    let buffer = "";
+                    for (const item of value) {
+                        this.write([ns.getValueSchema(), ns.getMergedTraits()], item);
+                        const headerItem = this.flush();
+                        const serialized = ns.getValueSchema().isTimestampSchema() ? headerItem : quoteHeader(headerItem);
+                        if (buffer !== "") {
+                            buffer += ", ";
+                        }
+                        buffer += serialized;
+                    }
+                    this.stringBuffer = buffer;
+                    return;
+                }
+                this.stringBuffer = JSON.stringify(value, null, 2);
+                break;
+            case "string":
+                const mediaType = ns.getMergedTraits().mediaType;
+                let intermediateValue = value;
+                if (mediaType) {
+                    const isJson = mediaType === "application/json" || mediaType.endsWith("+json");
+                    if (isJson) {
+                        intermediateValue = LazyJsonString.from(intermediateValue);
+                    }
+                    if (ns.getMergedTraits().httpHeader) {
+                        this.stringBuffer = (this.serdeContext?.base64Encoder ?? toBase64$1)(intermediateValue.toString());
+                        return;
+                    }
+                }
+                this.stringBuffer = value;
+                break;
+            default:
+                if (ns.isIdempotencyToken()) {
+                    this.stringBuffer = generateIdempotencyToken();
+                }
+                else {
+                    this.stringBuffer = String(value);
+                }
+        }
+    }
+    flush() {
+        const buffer = this.stringBuffer;
+        this.stringBuffer = "";
+        return buffer;
+    }
+}
+
+class HttpInterceptingShapeSerializer {
+    codecSerializer;
+    stringSerializer;
+    buffer;
+    constructor(codecSerializer, codecSettings, stringSerializer = new ToStringShapeSerializer(codecSettings)) {
+        this.codecSerializer = codecSerializer;
+        this.stringSerializer = stringSerializer;
+    }
+    setSerdeContext(serdeContext) {
+        this.codecSerializer.setSerdeContext(serdeContext);
+        this.stringSerializer.setSerdeContext(serdeContext);
+    }
+    write(schema, value) {
+        const ns = NormalizedSchema.of(schema);
+        const traits = ns.getMergedTraits();
+        if (traits.httpHeader || traits.httpLabel || traits.httpQuery) {
+            this.stringSerializer.write(ns, value);
+            this.buffer = this.stringSerializer.flush();
+            return;
+        }
+        return this.codecSerializer.write(ns, value);
+    }
+    flush() {
+        if (this.buffer !== undefined) {
+            const buffer = this.buffer;
+            this.buffer = undefined;
+            return buffer;
+        }
+        return this.codecSerializer.flush();
+    }
+}
+
+const getHttpHandlerExtensionConfiguration = (runtimeConfig) => {
+    return {
+        setHttpHandler(handler) {
+            runtimeConfig.httpHandler = handler;
+        },
+        httpHandler() {
+            return runtimeConfig.httpHandler;
+        },
+        updateHttpClientConfig(key, value) {
+            runtimeConfig.httpHandler?.updateHttpClientConfig(key, value);
+        },
+        httpHandlerConfigs() {
+            return runtimeConfig.httpHandler.httpHandlerConfigs();
+        },
+    };
+};
+const resolveHttpHandlerRuntimeConfig = (httpHandlerExtensionConfiguration) => {
+    return {
+        httpHandler: httpHandlerExtensionConfiguration.httpHandler(),
+    };
+};
+
+const CONTENT_LENGTH_HEADER = "content-length";
+function contentLengthMiddleware(bodyLengthChecker) {
+    return (next) => async (args) => {
+        const request = args.request;
+        if (HttpRequest.isInstance(request)) {
+            const { body, headers } = request;
+            if (body &&
+                Object.keys(headers)
+                    .map((str) => str.toLowerCase())
+                    .indexOf(CONTENT_LENGTH_HEADER) === -1) {
+                try {
+                    const length = bodyLengthChecker(body);
+                    request.headers = {
+                        ...request.headers,
+                        [CONTENT_LENGTH_HEADER]: String(length),
+                    };
+                }
+                catch (error) {
+                }
+            }
+        }
+        return next({
+            ...args,
+            request,
+        });
+    };
+}
+const contentLengthMiddlewareOptions = {
+    step: "build",
+    tags: ["SET_CONTENT_LENGTH", "CONTENT_LENGTH"],
+    name: "contentLengthMiddleware",
+    override: true,
+};
+const getContentLengthPlugin = (options) => ({
+    applyToStack: (clientStack) => {
+        clientStack.add(contentLengthMiddleware(options.bodyLengthChecker), contentLengthMiddlewareOptions);
+    },
+});
+
+const escapeUri = (uri) => encodeURIComponent(uri).replace(/[!'()*]/g, hexEncode);
+const hexEncode = (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`;
+
+function buildQueryString(query) {
+    const parts = [];
+    for (let key of Object.keys(query).sort()) {
+        const value = query[key];
+        key = escapeUri(key);
+        if (Array.isArray(value)) {
+            for (let i = 0, iLen = value.length; i < iLen; i++) {
+                parts.push(`${key}=${escapeUri(value[i])}`);
+            }
+        }
+        else {
+            let qsEntry = key;
+            if (value || typeof value === "string") {
+                qsEntry += `=${escapeUri(value)}`;
+            }
+            parts.push(qsEntry);
+        }
+    }
+    return parts.join("&");
+}
+
+const THROTTLING_ERROR_CODES = [
+    "BandwidthLimitExceeded",
+    "EC2ThrottledException",
+    "LimitExceededException",
+    "PriorRequestNotComplete",
+    "ProvisionedThroughputExceededException",
+    "RequestLimitExceeded",
+    "RequestThrottled",
+    "RequestThrottledException",
+    "SlowDown",
+    "ThrottledException",
+    "Throttling",
+    "ThrottlingException",
+    "TooManyRequestsException",
+    "TransactionInProgressException",
+];
+const TRANSIENT_ERROR_CODES = ["TimeoutError", "RequestTimeout", "RequestTimeoutException"];
+const TRANSIENT_ERROR_STATUS_CODES = [500, 502, 503, 504];
+const NODEJS_TIMEOUT_ERROR_CODES$1 = ["ECONNRESET", "ECONNREFUSED", "EPIPE", "ETIMEDOUT"];
+const NODEJS_NETWORK_ERROR_CODES = ["EHOSTUNREACH", "ENETUNREACH", "ENOTFOUND", "EAI_AGAIN"];
+
+const isRetryableByTrait = (error) => error?.$retryable !== undefined;
+const isClockSkewCorrectedError = (error) => error.$metadata?.clockSkewCorrected;
+const isBrowserNetworkError = (error) => {
+    const errorMessages = new Set([
+        "Failed to fetch",
+        "NetworkError when attempting to fetch resource",
+        "The Internet connection appears to be offline",
+        "Load failed",
+        "Network request failed",
+    ]);
+    const isValid = error && error instanceof TypeError;
+    if (!isValid) {
+        return false;
+    }
+    return errorMessages.has(error.message);
+};
+const isThrottlingError = (error) => error.$metadata?.httpStatusCode === 429 ||
+    THROTTLING_ERROR_CODES.includes(error.name) ||
+    error.$retryable?.throttling == true;
+const isTransientError = (error, depth = 0) => isRetryableByTrait(error) ||
+    isClockSkewCorrectedError(error) ||
+    (error.name === "InvalidSignatureException" && error.message?.includes("Signature expired")) ||
+    TRANSIENT_ERROR_CODES.includes(error.name) ||
+    NODEJS_TIMEOUT_ERROR_CODES$1.includes(error?.code || "") ||
+    NODEJS_NETWORK_ERROR_CODES.includes(error?.code || "") ||
+    TRANSIENT_ERROR_STATUS_CODES.includes(error.$metadata?.httpStatusCode || 0) ||
+    isBrowserNetworkError(error) ||
+    isNodeJsHttp2TransientError(error) ||
+    (error.cause !== undefined && depth <= 10 && isTransientError(error.cause, depth + 1));
+const isServerError = (error) => {
+    if (error.$metadata?.httpStatusCode !== undefined) {
+        const statusCode = error.$metadata.httpStatusCode;
+        if (500 <= statusCode && statusCode <= 599 && !isTransientError(error)) {
+            return true;
+        }
+        return false;
+    }
+    return false;
+};
+function isNodeJsHttp2TransientError(error) {
+    return error.code === "ERR_HTTP2_STREAM_ERROR" && error.message.includes("NGHTTP2_REFUSED_STREAM");
+}
+
+const MAXIMUM_RETRY_DELAY = 20 * 1000;
+const INITIAL_RETRY_TOKENS = 500;
+const NO_RETRY_INCREMENT = 1;
+const INVOCATION_ID_HEADER = "amz-sdk-invocation-id";
+const REQUEST_HEADER = "amz-sdk-request";
+
+function parseRetryAfterHeader(response, logger) {
+    if (!HttpResponse.isInstance(response)) {
+        return;
+    }
+    for (const header of Object.keys(response.headers)) {
+        const h = header.toLowerCase();
+        if (h === "retry-after") {
+            const retryAfter = response.headers[header];
+            let retryAfterSeconds = NaN;
+            if (retryAfter.endsWith("GMT")) {
+                try {
+                    const date = parseRfc7231DateTime(retryAfter);
+                    retryAfterSeconds = (date.getTime() - Date.now()) / 1000;
+                }
+                catch (e) {
+                    logger?.trace?.("Failed to parse retry-after header");
+                    logger?.trace?.(e);
+                }
+            }
+            else if (retryAfter.match(/ GMT, ((\d+)|(\d+\.\d+))$/)) {
+                retryAfterSeconds = Number(retryAfter.match(/ GMT, ([\d.]+)$/)?.[1]);
+            }
+            else if (retryAfter.match(/^((\d+)|(\d+\.\d+))$/)) {
+                retryAfterSeconds = Number(retryAfter);
+            }
+            else if (Date.parse(retryAfter) >= Date.now()) {
+                retryAfterSeconds = (Date.parse(retryAfter) - Date.now()) / 1000;
+            }
+            if (isNaN(retryAfterSeconds)) {
+                return;
+            }
+            return new Date(Date.now() + retryAfterSeconds * 1000);
+        }
+        else if (h === "x-amz-retry-after") {
+            const v = response.headers[header];
+            const backoffMilliseconds = Number(v);
+            if (isNaN(backoffMilliseconds)) {
+                logger?.trace?.(`Failed to parse x-amz-retry-after=${v}`);
+                return;
+            }
+            return new Date(Date.now() + backoffMilliseconds);
+        }
+    }
+}
+
+const asSdkError = (error) => {
+    if (error instanceof Error)
+        return error;
+    if (error instanceof Object)
+        return Object.assign(new Error(), error);
+    if (typeof error === "string")
+        return new Error(error);
+    return new Error(`AWS SDK error wrapper for ${error}`);
+};
+
+function bindRetryMiddleware(isStreamingPayload) {
+    return (options) => (next, context) => async (args) => {
+        let retryStrategy = await options.retryStrategy();
+        const maxAttempts = await options.maxAttempts();
+        if (isRetryStrategyV2(retryStrategy)) {
+            retryStrategy = retryStrategy;
+            let retryToken = await retryStrategy.acquireInitialRetryToken((context["partition_id"] ?? "") + (context.__retryLongPoll ? ":longpoll" : ""));
+            let lastError = new Error();
+            let attempts = 0;
+            let totalRetryDelay = 0;
+            const { request } = args;
+            const isRequest = HttpRequest.isInstance(request);
+            if (isRequest) {
+                request.headers[INVOCATION_ID_HEADER] = v4();
+            }
+            while (true) {
+                try {
+                    if (isRequest) {
+                        request.headers[REQUEST_HEADER] = `attempt=${attempts + 1}; max=${maxAttempts}`;
+                    }
+                    const { response, output } = await next(args);
+                    retryStrategy.recordSuccess(retryToken);
+                    output.$metadata.attempts = attempts + 1;
+                    output.$metadata.totalRetryDelay = totalRetryDelay;
+                    return { response, output };
+                }
+                catch (e) {
+                    const retryErrorInfo = getRetryErrorInfo(e, options.logger);
+                    lastError = asSdkError(e);
+                    if (isRequest && isStreamingPayload(request)) {
+                        (context.logger instanceof NoOpLogger ? console : context.logger)?.warn("An error was encountered in a non-retryable streaming request.");
+                        throw lastError;
+                    }
+                    try {
+                        retryToken = await retryStrategy.refreshRetryTokenForRetry(retryToken, retryErrorInfo);
+                    }
+                    catch (refreshError) {
+                        if (!lastError.$metadata) {
+                            lastError.$metadata = {};
+                        }
+                        lastError.$metadata.attempts = attempts + 1;
+                        lastError.$metadata.totalRetryDelay = totalRetryDelay;
+                        throw lastError;
+                    }
+                    attempts = retryToken.getRetryCount();
+                    const delay = retryToken.getRetryDelay();
+                    totalRetryDelay += (retryToken?.$retryLog?.acquisitionDelay ?? 0) + delay;
+                    if (delay > 0) {
+                        await cooldown(delay);
+                    }
+                }
+            }
+        }
+        else {
+            retryStrategy = retryStrategy;
+            if (retryStrategy?.mode) {
+                context.userAgent = [...(context.userAgent || []), ["cfg/retry-mode", retryStrategy.mode]];
+            }
+            return retryStrategy.retry(next, args);
+        }
+    };
+}
+const cooldown = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const isRetryStrategyV2 = (retryStrategy) => typeof retryStrategy.acquireInitialRetryToken !== "undefined" &&
+    typeof retryStrategy.refreshRetryTokenForRetry !== "undefined" &&
+    typeof retryStrategy.recordSuccess !== "undefined";
+const getRetryErrorInfo = (error, logger) => {
+    const errorInfo = {
+        error,
+        errorType: getRetryErrorType(error),
+    };
+    const retryAfterHint = parseRetryAfterHeader(error.$response, logger);
+    if (retryAfterHint) {
+        errorInfo.retryAfterHint = retryAfterHint;
+    }
+    return errorInfo;
+};
+const getRetryErrorType = (error) => {
+    if (isThrottlingError(error))
+        return "THROTTLING";
+    if (isTransientError(error))
+        return "TRANSIENT";
+    if (isServerError(error))
+        return "SERVER_ERROR";
+    return "CLIENT_ERROR";
+};
+const retryMiddlewareOptions = {
+    name: "retryMiddleware",
+    tags: ["RETRY"],
+    step: "finalizeRequest",
+    priority: "high",
+    override: true,
+};
+function bindGetRetryPlugin(isStreamingPayload) {
+    const retryMiddleware = bindRetryMiddleware(isStreamingPayload);
+    return (options) => ({
+        applyToStack: (clientStack) => {
+            clientStack.add(retryMiddleware(options), retryMiddlewareOptions);
+        },
+    });
+}
+
+class DefaultRateLimiter {
+    static setTimeoutFn = (fn, delay) => setTimeout(fn, delay);
+    beta;
+    minCapacity;
+    minFillRate;
+    scaleConstant;
+    smooth;
+    enabled = false;
+    availableTokens = 0;
+    lastMaxRate = 0;
+    measuredTxRate = 0;
+    requestCount = 0;
+    fillRate;
+    lastThrottleTime;
+    lastTimestamp = 0;
+    lastTxRateBucket;
+    maxCapacity;
+    timeWindow = 0;
+    constructor(options) {
+        this.beta = options?.beta ?? 0.7;
+        this.minCapacity = options?.minCapacity ?? 1;
+        this.minFillRate = options?.minFillRate ?? 0.5;
+        this.scaleConstant = options?.scaleConstant ?? 0.4;
+        this.smooth = options?.smooth ?? 0.8;
+        this.lastThrottleTime = this.getCurrentTimeInSeconds();
+        this.lastTxRateBucket = Math.floor(this.getCurrentTimeInSeconds());
+        this.fillRate = this.minFillRate;
+        this.maxCapacity = this.minCapacity;
+    }
+    async getSendToken() {
+        return this.acquireTokenBucket(1);
+    }
+    updateClientSendingRate(response) {
+        let calculatedRate;
+        this.updateMeasuredRate();
+        const retryErrorInfo = response;
+        const isThrottling = retryErrorInfo?.errorType === "THROTTLING" || isThrottlingError(retryErrorInfo?.error ?? response);
+        if (isThrottling) {
+            const rateToUse = !this.enabled ? this.measuredTxRate : Math.min(this.measuredTxRate, this.fillRate);
+            this.lastMaxRate = rateToUse;
+            this.calculateTimeWindow();
+            this.lastThrottleTime = this.getCurrentTimeInSeconds();
+            calculatedRate = this.cubicThrottle(rateToUse);
+            this.enableTokenBucket();
+        }
+        else {
+            this.calculateTimeWindow();
+            calculatedRate = this.cubicSuccess(this.getCurrentTimeInSeconds());
+        }
+        const newRate = Math.min(calculatedRate, 2 * this.measuredTxRate);
+        this.updateTokenBucketRate(newRate);
+    }
+    getCurrentTimeInSeconds() {
+        return Date.now() / 1000;
+    }
+    async acquireTokenBucket(amount) {
+        if (!this.enabled) {
+            return;
+        }
+        this.refillTokenBucket();
+        while (amount > this.availableTokens) {
+            const delay = ((amount - this.availableTokens) / this.fillRate) * 1000;
+            await new Promise((resolve) => DefaultRateLimiter.setTimeoutFn(resolve, delay));
+            this.refillTokenBucket();
+        }
+        this.availableTokens = this.availableTokens - amount;
+    }
+    refillTokenBucket() {
+        const timestamp = this.getCurrentTimeInSeconds();
+        if (!this.lastTimestamp) {
+            this.lastTimestamp = timestamp;
+            return;
+        }
+        const fillAmount = (timestamp - this.lastTimestamp) * this.fillRate;
+        this.availableTokens = Math.min(this.maxCapacity, this.availableTokens + fillAmount);
+        this.lastTimestamp = timestamp;
+    }
+    calculateTimeWindow() {
+        this.timeWindow = this.getPrecise(Math.pow((this.lastMaxRate * (1 - this.beta)) / this.scaleConstant, 1 / 3));
+    }
+    cubicThrottle(rateToUse) {
+        return this.getPrecise(rateToUse * this.beta);
+    }
+    cubicSuccess(timestamp) {
+        return this.getPrecise(this.scaleConstant * Math.pow(timestamp - this.lastThrottleTime - this.timeWindow, 3) + this.lastMaxRate);
+    }
+    enableTokenBucket() {
+        this.enabled = true;
+    }
+    updateTokenBucketRate(newRate) {
+        this.refillTokenBucket();
+        this.fillRate = Math.max(newRate, this.minFillRate);
+        this.maxCapacity = Math.max(newRate, this.minCapacity);
+        this.availableTokens = Math.min(this.availableTokens, this.maxCapacity);
+    }
+    updateMeasuredRate() {
+        const t = this.getCurrentTimeInSeconds();
+        const timeBucket = Math.floor(t * 2) / 2;
+        this.requestCount++;
+        if (timeBucket > this.lastTxRateBucket) {
+            const currentRate = this.requestCount / (timeBucket - this.lastTxRateBucket);
+            this.measuredTxRate = this.getPrecise(currentRate * this.smooth + this.measuredTxRate * (1 - this.smooth));
+            this.requestCount = 0;
+            this.lastTxRateBucket = timeBucket;
+        }
+    }
+    getPrecise(num) {
+        return parseFloat(num.toFixed(8));
+    }
+}
+
+class Retry {
+    static v2026 = typeof process !== "undefined" && process.env?.SMITHY_NEW_RETRIES_2026 === "true";
+    static delay() {
+        return Retry.v2026 ? 50 : 100;
+    }
+    static throttlingDelay() {
+        return Retry.v2026 ? 1_000 : 500;
+    }
+    static cost() {
+        return Retry.v2026 ? 14 : 5;
+    }
+    static throttlingCost() {
+        return Retry.v2026 ? 5 : 10;
+    }
+    static modifiedCostType() {
+        return Retry.v2026 ? "THROTTLING" : "TRANSIENT";
+    }
+}
+
+class DefaultRetryBackoffStrategy {
+    x = Retry.delay();
+    computeNextBackoffDelay(i) {
+        const b = Math.random();
+        const r = 2;
+        const t_i = b * Math.min(this.x * r ** i, MAXIMUM_RETRY_DELAY);
+        return Math.floor(t_i);
+    }
+    setDelayBase(delay) {
+        this.x = delay;
+    }
+}
+
+class DefaultRetryToken {
+    delay;
+    count;
+    cost;
+    longPoll;
+    $retryLog = {
+        acquisitionDelay: 0,
+    };
+    constructor(delay, count, cost, longPoll) {
+        this.delay = delay;
+        this.count = count;
+        this.cost = cost;
+        this.longPoll = longPoll;
+    }
+    getRetryCount() {
+        return this.count;
+    }
+    getRetryDelay() {
+        return Math.min(MAXIMUM_RETRY_DELAY, this.delay);
+    }
+    getRetryCost() {
+        return this.cost;
+    }
+    isLongPoll() {
+        return this.longPoll;
+    }
+}
+
+var RETRY_MODES;
+(function (RETRY_MODES) {
+    RETRY_MODES["STANDARD"] = "standard";
+    RETRY_MODES["ADAPTIVE"] = "adaptive";
+})(RETRY_MODES || (RETRY_MODES = {}));
+const DEFAULT_MAX_ATTEMPTS = 3;
+const DEFAULT_RETRY_MODE = RETRY_MODES.STANDARD;
+
+const refusal = {
+    incompatible: 1,
+    attempts: 2,
+    capacity: 3,
+};
+class StandardRetryStrategy {
+    mode = RETRY_MODES.STANDARD;
+    retryBackoffStrategy;
+    capacity = INITIAL_RETRY_TOKENS;
+    maxAttemptsProvider;
+    baseDelay;
+    constructor(arg1) {
+        if (typeof arg1 === "number") {
+            this.maxAttemptsProvider = async () => arg1;
+        }
+        else if (typeof arg1 === "function") {
+            this.maxAttemptsProvider = arg1;
+        }
+        else if (arg1 && typeof arg1 === "object") {
+            this.maxAttemptsProvider = async () => arg1.maxAttempts;
+            this.baseDelay = arg1.baseDelay;
+            this.retryBackoffStrategy = arg1.backoff;
+        }
+        this.maxAttemptsProvider ??= async () => DEFAULT_MAX_ATTEMPTS;
+        this.baseDelay ??= Retry.delay();
+        this.retryBackoffStrategy ??= new DefaultRetryBackoffStrategy();
+    }
+    async acquireInitialRetryToken(retryTokenScope) {
+        return new DefaultRetryToken(Retry.delay(), 0, undefined, Retry.v2026 && retryTokenScope.includes(":longpoll"));
+    }
+    async refreshRetryTokenForRetry(token, errorInfo) {
+        const maxAttempts = await this.getMaxAttempts();
+        const retryCode = this.retryCode(token, errorInfo, maxAttempts);
+        const shouldRetry = retryCode === 0;
+        const isLongPoll = token.isLongPoll?.();
+        if (shouldRetry || isLongPoll) {
+            const errorType = errorInfo.errorType;
+            this.retryBackoffStrategy.setDelayBase(errorType === "THROTTLING" ? Retry.throttlingDelay() : this.baseDelay);
+            const delayFromErrorType = this.retryBackoffStrategy.computeNextBackoffDelay(token.getRetryCount());
+            let retryDelay = delayFromErrorType;
+            if (errorInfo.retryAfterHint instanceof Date) {
+                retryDelay = Math.max(delayFromErrorType, Math.min(errorInfo.retryAfterHint.getTime() - Date.now(), delayFromErrorType + 5_000));
+            }
+            if (!shouldRetry) {
+                const longPollBackoff = Retry.v2026 && retryCode === refusal.capacity && isLongPoll ? retryDelay : 0;
+                if (longPollBackoff > 0) {
+                    await new Promise((r) => setTimeout(r, longPollBackoff));
+                }
+            }
+            else {
+                const capacityCost = this.getCapacityCost(errorType);
+                this.capacity -= capacityCost;
+                const nextToken = new DefaultRetryToken(0, token.getRetryCount() + 1, capacityCost, token.isLongPoll?.() ?? false);
+                await new Promise((r) => setTimeout(r, retryDelay));
+                nextToken.$retryLog.acquisitionDelay = retryDelay;
+                return nextToken;
+            }
+        }
+        throw new Error("No retry token available");
+    }
+    recordSuccess(token) {
+        this.capacity = Math.min(INITIAL_RETRY_TOKENS, this.capacity + (token.getRetryCost() ?? NO_RETRY_INCREMENT));
+    }
+    getCapacity() {
+        return this.capacity;
+    }
+    async maxAttempts() {
+        return this.maxAttemptsProvider();
+    }
+    async getMaxAttempts() {
+        try {
+            return await this.maxAttemptsProvider();
+        }
+        catch (error) {
+            console.warn(`Max attempts provider could not resolve. Using default of ${DEFAULT_MAX_ATTEMPTS}`);
+            return DEFAULT_MAX_ATTEMPTS;
+        }
+    }
+    retryCode(tokenToRenew, errorInfo, maxAttempts) {
+        const attempts = tokenToRenew.getRetryCount() + 1;
+        const retryableStatus = this.isRetryableError(errorInfo.errorType) ? 0 : refusal.incompatible;
+        const attemptStatus = attempts < maxAttempts ? 0 : refusal.attempts;
+        const capacityStatus = this.capacity >= this.getCapacityCost(errorInfo.errorType) ? 0 : refusal.capacity;
+        return retryableStatus || attemptStatus || capacityStatus;
+    }
+    getCapacityCost(errorType) {
+        return errorType === Retry.modifiedCostType() ? Retry.throttlingCost() : Retry.cost();
+    }
+    isRetryableError(errorType) {
+        return errorType === "THROTTLING" || errorType === "TRANSIENT";
+    }
+}
+
+class AdaptiveRetryStrategy {
+    mode = RETRY_MODES.ADAPTIVE;
+    rateLimiter;
+    standardRetryStrategy;
+    constructor(maxAttemptsProvider, options) {
+        const { rateLimiter } = options ?? {};
+        this.rateLimiter = rateLimiter ?? new DefaultRateLimiter();
+        this.standardRetryStrategy = options
+            ? new StandardRetryStrategy({
+                maxAttempts: typeof maxAttemptsProvider === "number" ? maxAttemptsProvider : 3,
+                ...options,
+            })
+            : new StandardRetryStrategy(maxAttemptsProvider);
+    }
+    async acquireInitialRetryToken(retryTokenScope) {
+        const token = await this.standardRetryStrategy.acquireInitialRetryToken(retryTokenScope);
+        await this.rateLimiter.getSendToken();
+        return token;
+    }
+    async refreshRetryTokenForRetry(tokenToRenew, errorInfo) {
+        this.rateLimiter.updateClientSendingRate(errorInfo);
+        const token = await this.standardRetryStrategy.refreshRetryTokenForRetry(tokenToRenew, errorInfo);
+        await this.rateLimiter.getSendToken();
+        return token;
+    }
+    recordSuccess(token) {
+        this.rateLimiter.updateClientSendingRate({});
+        this.standardRetryStrategy.recordSuccess(token);
+    }
+    async maxAttemptsProvider() {
+        return this.standardRetryStrategy.maxAttempts();
+    }
+}
+
+const ENV_MAX_ATTEMPTS = "AWS_MAX_ATTEMPTS";
+const CONFIG_MAX_ATTEMPTS = "max_attempts";
+const NODE_MAX_ATTEMPT_CONFIG_OPTIONS = {
+    environmentVariableSelector: (env) => {
+        const value = env[ENV_MAX_ATTEMPTS];
+        if (!value)
+            return undefined;
+        const maxAttempt = parseInt(value);
+        if (Number.isNaN(maxAttempt)) {
+            throw new Error(`Environment variable ${ENV_MAX_ATTEMPTS} mast be a number, got "${value}"`);
+        }
+        return maxAttempt;
+    },
+    configFileSelector: (profile) => {
+        const value = profile[CONFIG_MAX_ATTEMPTS];
+        if (!value)
+            return undefined;
+        const maxAttempt = parseInt(value);
+        if (Number.isNaN(maxAttempt)) {
+            throw new Error(`Shared config file entry ${CONFIG_MAX_ATTEMPTS} mast be a number, got "${value}"`);
+        }
+        return maxAttempt;
+    },
+    default: DEFAULT_MAX_ATTEMPTS,
+};
+const resolveRetryConfig = (input, defaults) => {
+    const { retryStrategy, retryMode } = input;
+    const { defaultMaxAttempts = DEFAULT_MAX_ATTEMPTS, defaultBaseDelay = Retry.delay() } = defaults ?? {};
+    const maxAttemptsProvider = normalizeProvider$1(input.maxAttempts ?? defaultMaxAttempts);
+    let controller = retryStrategy
+        ? Promise.resolve(retryStrategy)
+        : undefined;
+    const getDefault = async () => {
+        const maxAttempts = await maxAttemptsProvider();
+        const adaptive = (await normalizeProvider$1(retryMode)()) === RETRY_MODES.ADAPTIVE;
+        if (adaptive) {
+            return new AdaptiveRetryStrategy(maxAttemptsProvider, {
+                maxAttempts,
+                baseDelay: defaultBaseDelay,
+            });
+        }
+        return new StandardRetryStrategy({
+            maxAttempts,
+            baseDelay: defaultBaseDelay,
+        });
+    };
+    return Object.assign(input, {
+        maxAttempts: maxAttemptsProvider,
+        retryStrategy: () => (controller ??= getDefault()),
+    });
+};
+const ENV_RETRY_MODE = "AWS_RETRY_MODE";
+const CONFIG_RETRY_MODE = "retry_mode";
+const NODE_RETRY_MODE_CONFIG_OPTIONS = {
+    environmentVariableSelector: (env) => env[ENV_RETRY_MODE],
+    configFileSelector: (profile) => profile[CONFIG_RETRY_MODE],
+    default: DEFAULT_RETRY_MODE,
+};
+
+const getRetryPlugin = bindGetRetryPlugin(isStreamingPayload);
+
+Retry.v2026 ||= typeof process === "object" && process.env?.AWS_NEW_RETRIES_2026 === "true";
+function setFeature(context, feature, value) {
+    if (!context.__aws_sdk_context) {
+        context.__aws_sdk_context = {
+            features: {},
+        };
+    }
+    else if (!context.__aws_sdk_context.features) {
+        context.__aws_sdk_context.features = {};
+    }
+    context.__aws_sdk_context.features[feature] = value;
+}
+
+function resolveHostHeaderConfig(input) {
+    return input;
+}
+const hostHeaderMiddleware = (options) => (next) => async (args) => {
+    if (!HttpRequest.isInstance(args.request))
+        return next(args);
+    const { request } = args;
+    const { handlerProtocol = "" } = options.requestHandler.metadata || {};
+    if (handlerProtocol.indexOf("h2") >= 0 && !request.headers[":authority"]) {
+        delete request.headers["host"];
+        request.headers[":authority"] = request.hostname + (request.port ? ":" + request.port : "");
+    }
+    else if (!request.headers["host"]) {
+        let host = request.hostname;
+        if (request.port != null)
+            host += `:${request.port}`;
+        request.headers["host"] = host;
+    }
+    return next(args);
+};
+const hostHeaderMiddlewareOptions = {
+    name: "hostHeaderMiddleware",
+    step: "build",
+    priority: "low",
+    tags: ["HOST"],
+    override: true,
+};
+const getHostHeaderPlugin = (options) => ({
+    applyToStack: (clientStack) => {
+        clientStack.add(hostHeaderMiddleware(options), hostHeaderMiddlewareOptions);
+    },
+});
+
+const loggerMiddleware = () => (next, context) => async (args) => {
+    try {
+        const response = await next(args);
+        const { clientName, commandName, logger, dynamoDbDocumentClientOptions = {} } = context;
+        const { overrideInputFilterSensitiveLog, overrideOutputFilterSensitiveLog } = dynamoDbDocumentClientOptions;
+        const inputFilterSensitiveLog = overrideInputFilterSensitiveLog ?? context.inputFilterSensitiveLog;
+        const outputFilterSensitiveLog = overrideOutputFilterSensitiveLog ?? context.outputFilterSensitiveLog;
+        const { $metadata, ...outputWithoutMetadata } = response.output;
+        logger?.info?.({
+            clientName,
+            commandName,
+            input: inputFilterSensitiveLog(args.input),
+            output: outputFilterSensitiveLog(outputWithoutMetadata),
+            metadata: $metadata,
+        });
+        return response;
+    }
+    catch (error) {
+        const { clientName, commandName, logger, dynamoDbDocumentClientOptions = {} } = context;
+        const { overrideInputFilterSensitiveLog } = dynamoDbDocumentClientOptions;
+        const inputFilterSensitiveLog = overrideInputFilterSensitiveLog ?? context.inputFilterSensitiveLog;
+        logger?.error?.({
+            clientName,
+            commandName,
+            input: inputFilterSensitiveLog(args.input),
+            error,
+            metadata: error.$metadata,
+        });
+        throw error;
+    }
+};
+const loggerMiddlewareOptions = {
+    name: "loggerMiddleware",
+    tags: ["LOGGER"],
+    step: "initialize",
+    override: true,
+};
+const getLoggerPlugin = (options) => ({
+    applyToStack: (clientStack) => {
+        clientStack.add(loggerMiddleware(), loggerMiddlewareOptions);
+    },
+});
+
+const recursionDetectionMiddlewareOptions = {
+    step: "build",
+    tags: ["RECURSION_DETECTION"],
+    name: "recursionDetectionMiddleware",
+    override: true,
+    priority: "low",
+};
+
+const PROTECTED_KEYS = {
+    REQUEST_ID: Symbol.for("_AWS_LAMBDA_REQUEST_ID"),
+    X_RAY_TRACE_ID: Symbol.for("_AWS_LAMBDA_X_RAY_TRACE_ID"),
+    TENANT_ID: Symbol.for("_AWS_LAMBDA_TENANT_ID"),
+};
+const NO_GLOBAL_AWS_LAMBDA = ["true", "1"].includes(process.env?.AWS_LAMBDA_NODEJS_NO_GLOBAL_AWSLAMBDA ?? "");
+if (!NO_GLOBAL_AWS_LAMBDA) {
+    globalThis.awslambda = globalThis.awslambda || {};
+}
+class InvokeStoreBase {
+    static PROTECTED_KEYS = PROTECTED_KEYS;
+    isProtectedKey(key) {
+        return Object.values(PROTECTED_KEYS).includes(key);
+    }
+    getRequestId() {
+        return this.get(PROTECTED_KEYS.REQUEST_ID) ?? "-";
+    }
+    getXRayTraceId() {
+        return this.get(PROTECTED_KEYS.X_RAY_TRACE_ID);
+    }
+    getTenantId() {
+        return this.get(PROTECTED_KEYS.TENANT_ID);
+    }
+}
+class InvokeStoreSingle extends InvokeStoreBase {
+    currentContext;
+    getContext() {
+        return this.currentContext;
+    }
+    hasContext() {
+        return this.currentContext !== undefined;
+    }
+    get(key) {
+        return this.currentContext?.[key];
+    }
+    set(key, value) {
+        if (this.isProtectedKey(key)) {
+            throw new Error(`Cannot modify protected Lambda context field: ${String(key)}`);
+        }
+        this.currentContext = this.currentContext || {};
+        this.currentContext[key] = value;
+    }
+    run(context, fn) {
+        this.currentContext = context;
+        return fn();
+    }
+}
+class InvokeStoreMulti extends InvokeStoreBase {
+    als;
+    static async create() {
+        const instance = new InvokeStoreMulti();
+        const asyncHooks = await import('node:async_hooks');
+        instance.als = new asyncHooks.AsyncLocalStorage();
+        return instance;
+    }
+    getContext() {
+        return this.als.getStore();
+    }
+    hasContext() {
+        return this.als.getStore() !== undefined;
+    }
+    get(key) {
+        return this.als.getStore()?.[key];
+    }
+    set(key, value) {
+        if (this.isProtectedKey(key)) {
+            throw new Error(`Cannot modify protected Lambda context field: ${String(key)}`);
+        }
+        const store = this.als.getStore();
+        if (!store) {
+            throw new Error("No context available");
+        }
+        store[key] = value;
+    }
+    run(context, fn) {
+        return this.als.run(context, fn);
+    }
+}
+var InvokeStore;
+(function (InvokeStore) {
+    let instance = null;
+    async function getInstanceAsync(forceInvokeStoreMulti) {
+        if (!instance) {
+            instance = (async () => {
+                const isMulti = forceInvokeStoreMulti === true || "AWS_LAMBDA_MAX_CONCURRENCY" in process.env;
+                const newInstance = isMulti
+                    ? await InvokeStoreMulti.create()
+                    : new InvokeStoreSingle();
+                if (!NO_GLOBAL_AWS_LAMBDA && globalThis.awslambda?.InvokeStore) {
+                    return globalThis.awslambda.InvokeStore;
+                }
+                else if (!NO_GLOBAL_AWS_LAMBDA && globalThis.awslambda) {
+                    globalThis.awslambda.InvokeStore = newInstance;
+                    return newInstance;
+                }
+                else {
+                    return newInstance;
+                }
+            })();
+        }
+        return instance;
+    }
+    InvokeStore.getInstanceAsync = getInstanceAsync;
+    InvokeStore._testing = process.env.AWS_LAMBDA_BENCHMARK_MODE === "1"
+        ? {
+            reset: () => {
+                instance = null;
+                if (globalThis.awslambda?.InvokeStore) {
+                    delete globalThis.awslambda.InvokeStore;
+                }
+                globalThis.awslambda = { InvokeStore: undefined };
+            },
+        }
+        : undefined;
+})(InvokeStore || (InvokeStore = {}));
+
+const TRACE_ID_HEADER_NAME = "X-Amzn-Trace-Id";
+const ENV_LAMBDA_FUNCTION_NAME = "AWS_LAMBDA_FUNCTION_NAME";
+const ENV_TRACE_ID = "_X_AMZN_TRACE_ID";
+const recursionDetectionMiddleware = () => (next) => async (args) => {
+    const { request } = args;
+    if (!HttpRequest.isInstance(request)) {
+        return next(args);
+    }
+    const traceIdHeader = Object.keys(request.headers ?? {}).find((h) => h.toLowerCase() === TRACE_ID_HEADER_NAME.toLowerCase()) ??
+        TRACE_ID_HEADER_NAME;
+    if (request.headers.hasOwnProperty(traceIdHeader)) {
+        return next(args);
+    }
+    const functionName = process.env[ENV_LAMBDA_FUNCTION_NAME];
+    const traceIdFromEnv = process.env[ENV_TRACE_ID];
+    const invokeStore = await InvokeStore.getInstanceAsync();
+    const traceIdFromInvokeStore = invokeStore?.getXRayTraceId();
+    const traceId = traceIdFromInvokeStore ?? traceIdFromEnv;
+    const nonEmptyString = (str) => typeof str === "string" && str.length > 0;
+    if (nonEmptyString(functionName) && nonEmptyString(traceId)) {
+        request.headers[TRACE_ID_HEADER_NAME] = traceId;
+    }
+    return next({
+        ...args,
+        request,
+    });
+};
+
+const getRecursionDetectionPlugin = (options) => ({
+    applyToStack: (clientStack) => {
+        clientStack.add(recursionDetectionMiddleware(), recursionDetectionMiddlewareOptions);
+    },
+});
+
+const resolveAuthOptions = (candidateAuthOptions, authSchemePreference) => {
+    if (!authSchemePreference || authSchemePreference.length === 0) {
+        return candidateAuthOptions;
+    }
+    const preferredAuthOptions = [];
+    for (const preferredSchemeName of authSchemePreference) {
+        for (const candidateAuthOption of candidateAuthOptions) {
+            const candidateAuthSchemeName = candidateAuthOption.schemeId.split("#")[1];
+            if (candidateAuthSchemeName === preferredSchemeName) {
+                preferredAuthOptions.push(candidateAuthOption);
+            }
+        }
+    }
+    for (const candidateAuthOption of candidateAuthOptions) {
+        if (!preferredAuthOptions.find(({ schemeId }) => schemeId === candidateAuthOption.schemeId)) {
+            preferredAuthOptions.push(candidateAuthOption);
+        }
+    }
+    return preferredAuthOptions;
+};
+
+function convertHttpAuthSchemesToMap(httpAuthSchemes) {
+    const map = new Map();
+    for (const scheme of httpAuthSchemes) {
+        map.set(scheme.schemeId, scheme);
+    }
+    return map;
+}
+const httpAuthSchemeMiddleware = (config, mwOptions) => (next, context) => async (args) => {
+    const options = config.httpAuthSchemeProvider(await mwOptions.httpAuthSchemeParametersProvider(config, context, args.input));
+    const authSchemePreference = config.authSchemePreference ? await config.authSchemePreference() : [];
+    const resolvedOptions = resolveAuthOptions(options, authSchemePreference);
+    const authSchemes = convertHttpAuthSchemesToMap(config.httpAuthSchemes);
+    const smithyContext = getSmithyContext(context);
+    const failureReasons = [];
+    for (const option of resolvedOptions) {
+        const scheme = authSchemes.get(option.schemeId);
+        if (!scheme) {
+            failureReasons.push(`HttpAuthScheme \`${option.schemeId}\` was not enabled for this service.`);
+            continue;
+        }
+        const identityProvider = scheme.identityProvider(await mwOptions.identityProviderConfigProvider(config));
+        if (!identityProvider) {
+            failureReasons.push(`HttpAuthScheme \`${option.schemeId}\` did not have an IdentityProvider configured.`);
+            continue;
+        }
+        const { identityProperties = {}, signingProperties = {} } = option.propertiesExtractor?.(config, context) || {};
+        option.identityProperties = Object.assign(option.identityProperties || {}, identityProperties);
+        option.signingProperties = Object.assign(option.signingProperties || {}, signingProperties);
+        smithyContext.selectedHttpAuthScheme = {
+            httpAuthOption: option,
+            identity: await identityProvider(option.identityProperties),
+            signer: scheme.signer,
+        };
+        break;
+    }
+    if (!smithyContext.selectedHttpAuthScheme) {
+        throw new Error(failureReasons.join("\n"));
+    }
+    return next(args);
+};
+
+const httpAuthSchemeEndpointRuleSetMiddlewareOptions = {
+    step: "serialize",
+    tags: ["HTTP_AUTH_SCHEME"],
+    name: "httpAuthSchemeMiddleware",
+    override: true,
+    relation: "before",
+    toMiddleware: "endpointV2Middleware",
+};
+const getHttpAuthSchemeEndpointRuleSetPlugin = (config, { httpAuthSchemeParametersProvider, identityProviderConfigProvider, }) => ({
+    applyToStack: (clientStack) => {
+        clientStack.addRelativeTo(httpAuthSchemeMiddleware(config, {
+            httpAuthSchemeParametersProvider,
+            identityProviderConfigProvider,
+        }), httpAuthSchemeEndpointRuleSetMiddlewareOptions);
+    },
+});
+
+const defaultErrorHandler = (signingProperties) => (error) => {
+    throw error;
+};
+const defaultSuccessHandler = (httpResponse, signingProperties) => { };
+const httpSigningMiddleware = (config) => (next, context) => async (args) => {
+    if (!HttpRequest.isInstance(args.request)) {
+        return next(args);
+    }
+    const smithyContext = getSmithyContext(context);
+    const scheme = smithyContext.selectedHttpAuthScheme;
+    if (!scheme) {
+        throw new Error(`No HttpAuthScheme was selected: unable to sign request`);
+    }
+    const { httpAuthOption: { signingProperties = {} }, identity, signer, } = scheme;
+    const output = await next({
+        ...args,
+        request: await signer.sign(args.request, identity, signingProperties),
+    }).catch((signer.errorHandler || defaultErrorHandler)(signingProperties));
+    (signer.successHandler || defaultSuccessHandler)(output.response, signingProperties);
+    return output;
+};
+
+const httpSigningMiddlewareOptions = {
+    step: "finalizeRequest",
+    tags: ["HTTP_SIGNING"],
+    name: "httpSigningMiddleware",
+    aliases: ["apiKeyMiddleware", "tokenMiddleware", "awsAuthMiddleware"],
+    override: true,
+    relation: "after",
+    toMiddleware: "retryMiddleware",
+};
+const getHttpSigningPlugin = (config) => ({
+    applyToStack: (clientStack) => {
+        clientStack.addRelativeTo(httpSigningMiddleware(), httpSigningMiddlewareOptions);
+    },
+});
+
+const normalizeProvider = (input) => {
+    if (typeof input === "function")
+        return input;
+    const promisified = Promise.resolve(input);
+    return () => promisified;
+};
+
+class DefaultIdentityProviderConfig {
+    authSchemes = new Map();
+    constructor(config) {
+        for (const key in config) {
+            const value = config[key];
+            if (value !== undefined) {
+                this.authSchemes.set(key, value);
+            }
+        }
+    }
+    getIdentityProvider(schemeId) {
+        return this.authSchemes.get(schemeId);
+    }
+}
+
+class NoAuthSigner {
+    async sign(httpRequest, identity, signingProperties) {
+        return httpRequest;
+    }
+}
+
+const createIsIdentityExpiredFunction = (expirationMs) => function isIdentityExpired(identity) {
+    return doesIdentityRequireRefresh(identity) && identity.expiration.getTime() - Date.now() < expirationMs;
+};
+const EXPIRATION_MS = 300_000;
+const isIdentityExpired = createIsIdentityExpiredFunction(EXPIRATION_MS);
+const doesIdentityRequireRefresh = (identity) => identity.expiration !== undefined;
+const memoizeIdentityProvider = (provider, isExpired, requiresRefresh) => {
+    if (provider === undefined) {
+        return undefined;
+    }
+    const normalizedProvider = typeof provider !== "function" ? async () => Promise.resolve(provider) : provider;
+    let resolved;
+    let pending;
+    let hasResult;
+    let isConstant = false;
+    const coalesceProvider = async (options) => {
+        if (!pending) {
+            pending = normalizedProvider(options);
+        }
+        try {
+            resolved = await pending;
+            hasResult = true;
+            isConstant = false;
+        }
+        finally {
+            pending = undefined;
+        }
+        return resolved;
+    };
+    if (isExpired === undefined) {
+        return async (options) => {
+            if (!hasResult || options?.forceRefresh) {
+                resolved = await coalesceProvider(options);
+            }
+            return resolved;
+        };
+    }
+    return async (options) => {
+        if (!hasResult || options?.forceRefresh) {
+            resolved = await coalesceProvider(options);
+        }
+        if (isConstant) {
+            return resolved;
+        }
+        if (!requiresRefresh(resolved)) {
+            isConstant = true;
+            return resolved;
+        }
+        if (isExpired(resolved)) {
+            await coalesceProvider(options);
+            return resolved;
+        }
+        return resolved;
+    };
+};
+
+const DEFAULT_UA_APP_ID = undefined;
+function isValidUserAgentAppId(appId) {
+    if (appId === undefined) {
+        return true;
+    }
+    return typeof appId === "string" && appId.length <= 50;
+}
+function resolveUserAgentConfig(input) {
+    const normalizedAppIdProvider = normalizeProvider(input.userAgentAppId ?? DEFAULT_UA_APP_ID);
+    const { customUserAgent } = input;
+    return Object.assign(input, {
+        customUserAgent: typeof customUserAgent === "string" ? [[customUserAgent]] : customUserAgent,
+        userAgentAppId: async () => {
+            const appId = await normalizedAppIdProvider();
+            if (!isValidUserAgentAppId(appId)) {
+                const logger = input.logger?.constructor?.name === "NoOpLogger" || !input.logger ? console : input.logger;
+                if (typeof appId !== "string") {
+                    logger?.warn("userAgentAppId must be a string or undefined.");
+                }
+                else if (appId.length > 50) {
+                    logger?.warn("The provided userAgentAppId exceeds the maximum length of 50 characters.");
+                }
+            }
+            return appId;
+        },
+    });
+}
+
+const partitionsInfo = {
+    "partitions": [
+        {
+            "id": "aws",
+            "outputs": {
+                "dnsSuffix": "amazonaws.com",
+                "dualStackDnsSuffix": "api.aws",
+                "implicitGlobalRegion": "us-east-1",
+                "name": "aws",
+                "supportsDualStack": true,
+                "supportsFIPS": true
+            },
+            "regionRegex": "^(us|eu|ap|sa|ca|me|af|il|mx)\\-\\w+\\-\\d+$",
+            "regions": {
+                "af-south-1": {
+                    "description": "Africa (Cape Town)"
+                },
+                "ap-east-1": {
+                    "description": "Asia Pacific (Hong Kong)"
+                },
+                "ap-east-2": {
+                    "description": "Asia Pacific (Taipei)"
+                },
+                "ap-northeast-1": {
+                    "description": "Asia Pacific (Tokyo)"
+                },
+                "ap-northeast-2": {
+                    "description": "Asia Pacific (Seoul)"
+                },
+                "ap-northeast-3": {
+                    "description": "Asia Pacific (Osaka)"
+                },
+                "ap-south-1": {
+                    "description": "Asia Pacific (Mumbai)"
+                },
+                "ap-south-2": {
+                    "description": "Asia Pacific (Hyderabad)"
+                },
+                "ap-southeast-1": {
+                    "description": "Asia Pacific (Singapore)"
+                },
+                "ap-southeast-2": {
+                    "description": "Asia Pacific (Sydney)"
+                },
+                "ap-southeast-3": {
+                    "description": "Asia Pacific (Jakarta)"
+                },
+                "ap-southeast-4": {
+                    "description": "Asia Pacific (Melbourne)"
+                },
+                "ap-southeast-5": {
+                    "description": "Asia Pacific (Malaysia)"
+                },
+                "ap-southeast-6": {
+                    "description": "Asia Pacific (New Zealand)"
+                },
+                "ap-southeast-7": {
+                    "description": "Asia Pacific (Thailand)"
+                },
+                "aws-global": {
+                    "description": "aws global region"
+                },
+                "ca-central-1": {
+                    "description": "Canada (Central)"
+                },
+                "ca-west-1": {
+                    "description": "Canada West (Calgary)"
+                },
+                "eu-central-1": {
+                    "description": "Europe (Frankfurt)"
+                },
+                "eu-central-2": {
+                    "description": "Europe (Zurich)"
+                },
+                "eu-north-1": {
+                    "description": "Europe (Stockholm)"
+                },
+                "eu-south-1": {
+                    "description": "Europe (Milan)"
+                },
+                "eu-south-2": {
+                    "description": "Europe (Spain)"
+                },
+                "eu-west-1": {
+                    "description": "Europe (Ireland)"
+                },
+                "eu-west-2": {
+                    "description": "Europe (London)"
+                },
+                "eu-west-3": {
+                    "description": "Europe (Paris)"
+                },
+                "il-central-1": {
+                    "description": "Israel (Tel Aviv)"
+                },
+                "me-central-1": {
+                    "description": "Middle East (UAE)"
+                },
+                "me-south-1": {
+                    "description": "Middle East (Bahrain)"
+                },
+                "mx-central-1": {
+                    "description": "Mexico (Central)"
+                },
+                "sa-east-1": {
+                    "description": "South America (Sao Paulo)"
+                },
+                "us-east-1": {
+                    "description": "US East (N. Virginia)"
+                },
+                "us-east-2": {
+                    "description": "US East (Ohio)"
+                },
+                "us-west-1": {
+                    "description": "US West (N. California)"
+                },
+                "us-west-2": {
+                    "description": "US West (Oregon)"
+                }
+            }
+        },
+        {
+            "id": "aws-cn",
+            "outputs": {
+                "dnsSuffix": "amazonaws.com.cn",
+                "dualStackDnsSuffix": "api.amazonwebservices.com.cn",
+                "implicitGlobalRegion": "cn-northwest-1",
+                "name": "aws-cn",
+                "supportsDualStack": true,
+                "supportsFIPS": true
+            },
+            "regionRegex": "^cn\\-\\w+\\-\\d+$",
+            "regions": {
+                "aws-cn-global": {
+                    "description": "aws-cn global region"
+                },
+                "cn-north-1": {
+                    "description": "China (Beijing)"
+                },
+                "cn-northwest-1": {
+                    "description": "China (Ningxia)"
+                }
+            }
+        },
+        {
+            "id": "aws-eusc",
+            "outputs": {
+                "dnsSuffix": "amazonaws.eu",
+                "dualStackDnsSuffix": "api.amazonwebservices.eu",
+                "implicitGlobalRegion": "eusc-de-east-1",
+                "name": "aws-eusc",
+                "supportsDualStack": true,
+                "supportsFIPS": true
+            },
+            "regionRegex": "^eusc\\-(de)\\-\\w+\\-\\d+$",
+            "regions": {
+                "eusc-de-east-1": {
+                    "description": "AWS European Sovereign Cloud (Germany)"
+                }
+            }
+        },
+        {
+            "id": "aws-iso",
+            "outputs": {
+                "dnsSuffix": "c2s.ic.gov",
+                "dualStackDnsSuffix": "api.aws.ic.gov",
+                "implicitGlobalRegion": "us-iso-east-1",
+                "name": "aws-iso",
+                "supportsDualStack": true,
+                "supportsFIPS": true
+            },
+            "regionRegex": "^us\\-iso\\-\\w+\\-\\d+$",
+            "regions": {
+                "aws-iso-global": {
+                    "description": "aws-iso global region"
+                },
+                "us-iso-east-1": {
+                    "description": "US ISO East"
+                },
+                "us-iso-west-1": {
+                    "description": "US ISO WEST"
+                }
+            }
+        },
+        {
+            "id": "aws-iso-b",
+            "outputs": {
+                "dnsSuffix": "sc2s.sgov.gov",
+                "dualStackDnsSuffix": "api.aws.scloud",
+                "implicitGlobalRegion": "us-isob-east-1",
+                "name": "aws-iso-b",
+                "supportsDualStack": true,
+                "supportsFIPS": true
+            },
+            "regionRegex": "^us\\-isob\\-\\w+\\-\\d+$",
+            "regions": {
+                "aws-iso-b-global": {
+                    "description": "aws-iso-b global region"
+                },
+                "us-isob-east-1": {
+                    "description": "US ISOB East (Ohio)"
+                },
+                "us-isob-west-1": {
+                    "description": "US ISOB West"
+                }
+            }
+        },
+        {
+            "id": "aws-iso-e",
+            "outputs": {
+                "dnsSuffix": "cloud.adc-e.uk",
+                "dualStackDnsSuffix": "api.cloud-aws.adc-e.uk",
+                "implicitGlobalRegion": "eu-isoe-west-1",
+                "name": "aws-iso-e",
+                "supportsDualStack": true,
+                "supportsFIPS": true
+            },
+            "regionRegex": "^eu\\-isoe\\-\\w+\\-\\d+$",
+            "regions": {
+                "aws-iso-e-global": {
+                    "description": "aws-iso-e global region"
+                },
+                "eu-isoe-west-1": {
+                    "description": "EU ISOE West"
+                }
+            }
+        },
+        {
+            "id": "aws-iso-f",
+            "outputs": {
+                "dnsSuffix": "csp.hci.ic.gov",
+                "dualStackDnsSuffix": "api.aws.hci.ic.gov",
+                "implicitGlobalRegion": "us-isof-south-1",
+                "name": "aws-iso-f",
+                "supportsDualStack": true,
+                "supportsFIPS": true
+            },
+            "regionRegex": "^us\\-isof\\-\\w+\\-\\d+$",
+            "regions": {
+                "aws-iso-f-global": {
+                    "description": "aws-iso-f global region"
+                },
+                "us-isof-east-1": {
+                    "description": "US ISOF EAST"
+                },
+                "us-isof-south-1": {
+                    "description": "US ISOF SOUTH"
+                }
+            }
+        },
+        {
+            "id": "aws-us-gov",
+            "outputs": {
+                "dnsSuffix": "amazonaws.com",
+                "dualStackDnsSuffix": "api.aws",
+                "implicitGlobalRegion": "us-gov-west-1",
+                "name": "aws-us-gov",
+                "supportsDualStack": true,
+                "supportsFIPS": true
+            },
+            "regionRegex": "^us\\-gov\\-\\w+\\-\\d+$",
+            "regions": {
+                "aws-us-gov-global": {
+                    "description": "aws-us-gov global region"
+                },
+                "us-gov-east-1": {
+                    "description": "AWS GovCloud (US-East)"
+                },
+                "us-gov-west-1": {
+                    "description": "AWS GovCloud (US-West)"
+                }
+            }
+        }
+    ]};
+
+let selectedPartitionsInfo = partitionsInfo;
+const partition = (value) => {
+    const { partitions } = selectedPartitionsInfo;
+    for (const partition of partitions) {
+        const { regions, outputs } = partition;
+        for (const [region, regionData] of Object.entries(regions)) {
+            if (region === value) {
+                return {
+                    ...outputs,
+                    ...regionData,
+                };
+            }
+        }
+    }
+    for (const partition of partitions) {
+        const { regionRegex, outputs } = partition;
+        if (new RegExp(regionRegex).test(value)) {
+            return {
+                ...outputs,
+            };
+        }
+    }
+    const DEFAULT_PARTITION = partitions.find((partition) => partition.id === "aws");
+    if (!DEFAULT_PARTITION) {
+        throw new Error("Provided region was not found in the partition array or regex," +
+            " and default partition with id 'aws' doesn't exist.");
+    }
+    return {
+        ...DEFAULT_PARTITION.outputs,
+    };
+};
+
+const ACCOUNT_ID_ENDPOINT_REGEX = /\d{12}\.ddb/;
+async function checkFeatures(context, config, args) {
+    const request = args.request;
+    if (request?.headers?.["smithy-protocol"] === "rpc-v2-cbor") {
+        setFeature(context, "PROTOCOL_RPC_V2_CBOR", "M");
+    }
+    if (typeof config.retryStrategy === "function") {
+        const retryStrategy = await config.retryStrategy();
+        if (typeof retryStrategy.mode === "string") {
+            switch (retryStrategy.mode) {
+                case RETRY_MODES.ADAPTIVE:
+                    setFeature(context, "RETRY_MODE_ADAPTIVE", "F");
+                    break;
+                case RETRY_MODES.STANDARD:
+                    setFeature(context, "RETRY_MODE_STANDARD", "E");
+                    break;
+            }
+        }
+    }
+    if (typeof config.accountIdEndpointMode === "function") {
+        const endpointV2 = context.endpointV2;
+        if (String(endpointV2?.url?.hostname).match(ACCOUNT_ID_ENDPOINT_REGEX)) {
+            setFeature(context, "ACCOUNT_ID_ENDPOINT", "O");
+        }
+        switch (await config.accountIdEndpointMode?.()) {
+            case "disabled":
+                setFeature(context, "ACCOUNT_ID_MODE_DISABLED", "Q");
+                break;
+            case "preferred":
+                setFeature(context, "ACCOUNT_ID_MODE_PREFERRED", "P");
+                break;
+            case "required":
+                setFeature(context, "ACCOUNT_ID_MODE_REQUIRED", "R");
+                break;
+        }
+    }
+    const identity = context.__smithy_context?.selectedHttpAuthScheme?.identity;
+    if (identity?.$source) {
+        const credentials = identity;
+        if (credentials.accountId) {
+            setFeature(context, "RESOLVED_ACCOUNT_ID", "T");
+        }
+        for (const [key, value] of Object.entries(credentials.$source ?? {})) {
+            setFeature(context, key, value);
+        }
+    }
+}
+
+const USER_AGENT = "user-agent";
+const X_AMZ_USER_AGENT = "x-amz-user-agent";
+const SPACE = " ";
+const UA_NAME_SEPARATOR = "/";
+const UA_NAME_ESCAPE_REGEX = /[^!$%&'*+\-.^_`|~\w]/g;
+const UA_VALUE_ESCAPE_REGEX = /[^!$%&'*+\-.^_`|~\w#]/g;
+const UA_ESCAPE_CHAR = "-";
+
+const BYTE_LIMIT = 1024;
+function encodeFeatures(features) {
+    let buffer = "";
+    for (const key in features) {
+        const val = features[key];
+        if (buffer.length + val.length + 1 <= BYTE_LIMIT) {
+            if (buffer.length) {
+                buffer += "," + val;
+            }
+            else {
+                buffer += val;
+            }
+            continue;
+        }
+        break;
+    }
+    return buffer;
+}
+
+const userAgentMiddleware = (options) => (next, context) => async (args) => {
+    const { request } = args;
+    if (!HttpRequest.isInstance(request)) {
+        return next(args);
+    }
+    const { headers } = request;
+    const userAgent = context?.userAgent?.map(escapeUserAgent) || [];
+    const defaultUserAgent = (await options.defaultUserAgentProvider()).map(escapeUserAgent);
+    await checkFeatures(context, options, args);
+    const awsContext = context;
+    defaultUserAgent.push(`m/${encodeFeatures(Object.assign({}, context.__smithy_context?.features, awsContext.__aws_sdk_context?.features))}`);
+    const customUserAgent = options?.customUserAgent?.map(escapeUserAgent) || [];
+    const appId = await options.userAgentAppId();
+    if (appId) {
+        defaultUserAgent.push(escapeUserAgent([`app`, `${appId}`]));
+    }
+    const sdkUserAgentValue = ([])
+        .concat([...defaultUserAgent, ...userAgent, ...customUserAgent])
+        .join(SPACE);
+    const normalUAValue = [
+        ...defaultUserAgent.filter((section) => section.startsWith("aws-sdk-")),
+        ...customUserAgent,
+    ].join(SPACE);
+    if (options.runtime !== "browser") {
+        if (normalUAValue) {
+            headers[X_AMZ_USER_AGENT] = headers[X_AMZ_USER_AGENT]
+                ? `${headers[USER_AGENT]} ${normalUAValue}`
+                : normalUAValue;
+        }
+        headers[USER_AGENT] = sdkUserAgentValue;
+    }
+    else {
+        headers[X_AMZ_USER_AGENT] = sdkUserAgentValue;
+    }
+    return next({
+        ...args,
+        request,
+    });
+};
+const escapeUserAgent = (userAgentPair) => {
+    const name = userAgentPair[0]
+        .split(UA_NAME_SEPARATOR)
+        .map((part) => part.replace(UA_NAME_ESCAPE_REGEX, UA_ESCAPE_CHAR))
+        .join(UA_NAME_SEPARATOR);
+    const version = userAgentPair[1]?.replace(UA_VALUE_ESCAPE_REGEX, UA_ESCAPE_CHAR);
+    const prefixSeparatorIndex = name.indexOf(UA_NAME_SEPARATOR);
+    const prefix = name.substring(0, prefixSeparatorIndex);
+    let uaName = name.substring(prefixSeparatorIndex + 1);
+    if (prefix === "api") {
+        uaName = uaName.toLowerCase();
+    }
+    return [prefix, uaName, version]
+        .filter((item) => item && item.length > 0)
+        .reduce((acc, item, index) => {
+        switch (index) {
+            case 0:
+                return item;
+            case 1:
+                return `${acc}/${item}`;
+            default:
+                return `${acc}#${item}`;
+        }
+    }, "");
+};
+const getUserAgentMiddlewareOptions = {
+    name: "getUserAgentMiddleware",
+    step: "build",
+    priority: "low",
+    tags: ["SET_USER_AGENT", "USER_AGENT"],
+    override: true,
+};
+const getUserAgentPlugin = (config) => ({
+    applyToStack: (clientStack) => {
+        clientStack.add(userAgentMiddleware(config), getUserAgentMiddlewareOptions);
+    },
+});
+
+const getRuntimeUserAgentPair = () => {
+    const runtimesToCheck = ["deno", "bun", "llrt"];
+    for (const runtime of runtimesToCheck) {
+        if (versions[runtime]) {
+            return [`md/${runtime}`, versions[runtime]];
+        }
+    }
+    return ["md/nodejs", versions.node];
+};
+
+const getNodeModulesParentDirs = (dirname) => {
+    const cwd = process.cwd();
+    if (!dirname) {
+        return [cwd];
+    }
+    const normalizedPath = normalize(dirname);
+    const parts = normalizedPath.split(sep);
+    const nodeModulesIndex = parts.indexOf("node_modules");
+    const parentDir = nodeModulesIndex !== -1 ? parts.slice(0, nodeModulesIndex).join(sep) : normalizedPath;
+    if (cwd === parentDir) {
+        return [cwd];
+    }
+    return [parentDir, cwd];
+};
+
+const SEMVER_REGEX = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+[0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*)?$/;
+const getSanitizedTypeScriptVersion = (version = "") => {
+    const match = version.match(SEMVER_REGEX);
+    if (!match) {
+        return undefined;
+    }
+    const [major, minor, patch, prerelease] = [match[1], match[2], match[3], match[4]];
+    return prerelease ? `${major}.${minor}.${patch}-${prerelease}` : `${major}.${minor}.${patch}`;
+};
+
+const ALLOWED_PREFIXES = ["^", "~", ">=", "<=", ">", "<"];
+const ALLOWED_DIST_TAGS = ["latest", "beta", "dev", "rc", "insiders", "next"];
+const getSanitizedDevTypeScriptVersion = (version = "") => {
+    if (ALLOWED_DIST_TAGS.includes(version)) {
+        return version;
+    }
+    const prefix = ALLOWED_PREFIXES.find((p) => version.startsWith(p)) ?? "";
+    const sanitizedTypeScriptVersion = getSanitizedTypeScriptVersion(version.slice(prefix.length));
+    if (!sanitizedTypeScriptVersion) {
+        return undefined;
+    }
+    return `${prefix}${sanitizedTypeScriptVersion}`;
+};
+
+let tscVersion;
+const TS_PACKAGE_JSON = join("node_modules", "typescript", "package.json");
+const getTypeScriptUserAgentPair = async () => {
+    if (tscVersion === null) {
+        return undefined;
+    }
+    else if (typeof tscVersion === "string") {
+        return ["md/tsc", tscVersion];
+    }
+    let isTypeScriptDetectionDisabled = false;
+    try {
+        isTypeScriptDetectionDisabled =
+            booleanSelector(process.env, "AWS_SDK_JS_TYPESCRIPT_DETECTION_DISABLED", SelectorType.ENV) || false;
+    }
+    catch { }
+    if (isTypeScriptDetectionDisabled) {
+        tscVersion = null;
+        return undefined;
+    }
+    const dirname = typeof __dirname !== "undefined" ? __dirname : undefined;
+    const nodeModulesParentDirs = getNodeModulesParentDirs(dirname);
+    let versionFromApp;
+    for (const nodeModulesParentDir of nodeModulesParentDirs) {
+        try {
+            const appPackageJsonPath = join(nodeModulesParentDir, "package.json");
+            const packageJson = await readFile$1(appPackageJsonPath, "utf-8");
+            const { dependencies, devDependencies } = JSON.parse(packageJson);
+            const version = devDependencies?.typescript ?? dependencies?.typescript;
+            if (typeof version !== "string") {
+                continue;
+            }
+            versionFromApp = version;
+            break;
+        }
+        catch {
+        }
+    }
+    if (!versionFromApp) {
+        tscVersion = null;
+        return undefined;
+    }
+    let versionFromNodeModules;
+    for (const nodeModulesParentDir of nodeModulesParentDirs) {
+        try {
+            const tsPackageJsonPath = join(nodeModulesParentDir, TS_PACKAGE_JSON);
+            const packageJson = await readFile$1(tsPackageJsonPath, "utf-8");
+            const { version } = JSON.parse(packageJson);
+            const sanitizedVersion = getSanitizedTypeScriptVersion(version);
+            if (typeof sanitizedVersion !== "string") {
+                continue;
+            }
+            versionFromNodeModules = sanitizedVersion;
+            break;
+        }
+        catch {
+        }
+    }
+    if (versionFromNodeModules) {
+        tscVersion = versionFromNodeModules;
+        return ["md/tsc", tscVersion];
+    }
+    const sanitizedVersion = getSanitizedDevTypeScriptVersion(versionFromApp);
+    if (typeof sanitizedVersion !== "string") {
+        tscVersion = null;
+        return undefined;
+    }
+    tscVersion = `dev_${sanitizedVersion}`;
+    return ["md/tsc", tscVersion];
+};
+
+const isCrtAvailable = () => {
+    return null;
+};
+
+const createDefaultUserAgentProvider = ({ serviceId, clientVersion }) => {
+    const runtimeUserAgentPair = getRuntimeUserAgentPair();
+    return async (config) => {
+        const sections = [
+            ["aws-sdk-js", clientVersion],
+            ["ua", "2.1"],
+            [`os/${platform()}`, release()],
+            ["lang/js"],
+            runtimeUserAgentPair,
+        ];
+        const typescriptUserAgentPair = await getTypeScriptUserAgentPair();
+        if (typescriptUserAgentPair) {
+            sections.push(typescriptUserAgentPair);
+        }
+        const crtAvailable = isCrtAvailable();
+        if (crtAvailable) {
+            sections.push(crtAvailable);
+        }
+        if (serviceId) {
+            sections.push([`api/${serviceId}`, clientVersion]);
+        }
+        if (env.AWS_EXECUTION_ENV) {
+            sections.push([`exec-env/${env.AWS_EXECUTION_ENV}`]);
+        }
+        const appId = await config?.userAgentAppId?.();
+        const resolvedUserAgent = appId ? [...sections, [`app/${appId}`]] : [...sections];
+        return resolvedUserAgent;
+    };
+};
+
+const UA_APP_ID_ENV_NAME = "AWS_SDK_UA_APP_ID";
+const UA_APP_ID_INI_NAME = "sdk_ua_app_id";
+const UA_APP_ID_INI_NAME_DEPRECATED = "sdk-ua-app-id";
+const NODE_APP_ID_CONFIG_OPTIONS = {
+    environmentVariableSelector: (env) => env[UA_APP_ID_ENV_NAME],
+    configFileSelector: (profile) => profile[UA_APP_ID_INI_NAME] ?? profile[UA_APP_ID_INI_NAME_DEPRECATED],
+    default: DEFAULT_UA_APP_ID,
+};
+
+const isVirtualHostableS3Bucket = (value, allowSubDomains = false) => {
+    if (allowSubDomains) {
+        for (const label of value.split(".")) {
+            if (!isVirtualHostableS3Bucket(label)) {
+                return false;
+            }
+        }
+        return true;
+    }
+    if (!isValidHostLabel(value)) {
+        return false;
+    }
+    if (value.length < 3 || value.length > 63) {
+        return false;
+    }
+    if (value !== value.toLowerCase()) {
+        return false;
+    }
+    if (isIpAddress(value)) {
+        return false;
+    }
+    return true;
+};
+
+const ARN_DELIMITER = ":";
+const RESOURCE_DELIMITER = "/";
+const parseArn = (value) => {
+    const segments = value.split(ARN_DELIMITER);
+    if (segments.length < 6)
+        return null;
+    const [arn, partition, service, region, accountId, ...resourcePath] = segments;
+    if (arn !== "arn" || partition === "" || service === "" || resourcePath.join(ARN_DELIMITER) === "")
+        return null;
+    const resourceId = resourcePath.map((resource) => resource.split(RESOURCE_DELIMITER)).flat();
+    return {
+        partition,
+        service,
+        region,
+        accountId,
+        resourceId,
+    };
+};
+
+const awsEndpointFunctions = {
+    isVirtualHostableS3Bucket: isVirtualHostableS3Bucket,
+    parseArn: parseArn,
+    partition: partition,
+};
+customEndpointFunctions.aws = awsEndpointFunctions;
+
+function stsRegionDefaultResolver(loaderConfig = {}) {
+    return loadConfig({
+        ...NODE_REGION_CONFIG_OPTIONS,
+        async default() {
+            {
+                console.warn("@aws-sdk - WARN - default STS region of us-east-1 used. See @aws-sdk/credential-providers README and set a region explicitly.");
+            }
+            return "us-east-1";
+        },
+    }, { ...NODE_REGION_CONFIG_FILE_OPTIONS, ...loaderConfig });
+}
+
+const getAwsRegionExtensionConfiguration = (runtimeConfig) => {
+    return {
+        setRegion(region) {
+            runtimeConfig.region = region;
+        },
+        region() {
+            return runtimeConfig.region;
+        },
+    };
+};
+const resolveAwsRegionExtensionConfiguration = (awsRegionExtensionConfiguration) => {
+    return {
+        region: awsRegionExtensionConfiguration.region(),
+    };
+};
+
+const ENV_ENDPOINT_DISCOVERY = ["AWS_ENABLE_ENDPOINT_DISCOVERY", "AWS_ENDPOINT_DISCOVERY_ENABLED"];
+const CONFIG_ENDPOINT_DISCOVERY = "endpoint_discovery_enabled";
+const isFalsy = (value) => ["false", "0"].indexOf(value) >= 0;
+const NODE_ENDPOINT_DISCOVERY_CONFIG_OPTIONS = {
+    environmentVariableSelector: (env) => {
+        for (let i = 0; i < ENV_ENDPOINT_DISCOVERY.length; i++) {
+            const envKey = ENV_ENDPOINT_DISCOVERY[i];
+            if (envKey in env) {
+                const value = env[envKey];
+                if (value === "") {
+                    throw Error(`Environment variable ${envKey} can't be empty of undefined, got "${value}"`);
+                }
+                return !isFalsy(value);
+            }
+        }
+    },
+    configFileSelector: (profile) => {
+        if (CONFIG_ENDPOINT_DISCOVERY in profile) {
+            const value = profile[CONFIG_ENDPOINT_DISCOVERY];
+            if (value === undefined) {
+                throw Error(`Shared config entry ${CONFIG_ENDPOINT_DISCOVERY} can't be undefined, got "${value}"`);
+            }
+            return !isFalsy(value);
+        }
+    },
+    default: undefined,
+};
 
 /**
  * Obliterator Iterator Class
@@ -33154,7 +39671,7 @@ var hasRequiredTypedArrays;
 function requireTypedArrays () {
 	if (hasRequiredTypedArrays) return typedArrays;
 	hasRequiredTypedArrays = 1;
-	(function (exports$1) {
+	(function (exports) {
 		/**
 		 * When using an unsigned integer array to store pointers, one might want to
 		 * choose the optimal word size in regards to the actual numbers of pointers
@@ -33173,7 +39690,7 @@ function requireTypedArrays () {
 		    MAX_SIGNED_16BIT_INTEGER = Math.pow(2, 15) - 1,
 		    MAX_SIGNED_32BIT_INTEGER = Math.pow(2, 31) - 1;
 
-		exports$1.getPointerArray = function(size) {
+		exports.getPointerArray = function(size) {
 		  var maxIndex = size - 1;
 
 		  if (maxIndex <= MAX_8BIT_INTEGER)
@@ -33188,7 +39705,7 @@ function requireTypedArrays () {
 		  return Float64Array;
 		};
 
-		exports$1.getSignedPointerArray = function(size) {
+		exports.getSignedPointerArray = function(size) {
 		  var maxIndex = size - 1;
 
 		  if (maxIndex <= MAX_SIGNED_8BIT_INTEGER)
@@ -33209,7 +39726,7 @@ function requireTypedArrays () {
 		 * @param  {number} value - Value to test.
 		 * @return {TypedArrayClass}
 		 */
-		exports$1.getNumberType = function(value) {
+		exports.getNumberType = function(value) {
 
 		  // <= 32 bits itnteger?
 		  if (value === (value | 0)) {
@@ -33261,7 +39778,7 @@ function requireTypedArrays () {
 		};
 
 		// TODO: make this a one-shot for one value
-		exports$1.getMinimalRepresentation = function(array, getter) {
+		exports.getMinimalRepresentation = function(array, getter) {
 		  var maxType = null,
 		      maxPriority = 0,
 		      p,
@@ -33272,7 +39789,7 @@ function requireTypedArrays () {
 
 		  for (i = 0, l = array.length; i < l; i++) {
 		    v = getter ? getter(array[i]) : array[i];
-		    t = exports$1.getNumberType(v);
+		    t = exports.getNumberType(v);
 		    p = TYPE_PRIORITY[t.name];
 
 		    if (p > maxPriority) {
@@ -33290,7 +39807,7 @@ function requireTypedArrays () {
 		 * @param  {any} value - Value to test.
 		 * @return {boolean}
 		 */
-		exports$1.isTypedArray = function(value) {
+		exports.isTypedArray = function(value) {
 		  return typeof ArrayBuffer !== 'undefined' && ArrayBuffer.isView(value);
 		};
 
@@ -33300,7 +39817,7 @@ function requireTypedArrays () {
 		 * @param  {...ByteArray}
 		 * @return {ByteArray}
 		 */
-		exports$1.concat = function() {
+		exports.concat = function() {
 		  var length = 0,
 		      i,
 		      o,
@@ -33325,8 +39842,8 @@ function requireTypedArrays () {
 		 * @param  {number}    length - Length of target.
 		 * @return {ByteArray}
 		 */
-		exports$1.indices = function(length) {
-		  var PointerArray = exports$1.getPointerArray(length);
+		exports.indices = function(length) {
+		  var PointerArray = exports.getPointerArray(length);
 
 		  var array = new PointerArray(length);
 
@@ -33889,7 +40406,7 @@ function requireLruCache () {
 var lruCacheExports = requireLruCache();
 var LRUCache = /*@__PURE__*/getDefaultExportFromCjs(lruCacheExports);
 
-let EndpointCache$1 = class EndpointCache {
+class EndpointCache {
     cache;
     constructor(capacity) {
         this.cache = new LRUCache(capacity);
@@ -33941,3894 +40458,19 @@ let EndpointCache$1 = class EndpointCache {
     clear() {
         this.cache.clear();
     }
-};
+}
 
 const resolveEndpointDiscoveryConfig = (input, { endpointDiscoveryCommandCtor }) => {
     const { endpointCacheSize, endpointDiscoveryEnabled, endpointDiscoveryEnabledProvider } = input;
     return Object.assign(input, {
         endpointDiscoveryCommandCtor,
-        endpointCache: new EndpointCache$1(endpointCacheSize ?? 1000),
+        endpointCache: new EndpointCache(endpointCacheSize ?? 1000),
         endpointDiscoveryEnabled: endpointDiscoveryEnabled !== undefined
             ? () => Promise.resolve(endpointDiscoveryEnabled)
             : endpointDiscoveryEnabledProvider,
         isClientEndpointDiscoveryEnabled: endpointDiscoveryEnabled !== undefined,
     });
 };
-
-function resolveHostHeaderConfig(input) {
-    return input;
-}
-const hostHeaderMiddleware = (options) => (next) => async (args) => {
-    if (!HttpRequest.isInstance(args.request))
-        return next(args);
-    const { request } = args;
-    const { handlerProtocol = "" } = options.requestHandler.metadata || {};
-    if (handlerProtocol.indexOf("h2") >= 0 && !request.headers[":authority"]) {
-        delete request.headers["host"];
-        request.headers[":authority"] = request.hostname + (request.port ? ":" + request.port : "");
-    }
-    else if (!request.headers["host"]) {
-        let host = request.hostname;
-        if (request.port != null)
-            host += `:${request.port}`;
-        request.headers["host"] = host;
-    }
-    return next(args);
-};
-const hostHeaderMiddlewareOptions = {
-    name: "hostHeaderMiddleware",
-    step: "build",
-    priority: "low",
-    tags: ["HOST"],
-    override: true,
-};
-const getHostHeaderPlugin = (options) => ({
-    applyToStack: (clientStack) => {
-        clientStack.add(hostHeaderMiddleware(options), hostHeaderMiddlewareOptions);
-    },
-});
-
-const loggerMiddleware = () => (next, context) => async (args) => {
-    try {
-        const response = await next(args);
-        const { clientName, commandName, logger, dynamoDbDocumentClientOptions = {} } = context;
-        const { overrideInputFilterSensitiveLog, overrideOutputFilterSensitiveLog } = dynamoDbDocumentClientOptions;
-        const inputFilterSensitiveLog = overrideInputFilterSensitiveLog ?? context.inputFilterSensitiveLog;
-        const outputFilterSensitiveLog = overrideOutputFilterSensitiveLog ?? context.outputFilterSensitiveLog;
-        const { $metadata, ...outputWithoutMetadata } = response.output;
-        logger?.info?.({
-            clientName,
-            commandName,
-            input: inputFilterSensitiveLog(args.input),
-            output: outputFilterSensitiveLog(outputWithoutMetadata),
-            metadata: $metadata,
-        });
-        return response;
-    }
-    catch (error) {
-        const { clientName, commandName, logger, dynamoDbDocumentClientOptions = {} } = context;
-        const { overrideInputFilterSensitiveLog } = dynamoDbDocumentClientOptions;
-        const inputFilterSensitiveLog = overrideInputFilterSensitiveLog ?? context.inputFilterSensitiveLog;
-        logger?.error?.({
-            clientName,
-            commandName,
-            input: inputFilterSensitiveLog(args.input),
-            error,
-            metadata: error.$metadata,
-        });
-        throw error;
-    }
-};
-const loggerMiddlewareOptions = {
-    name: "loggerMiddleware",
-    tags: ["LOGGER"],
-    step: "initialize",
-    override: true,
-};
-const getLoggerPlugin = (options) => ({
-    applyToStack: (clientStack) => {
-        clientStack.add(loggerMiddleware(), loggerMiddlewareOptions);
-    },
-});
-
-const recursionDetectionMiddlewareOptions = {
-    step: "build",
-    tags: ["RECURSION_DETECTION"],
-    name: "recursionDetectionMiddleware",
-    override: true,
-    priority: "low",
-};
-
-const PROTECTED_KEYS = {
-    REQUEST_ID: Symbol.for("_AWS_LAMBDA_REQUEST_ID"),
-    X_RAY_TRACE_ID: Symbol.for("_AWS_LAMBDA_X_RAY_TRACE_ID"),
-    TENANT_ID: Symbol.for("_AWS_LAMBDA_TENANT_ID"),
-};
-const NO_GLOBAL_AWS_LAMBDA = ["true", "1"].includes(process.env?.AWS_LAMBDA_NODEJS_NO_GLOBAL_AWSLAMBDA ?? "");
-if (!NO_GLOBAL_AWS_LAMBDA) {
-    globalThis.awslambda = globalThis.awslambda || {};
-}
-class InvokeStoreBase {
-    static PROTECTED_KEYS = PROTECTED_KEYS;
-    isProtectedKey(key) {
-        return Object.values(PROTECTED_KEYS).includes(key);
-    }
-    getRequestId() {
-        return this.get(PROTECTED_KEYS.REQUEST_ID) ?? "-";
-    }
-    getXRayTraceId() {
-        return this.get(PROTECTED_KEYS.X_RAY_TRACE_ID);
-    }
-    getTenantId() {
-        return this.get(PROTECTED_KEYS.TENANT_ID);
-    }
-}
-class InvokeStoreSingle extends InvokeStoreBase {
-    currentContext;
-    getContext() {
-        return this.currentContext;
-    }
-    hasContext() {
-        return this.currentContext !== undefined;
-    }
-    get(key) {
-        return this.currentContext?.[key];
-    }
-    set(key, value) {
-        if (this.isProtectedKey(key)) {
-            throw new Error(`Cannot modify protected Lambda context field: ${String(key)}`);
-        }
-        this.currentContext = this.currentContext || {};
-        this.currentContext[key] = value;
-    }
-    run(context, fn) {
-        this.currentContext = context;
-        return fn();
-    }
-}
-class InvokeStoreMulti extends InvokeStoreBase {
-    als;
-    static async create() {
-        const instance = new InvokeStoreMulti();
-        const asyncHooks = await import('node:async_hooks');
-        instance.als = new asyncHooks.AsyncLocalStorage();
-        return instance;
-    }
-    getContext() {
-        return this.als.getStore();
-    }
-    hasContext() {
-        return this.als.getStore() !== undefined;
-    }
-    get(key) {
-        return this.als.getStore()?.[key];
-    }
-    set(key, value) {
-        if (this.isProtectedKey(key)) {
-            throw new Error(`Cannot modify protected Lambda context field: ${String(key)}`);
-        }
-        const store = this.als.getStore();
-        if (!store) {
-            throw new Error("No context available");
-        }
-        store[key] = value;
-    }
-    run(context, fn) {
-        return this.als.run(context, fn);
-    }
-}
-var InvokeStore;
-(function (InvokeStore) {
-    let instance = null;
-    async function getInstanceAsync() {
-        if (!instance) {
-            instance = (async () => {
-                const isMulti = "AWS_LAMBDA_MAX_CONCURRENCY" in process.env;
-                const newInstance = isMulti
-                    ? await InvokeStoreMulti.create()
-                    : new InvokeStoreSingle();
-                if (!NO_GLOBAL_AWS_LAMBDA && globalThis.awslambda?.InvokeStore) {
-                    return globalThis.awslambda.InvokeStore;
-                }
-                else if (!NO_GLOBAL_AWS_LAMBDA && globalThis.awslambda) {
-                    globalThis.awslambda.InvokeStore = newInstance;
-                    return newInstance;
-                }
-                else {
-                    return newInstance;
-                }
-            })();
-        }
-        return instance;
-    }
-    InvokeStore.getInstanceAsync = getInstanceAsync;
-    InvokeStore._testing = process.env.AWS_LAMBDA_BENCHMARK_MODE === "1"
-        ? {
-            reset: () => {
-                instance = null;
-                if (globalThis.awslambda?.InvokeStore) {
-                    delete globalThis.awslambda.InvokeStore;
-                }
-                globalThis.awslambda = { InvokeStore: undefined };
-            },
-        }
-        : undefined;
-})(InvokeStore || (InvokeStore = {}));
-
-const TRACE_ID_HEADER_NAME = "X-Amzn-Trace-Id";
-const ENV_LAMBDA_FUNCTION_NAME = "AWS_LAMBDA_FUNCTION_NAME";
-const ENV_TRACE_ID = "_X_AMZN_TRACE_ID";
-const recursionDetectionMiddleware = () => (next) => async (args) => {
-    const { request } = args;
-    if (!HttpRequest.isInstance(request)) {
-        return next(args);
-    }
-    const traceIdHeader = Object.keys(request.headers ?? {}).find((h) => h.toLowerCase() === TRACE_ID_HEADER_NAME.toLowerCase()) ??
-        TRACE_ID_HEADER_NAME;
-    if (request.headers.hasOwnProperty(traceIdHeader)) {
-        return next(args);
-    }
-    const functionName = process.env[ENV_LAMBDA_FUNCTION_NAME];
-    const traceIdFromEnv = process.env[ENV_TRACE_ID];
-    const invokeStore = await InvokeStore.getInstanceAsync();
-    const traceIdFromInvokeStore = invokeStore?.getXRayTraceId();
-    const traceId = traceIdFromInvokeStore ?? traceIdFromEnv;
-    const nonEmptyString = (str) => typeof str === "string" && str.length > 0;
-    if (nonEmptyString(functionName) && nonEmptyString(traceId)) {
-        request.headers[TRACE_ID_HEADER_NAME] = traceId;
-    }
-    return next({
-        ...args,
-        request,
-    });
-};
-
-const getRecursionDetectionPlugin = (options) => ({
-    applyToStack: (clientStack) => {
-        clientStack.add(recursionDetectionMiddleware(), recursionDetectionMiddlewareOptions);
-    },
-});
-
-const resolveAuthOptions = (candidateAuthOptions, authSchemePreference) => {
-    if (!authSchemePreference || authSchemePreference.length === 0) {
-        return candidateAuthOptions;
-    }
-    const preferredAuthOptions = [];
-    for (const preferredSchemeName of authSchemePreference) {
-        for (const candidateAuthOption of candidateAuthOptions) {
-            const candidateAuthSchemeName = candidateAuthOption.schemeId.split("#")[1];
-            if (candidateAuthSchemeName === preferredSchemeName) {
-                preferredAuthOptions.push(candidateAuthOption);
-            }
-        }
-    }
-    for (const candidateAuthOption of candidateAuthOptions) {
-        if (!preferredAuthOptions.find(({ schemeId }) => schemeId === candidateAuthOption.schemeId)) {
-            preferredAuthOptions.push(candidateAuthOption);
-        }
-    }
-    return preferredAuthOptions;
-};
-
-function convertHttpAuthSchemesToMap(httpAuthSchemes) {
-    const map = new Map();
-    for (const scheme of httpAuthSchemes) {
-        map.set(scheme.schemeId, scheme);
-    }
-    return map;
-}
-const httpAuthSchemeMiddleware = (config, mwOptions) => (next, context) => async (args) => {
-    const options = config.httpAuthSchemeProvider(await mwOptions.httpAuthSchemeParametersProvider(config, context, args.input));
-    const authSchemePreference = config.authSchemePreference ? await config.authSchemePreference() : [];
-    const resolvedOptions = resolveAuthOptions(options, authSchemePreference);
-    const authSchemes = convertHttpAuthSchemesToMap(config.httpAuthSchemes);
-    const smithyContext = getSmithyContext(context);
-    const failureReasons = [];
-    for (const option of resolvedOptions) {
-        const scheme = authSchemes.get(option.schemeId);
-        if (!scheme) {
-            failureReasons.push(`HttpAuthScheme \`${option.schemeId}\` was not enabled for this service.`);
-            continue;
-        }
-        const identityProvider = scheme.identityProvider(await mwOptions.identityProviderConfigProvider(config));
-        if (!identityProvider) {
-            failureReasons.push(`HttpAuthScheme \`${option.schemeId}\` did not have an IdentityProvider configured.`);
-            continue;
-        }
-        const { identityProperties = {}, signingProperties = {} } = option.propertiesExtractor?.(config, context) || {};
-        option.identityProperties = Object.assign(option.identityProperties || {}, identityProperties);
-        option.signingProperties = Object.assign(option.signingProperties || {}, signingProperties);
-        smithyContext.selectedHttpAuthScheme = {
-            httpAuthOption: option,
-            identity: await identityProvider(option.identityProperties),
-            signer: scheme.signer,
-        };
-        break;
-    }
-    if (!smithyContext.selectedHttpAuthScheme) {
-        throw new Error(failureReasons.join("\n"));
-    }
-    return next(args);
-};
-
-const httpAuthSchemeEndpointRuleSetMiddlewareOptions = {
-    step: "serialize",
-    tags: ["HTTP_AUTH_SCHEME"],
-    name: "httpAuthSchemeMiddleware",
-    override: true,
-    relation: "before",
-    toMiddleware: "endpointV2Middleware",
-};
-const getHttpAuthSchemeEndpointRuleSetPlugin = (config, { httpAuthSchemeParametersProvider, identityProviderConfigProvider, }) => ({
-    applyToStack: (clientStack) => {
-        clientStack.addRelativeTo(httpAuthSchemeMiddleware(config, {
-            httpAuthSchemeParametersProvider,
-            identityProviderConfigProvider,
-        }), httpAuthSchemeEndpointRuleSetMiddlewareOptions);
-    },
-});
-
-const serializerMiddlewareOption$1 = {
-    name: "serializerMiddleware"};
-
-const defaultErrorHandler = (signingProperties) => (error) => {
-    throw error;
-};
-const defaultSuccessHandler = (httpResponse, signingProperties) => { };
-const httpSigningMiddleware = (config) => (next, context) => async (args) => {
-    if (!HttpRequest.isInstance(args.request)) {
-        return next(args);
-    }
-    const smithyContext = getSmithyContext(context);
-    const scheme = smithyContext.selectedHttpAuthScheme;
-    if (!scheme) {
-        throw new Error(`No HttpAuthScheme was selected: unable to sign request`);
-    }
-    const { httpAuthOption: { signingProperties = {} }, identity, signer, } = scheme;
-    const output = await next({
-        ...args,
-        request: await signer.sign(args.request, identity, signingProperties),
-    }).catch((signer.errorHandler || defaultErrorHandler)(signingProperties));
-    (signer.successHandler || defaultSuccessHandler)(output.response, signingProperties);
-    return output;
-};
-
-const httpSigningMiddlewareOptions = {
-    step: "finalizeRequest",
-    tags: ["HTTP_SIGNING"],
-    name: "httpSigningMiddleware",
-    aliases: ["apiKeyMiddleware", "tokenMiddleware", "awsAuthMiddleware"],
-    override: true,
-    relation: "after",
-    toMiddleware: "retryMiddleware",
-};
-const getHttpSigningPlugin = (config) => ({
-    applyToStack: (clientStack) => {
-        clientStack.addRelativeTo(httpSigningMiddleware(), httpSigningMiddlewareOptions);
-    },
-});
-
-const normalizeProvider = (input) => {
-    if (typeof input === "function")
-        return input;
-    const promisified = Promise.resolve(input);
-    return () => promisified;
-};
-
-const isArrayBuffer = (arg) => (typeof ArrayBuffer === "function" && arg instanceof ArrayBuffer) ||
-    Object.prototype.toString.call(arg) === "[object ArrayBuffer]";
-
-const fromArrayBuffer = (input, offset = 0, length = input.byteLength - offset) => {
-    if (!isArrayBuffer(input)) {
-        throw new TypeError(`The "input" argument must be ArrayBuffer. Received type ${typeof input} (${input})`);
-    }
-    return Buffer$1.from(input, offset, length);
-};
-const fromString = (input, encoding) => {
-    if (typeof input !== "string") {
-        throw new TypeError(`The "input" argument must be of type string. Received type ${typeof input} (${input})`);
-    }
-    return encoding ? Buffer$1.from(input, encoding) : Buffer$1.from(input);
-};
-
-const BASE64_REGEX = /^[A-Za-z0-9+/]*={0,2}$/;
-const fromBase64 = (input) => {
-    if ((input.length * 3) % 4 !== 0) {
-        throw new TypeError(`Incorrect padding on base64 string.`);
-    }
-    if (!BASE64_REGEX.exec(input)) {
-        throw new TypeError(`Invalid base64 string.`);
-    }
-    const buffer = fromString(input, "base64");
-    return new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
-};
-
-const fromUtf8 = (input) => {
-    const buf = fromString(input, "utf8");
-    return new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength / Uint8Array.BYTES_PER_ELEMENT);
-};
-
-const toUint8Array = (data) => {
-    if (typeof data === "string") {
-        return fromUtf8(data);
-    }
-    if (ArrayBuffer.isView(data)) {
-        return new Uint8Array(data.buffer, data.byteOffset, data.byteLength / Uint8Array.BYTES_PER_ELEMENT);
-    }
-    return new Uint8Array(data);
-};
-
-const toUtf8 = (input) => {
-    if (typeof input === "string") {
-        return input;
-    }
-    if (typeof input !== "object" || typeof input.byteOffset !== "number" || typeof input.byteLength !== "number") {
-        throw new Error("@smithy/util-utf8: toUtf8 encoder function only accepts string | Uint8Array.");
-    }
-    return fromArrayBuffer(input.buffer, input.byteOffset, input.byteLength).toString("utf8");
-};
-
-const toBase64 = (_input) => {
-    let input;
-    if (typeof _input === "string") {
-        input = fromUtf8(_input);
-    }
-    else {
-        input = _input;
-    }
-    if (typeof input !== "object" || typeof input.byteOffset !== "number" || typeof input.byteLength !== "number") {
-        throw new Error("@smithy/util-base64: toBase64 encoder function only accepts string | Uint8Array.");
-    }
-    return fromArrayBuffer(input.buffer, input.byteOffset, input.byteLength).toString("base64");
-};
-
-class Uint8ArrayBlobAdapter extends Uint8Array {
-    static fromString(source, encoding = "utf-8") {
-        if (typeof source === "string") {
-            if (encoding === "base64") {
-                return Uint8ArrayBlobAdapter.mutate(fromBase64(source));
-            }
-            return Uint8ArrayBlobAdapter.mutate(fromUtf8(source));
-        }
-        throw new Error(`Unsupported conversion from ${typeof source} to Uint8ArrayBlobAdapter.`);
-    }
-    static mutate(source) {
-        Object.setPrototypeOf(source, Uint8ArrayBlobAdapter.prototype);
-        return source;
-    }
-    transformToString(encoding = "utf-8") {
-        if (encoding === "base64") {
-            return toBase64(this);
-        }
-        return toUtf8(this);
-    }
-}
-
-const isReadableStream = (stream) => typeof ReadableStream === "function" &&
-    (stream?.constructor?.name === ReadableStream.name || stream instanceof ReadableStream);
-
-const escapeUri = (uri) => encodeURIComponent(uri).replace(/[!'()*]/g, hexEncode);
-const hexEncode = (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`;
-
-function buildQueryString(query) {
-    const parts = [];
-    for (let key of Object.keys(query).sort()) {
-        const value = query[key];
-        key = escapeUri(key);
-        if (Array.isArray(value)) {
-            for (let i = 0, iLen = value.length; i < iLen; i++) {
-                parts.push(`${key}=${escapeUri(value[i])}`);
-            }
-        }
-        else {
-            let qsEntry = key;
-            if (value || typeof value === "string") {
-                qsEntry += `=${escapeUri(value)}`;
-            }
-            parts.push(qsEntry);
-        }
-    }
-    return parts.join("&");
-}
-
-const NODEJS_TIMEOUT_ERROR_CODES$1 = ["ECONNRESET", "EPIPE", "ETIMEDOUT"];
-
-const getTransformedHeaders = (headers) => {
-    const transformedHeaders = {};
-    for (const name of Object.keys(headers)) {
-        const headerValues = headers[name];
-        transformedHeaders[name] = Array.isArray(headerValues) ? headerValues.join(",") : headerValues;
-    }
-    return transformedHeaders;
-};
-
-const timing = {
-    setTimeout: (cb, ms) => setTimeout(cb, ms),
-    clearTimeout: (timeoutId) => clearTimeout(timeoutId),
-};
-
-const DEFER_EVENT_LISTENER_TIME$2 = 1000;
-const setConnectionTimeout = (request, reject, timeoutInMs = 0) => {
-    if (!timeoutInMs) {
-        return -1;
-    }
-    const registerTimeout = (offset) => {
-        const timeoutId = timing.setTimeout(() => {
-            request.destroy();
-            reject(Object.assign(new Error(`@smithy/node-http-handler - the request socket did not establish a connection with the server within the configured timeout of ${timeoutInMs} ms.`), {
-                name: "TimeoutError",
-            }));
-        }, timeoutInMs - offset);
-        const doWithSocket = (socket) => {
-            if (socket?.connecting) {
-                socket.on("connect", () => {
-                    timing.clearTimeout(timeoutId);
-                });
-            }
-            else {
-                timing.clearTimeout(timeoutId);
-            }
-        };
-        if (request.socket) {
-            doWithSocket(request.socket);
-        }
-        else {
-            request.on("socket", doWithSocket);
-        }
-    };
-    if (timeoutInMs < 2000) {
-        registerTimeout(0);
-        return 0;
-    }
-    return timing.setTimeout(registerTimeout.bind(null, DEFER_EVENT_LISTENER_TIME$2), DEFER_EVENT_LISTENER_TIME$2);
-};
-
-const setRequestTimeout = (req, reject, timeoutInMs = 0, throwOnRequestTimeout, logger) => {
-    if (timeoutInMs) {
-        return timing.setTimeout(() => {
-            let msg = `@smithy/node-http-handler - [${throwOnRequestTimeout ? "ERROR" : "WARN"}] a request has exceeded the configured ${timeoutInMs} ms requestTimeout.`;
-            if (throwOnRequestTimeout) {
-                const error = Object.assign(new Error(msg), {
-                    name: "TimeoutError",
-                    code: "ETIMEDOUT",
-                });
-                req.destroy(error);
-                reject(error);
-            }
-            else {
-                msg += ` Init client requestHandler with throwOnRequestTimeout=true to turn this into an error.`;
-                logger?.warn?.(msg);
-            }
-        }, timeoutInMs);
-    }
-    return -1;
-};
-
-const DEFER_EVENT_LISTENER_TIME$1 = 3000;
-const setSocketKeepAlive = (request, { keepAlive, keepAliveMsecs }, deferTimeMs = DEFER_EVENT_LISTENER_TIME$1) => {
-    if (keepAlive !== true) {
-        return -1;
-    }
-    const registerListener = () => {
-        if (request.socket) {
-            request.socket.setKeepAlive(keepAlive, keepAliveMsecs || 0);
-        }
-        else {
-            request.on("socket", (socket) => {
-                socket.setKeepAlive(keepAlive, keepAliveMsecs || 0);
-            });
-        }
-    };
-    if (deferTimeMs === 0) {
-        registerListener();
-        return 0;
-    }
-    return timing.setTimeout(registerListener, deferTimeMs);
-};
-
-const DEFER_EVENT_LISTENER_TIME = 3000;
-const setSocketTimeout = (request, reject, timeoutInMs = 0) => {
-    const registerTimeout = (offset) => {
-        const timeout = timeoutInMs - offset;
-        const onTimeout = () => {
-            request.destroy();
-            reject(Object.assign(new Error(`@smithy/node-http-handler - the request socket timed out after ${timeoutInMs} ms of inactivity (configured by client requestHandler).`), { name: "TimeoutError" }));
-        };
-        if (request.socket) {
-            request.socket.setTimeout(timeout, onTimeout);
-            request.on("close", () => request.socket?.removeListener("timeout", onTimeout));
-        }
-        else {
-            request.setTimeout(timeout, onTimeout);
-        }
-    };
-    if (0 < timeoutInMs && timeoutInMs < 6000) {
-        registerTimeout(0);
-        return 0;
-    }
-    return timing.setTimeout(registerTimeout.bind(null, timeoutInMs === 0 ? 0 : DEFER_EVENT_LISTENER_TIME), DEFER_EVENT_LISTENER_TIME);
-};
-
-const MIN_WAIT_TIME = 6_000;
-async function writeRequestBody(httpRequest, request, maxContinueTimeoutMs = MIN_WAIT_TIME, externalAgent = false) {
-    const headers = request.headers ?? {};
-    const expect = headers.Expect || headers.expect;
-    let timeoutId = -1;
-    let sendBody = true;
-    if (!externalAgent && expect === "100-continue") {
-        sendBody = await Promise.race([
-            new Promise((resolve) => {
-                timeoutId = Number(timing.setTimeout(() => resolve(true), Math.max(MIN_WAIT_TIME, maxContinueTimeoutMs)));
-            }),
-            new Promise((resolve) => {
-                httpRequest.on("continue", () => {
-                    timing.clearTimeout(timeoutId);
-                    resolve(true);
-                });
-                httpRequest.on("response", () => {
-                    timing.clearTimeout(timeoutId);
-                    resolve(false);
-                });
-                httpRequest.on("error", () => {
-                    timing.clearTimeout(timeoutId);
-                    resolve(false);
-                });
-            }),
-        ]);
-    }
-    if (sendBody) {
-        writeBody(httpRequest, request.body);
-    }
-}
-function writeBody(httpRequest, body) {
-    if (body instanceof Readable) {
-        body.pipe(httpRequest);
-        return;
-    }
-    if (body) {
-        if (Buffer.isBuffer(body) || typeof body === "string") {
-            httpRequest.end(body);
-            return;
-        }
-        const uint8 = body;
-        if (typeof uint8 === "object" &&
-            uint8.buffer &&
-            typeof uint8.byteOffset === "number" &&
-            typeof uint8.byteLength === "number") {
-            httpRequest.end(Buffer.from(uint8.buffer, uint8.byteOffset, uint8.byteLength));
-            return;
-        }
-        httpRequest.end(Buffer.from(body));
-        return;
-    }
-    httpRequest.end();
-}
-
-class NodeHttpHandler {
-    config;
-    configProvider;
-    socketWarningTimestamp = 0;
-    externalAgent = false;
-    metadata = { handlerProtocol: "http/1.1" };
-    static create(instanceOrOptions) {
-        if (typeof instanceOrOptions?.handle === "function") {
-            return instanceOrOptions;
-        }
-        return new NodeHttpHandler(instanceOrOptions);
-    }
-    static checkSocketUsage(agent, socketWarningTimestamp, logger = console) {
-        const { sockets, requests, maxSockets } = agent;
-        if (typeof maxSockets !== "number" || maxSockets === Infinity) {
-            return socketWarningTimestamp;
-        }
-        const interval = 15_000;
-        if (Date.now() - interval < socketWarningTimestamp) {
-            return socketWarningTimestamp;
-        }
-        if (sockets && requests) {
-            for (const origin in sockets) {
-                const socketsInUse = sockets[origin]?.length ?? 0;
-                const requestsEnqueued = requests[origin]?.length ?? 0;
-                if (socketsInUse >= maxSockets && requestsEnqueued >= 2 * maxSockets) {
-                    logger?.warn?.(`@smithy/node-http-handler:WARN - socket usage at capacity=${socketsInUse} and ${requestsEnqueued} additional requests are enqueued.
-See https://docs.aws.amazon.com/sdk-for-javascript/v3/developer-guide/node-configuring-maxsockets.html
-or increase socketAcquisitionWarningTimeout=(millis) in the NodeHttpHandler config.`);
-                    return Date.now();
-                }
-            }
-        }
-        return socketWarningTimestamp;
-    }
-    constructor(options) {
-        this.configProvider = new Promise((resolve, reject) => {
-            if (typeof options === "function") {
-                options()
-                    .then((_options) => {
-                    resolve(this.resolveDefaultConfig(_options));
-                })
-                    .catch(reject);
-            }
-            else {
-                resolve(this.resolveDefaultConfig(options));
-            }
-        });
-    }
-    resolveDefaultConfig(options) {
-        const { requestTimeout, connectionTimeout, socketTimeout, socketAcquisitionWarningTimeout, httpAgent, httpsAgent, throwOnRequestTimeout, } = options || {};
-        const keepAlive = true;
-        const maxSockets = 50;
-        return {
-            connectionTimeout,
-            requestTimeout,
-            socketTimeout,
-            socketAcquisitionWarningTimeout,
-            throwOnRequestTimeout,
-            httpAgent: (() => {
-                if (httpAgent instanceof Agent$1 || typeof httpAgent?.destroy === "function") {
-                    this.externalAgent = true;
-                    return httpAgent;
-                }
-                return new Agent$1({ keepAlive, maxSockets, ...httpAgent });
-            })(),
-            httpsAgent: (() => {
-                if (httpsAgent instanceof Agent || typeof httpsAgent?.destroy === "function") {
-                    this.externalAgent = true;
-                    return httpsAgent;
-                }
-                return new Agent({ keepAlive, maxSockets, ...httpsAgent });
-            })(),
-            logger: console,
-        };
-    }
-    destroy() {
-        this.config?.httpAgent?.destroy();
-        this.config?.httpsAgent?.destroy();
-    }
-    async handle(request, { abortSignal, requestTimeout } = {}) {
-        if (!this.config) {
-            this.config = await this.configProvider;
-        }
-        return new Promise((_resolve, _reject) => {
-            const config = this.config;
-            let writeRequestBodyPromise = undefined;
-            const timeouts = [];
-            const resolve = async (arg) => {
-                await writeRequestBodyPromise;
-                timeouts.forEach(timing.clearTimeout);
-                _resolve(arg);
-            };
-            const reject = async (arg) => {
-                await writeRequestBodyPromise;
-                timeouts.forEach(timing.clearTimeout);
-                _reject(arg);
-            };
-            if (abortSignal?.aborted) {
-                const abortError = new Error("Request aborted");
-                abortError.name = "AbortError";
-                reject(abortError);
-                return;
-            }
-            const isSSL = request.protocol === "https:";
-            const headers = request.headers ?? {};
-            const expectContinue = (headers.Expect ?? headers.expect) === "100-continue";
-            let agent = isSSL ? config.httpsAgent : config.httpAgent;
-            if (expectContinue && !this.externalAgent) {
-                agent = new (isSSL ? Agent : Agent$1)({
-                    keepAlive: false,
-                    maxSockets: Infinity,
-                });
-            }
-            timeouts.push(timing.setTimeout(() => {
-                this.socketWarningTimestamp = NodeHttpHandler.checkSocketUsage(agent, this.socketWarningTimestamp, config.logger);
-            }, config.socketAcquisitionWarningTimeout ?? (config.requestTimeout ?? 2000) + (config.connectionTimeout ?? 1000)));
-            const queryString = buildQueryString(request.query || {});
-            let auth = undefined;
-            if (request.username != null || request.password != null) {
-                const username = request.username ?? "";
-                const password = request.password ?? "";
-                auth = `${username}:${password}`;
-            }
-            let path = request.path;
-            if (queryString) {
-                path += `?${queryString}`;
-            }
-            if (request.fragment) {
-                path += `#${request.fragment}`;
-            }
-            let hostname = request.hostname ?? "";
-            if (hostname[0] === "[" && hostname.endsWith("]")) {
-                hostname = request.hostname.slice(1, -1);
-            }
-            else {
-                hostname = request.hostname;
-            }
-            const nodeHttpsOptions = {
-                headers: request.headers,
-                host: hostname,
-                method: request.method,
-                path,
-                port: request.port,
-                agent,
-                auth,
-            };
-            const requestFunc = isSSL ? request$2 : request$3;
-            const req = requestFunc(nodeHttpsOptions, (res) => {
-                const httpResponse = new HttpResponse({
-                    statusCode: res.statusCode || -1,
-                    reason: res.statusMessage,
-                    headers: getTransformedHeaders(res.headers),
-                    body: res,
-                });
-                resolve({ response: httpResponse });
-            });
-            req.on("error", (err) => {
-                if (NODEJS_TIMEOUT_ERROR_CODES$1.includes(err.code)) {
-                    reject(Object.assign(err, { name: "TimeoutError" }));
-                }
-                else {
-                    reject(err);
-                }
-            });
-            if (abortSignal) {
-                const onAbort = () => {
-                    req.destroy();
-                    const abortError = new Error("Request aborted");
-                    abortError.name = "AbortError";
-                    reject(abortError);
-                };
-                if (typeof abortSignal.addEventListener === "function") {
-                    const signal = abortSignal;
-                    signal.addEventListener("abort", onAbort, { once: true });
-                    req.once("close", () => signal.removeEventListener("abort", onAbort));
-                }
-                else {
-                    abortSignal.onabort = onAbort;
-                }
-            }
-            const effectiveRequestTimeout = requestTimeout ?? config.requestTimeout;
-            timeouts.push(setConnectionTimeout(req, reject, config.connectionTimeout));
-            timeouts.push(setRequestTimeout(req, reject, effectiveRequestTimeout, config.throwOnRequestTimeout, config.logger ?? console));
-            timeouts.push(setSocketTimeout(req, reject, config.socketTimeout));
-            const httpAgent = nodeHttpsOptions.agent;
-            if (typeof httpAgent === "object" && "keepAlive" in httpAgent) {
-                timeouts.push(setSocketKeepAlive(req, {
-                    keepAlive: httpAgent.keepAlive,
-                    keepAliveMsecs: httpAgent.keepAliveMsecs,
-                }));
-            }
-            writeRequestBodyPromise = writeRequestBody(req, request, effectiveRequestTimeout, this.externalAgent).catch((e) => {
-                timeouts.forEach(timing.clearTimeout);
-                return _reject(e);
-            });
-        });
-    }
-    updateHttpClientConfig(key, value) {
-        this.config = undefined;
-        this.configProvider = this.configProvider.then((config) => {
-            return {
-                ...config,
-                [key]: value,
-            };
-        });
-    }
-    httpHandlerConfigs() {
-        return this.config ?? {};
-    }
-}
-
-class Collector extends Writable {
-    bufferedBytes = [];
-    _write(chunk, encoding, callback) {
-        this.bufferedBytes.push(chunk);
-        callback();
-    }
-}
-
-const streamCollector$1 = (stream) => {
-    if (isReadableStreamInstance(stream)) {
-        return collectReadableStream(stream);
-    }
-    return new Promise((resolve, reject) => {
-        const collector = new Collector();
-        stream.pipe(collector);
-        stream.on("error", (err) => {
-            collector.end();
-            reject(err);
-        });
-        collector.on("error", reject);
-        collector.on("finish", function () {
-            const bytes = new Uint8Array(Buffer.concat(this.bufferedBytes));
-            resolve(bytes);
-        });
-    });
-};
-const isReadableStreamInstance = (stream) => typeof ReadableStream === "function" && stream instanceof ReadableStream;
-async function collectReadableStream(stream) {
-    const chunks = [];
-    const reader = stream.getReader();
-    let isDone = false;
-    let length = 0;
-    while (!isDone) {
-        const { done, value } = await reader.read();
-        if (value) {
-            chunks.push(value);
-            length += value.length;
-        }
-        isDone = done;
-    }
-    const collected = new Uint8Array(length);
-    let offset = 0;
-    for (const chunk of chunks) {
-        collected.set(chunk, offset);
-        offset += chunk.length;
-    }
-    return collected;
-}
-
-const streamCollector = async (stream) => {
-    if ((typeof Blob === "function" && stream instanceof Blob) || stream.constructor?.name === "Blob") {
-        if (Blob.prototype.arrayBuffer !== undefined) {
-            return new Uint8Array(await stream.arrayBuffer());
-        }
-        return collectBlob(stream);
-    }
-    return collectStream(stream);
-};
-async function collectBlob(blob) {
-    const base64 = await readToBase64(blob);
-    const arrayBuffer = fromBase64(base64);
-    return new Uint8Array(arrayBuffer);
-}
-async function collectStream(stream) {
-    const chunks = [];
-    const reader = stream.getReader();
-    let isDone = false;
-    let length = 0;
-    while (!isDone) {
-        const { done, value } = await reader.read();
-        if (value) {
-            chunks.push(value);
-            length += value.length;
-        }
-        isDone = done;
-    }
-    const collected = new Uint8Array(length);
-    let offset = 0;
-    for (const chunk of chunks) {
-        collected.set(chunk, offset);
-        offset += chunk.length;
-    }
-    return collected;
-}
-function readToBase64(blob) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-            if (reader.readyState !== 2) {
-                return reject(new Error("Reader aborted too early"));
-            }
-            const result = (reader.result ?? "");
-            const commaIndex = result.indexOf(",");
-            const dataOffset = commaIndex > -1 ? commaIndex + 1 : result.length;
-            resolve(result.substring(dataOffset));
-        };
-        reader.onabort = () => reject(new Error("Read aborted"));
-        reader.onerror = () => reject(reader.error);
-        reader.readAsDataURL(blob);
-    });
-}
-
-const SHORT_TO_HEX = {};
-const HEX_TO_SHORT = {};
-for (let i = 0; i < 256; i++) {
-    let encodedByte = i.toString(16).toLowerCase();
-    if (encodedByte.length === 1) {
-        encodedByte = `0${encodedByte}`;
-    }
-    SHORT_TO_HEX[i] = encodedByte;
-    HEX_TO_SHORT[encodedByte] = i;
-}
-function fromHex(encoded) {
-    if (encoded.length % 2 !== 0) {
-        throw new Error("Hex encoded strings must have an even number length");
-    }
-    const out = new Uint8Array(encoded.length / 2);
-    for (let i = 0; i < encoded.length; i += 2) {
-        const encodedByte = encoded.slice(i, i + 2).toLowerCase();
-        if (encodedByte in HEX_TO_SHORT) {
-            out[i / 2] = HEX_TO_SHORT[encodedByte];
-        }
-        else {
-            throw new Error(`Cannot decode unrecognized sequence ${encodedByte} as hexadecimal`);
-        }
-    }
-    return out;
-}
-function toHex(bytes) {
-    let out = "";
-    for (let i = 0; i < bytes.byteLength; i++) {
-        out += SHORT_TO_HEX[bytes[i]];
-    }
-    return out;
-}
-
-const ERR_MSG_STREAM_HAS_BEEN_TRANSFORMED$1 = "The stream has already been transformed.";
-const sdkStreamMixin$1 = (stream) => {
-    if (!isBlobInstance(stream) && !isReadableStream(stream)) {
-        const name = stream?.__proto__?.constructor?.name || stream;
-        throw new Error(`Unexpected stream implementation, expect Blob or ReadableStream, got ${name}`);
-    }
-    let transformed = false;
-    const transformToByteArray = async () => {
-        if (transformed) {
-            throw new Error(ERR_MSG_STREAM_HAS_BEEN_TRANSFORMED$1);
-        }
-        transformed = true;
-        return await streamCollector(stream);
-    };
-    const blobToWebStream = (blob) => {
-        if (typeof blob.stream !== "function") {
-            throw new Error("Cannot transform payload Blob to web stream. Please make sure the Blob.stream() is polyfilled.\n" +
-                "If you are using React Native, this API is not yet supported, see: https://react-native.canny.io/feature-requests/p/fetch-streaming-body");
-        }
-        return blob.stream();
-    };
-    return Object.assign(stream, {
-        transformToByteArray: transformToByteArray,
-        transformToString: async (encoding) => {
-            const buf = await transformToByteArray();
-            if (encoding === "base64") {
-                return toBase64(buf);
-            }
-            else if (encoding === "hex") {
-                return toHex(buf);
-            }
-            else if (encoding === undefined || encoding === "utf8" || encoding === "utf-8") {
-                return toUtf8(buf);
-            }
-            else if (typeof TextDecoder === "function") {
-                return new TextDecoder(encoding).decode(buf);
-            }
-            else {
-                throw new Error("TextDecoder is not available, please make sure polyfill is provided.");
-            }
-        },
-        transformToWebStream: () => {
-            if (transformed) {
-                throw new Error(ERR_MSG_STREAM_HAS_BEEN_TRANSFORMED$1);
-            }
-            transformed = true;
-            if (isBlobInstance(stream)) {
-                return blobToWebStream(stream);
-            }
-            else if (isReadableStream(stream)) {
-                return stream;
-            }
-            else {
-                throw new Error(`Cannot transform payload to web stream, got ${stream}`);
-            }
-        },
-    });
-};
-const isBlobInstance = (stream) => typeof Blob === "function" && stream instanceof Blob;
-
-const ERR_MSG_STREAM_HAS_BEEN_TRANSFORMED = "The stream has already been transformed.";
-const sdkStreamMixin = (stream) => {
-    if (!(stream instanceof Readable)) {
-        try {
-            return sdkStreamMixin$1(stream);
-        }
-        catch (e) {
-            const name = stream?.__proto__?.constructor?.name || stream;
-            throw new Error(`Unexpected stream implementation, expect Stream.Readable instance, got ${name}`);
-        }
-    }
-    let transformed = false;
-    const transformToByteArray = async () => {
-        if (transformed) {
-            throw new Error(ERR_MSG_STREAM_HAS_BEEN_TRANSFORMED);
-        }
-        transformed = true;
-        return await streamCollector$1(stream);
-    };
-    return Object.assign(stream, {
-        transformToByteArray,
-        transformToString: async (encoding) => {
-            const buf = await transformToByteArray();
-            if (encoding === undefined || Buffer.isEncoding(encoding)) {
-                return fromArrayBuffer(buf.buffer, buf.byteOffset, buf.byteLength).toString(encoding);
-            }
-            else {
-                const decoder = new TextDecoder(encoding);
-                return decoder.decode(buf);
-            }
-        },
-        transformToWebStream: () => {
-            if (transformed) {
-                throw new Error(ERR_MSG_STREAM_HAS_BEEN_TRANSFORMED);
-            }
-            if (stream.readableFlowing !== null) {
-                throw new Error("The stream has been consumed by other callbacks.");
-            }
-            if (typeof Readable.toWeb !== "function") {
-                throw new Error("Readable.toWeb() is not supported. Please ensure a polyfill is available.");
-            }
-            transformed = true;
-            return Readable.toWeb(stream);
-        },
-    });
-};
-
-const collectBody = async (streamBody = new Uint8Array(), context) => {
-    if (streamBody instanceof Uint8Array) {
-        return Uint8ArrayBlobAdapter.mutate(streamBody);
-    }
-    if (!streamBody) {
-        return Uint8ArrayBlobAdapter.mutate(new Uint8Array());
-    }
-    const fromContext = context.streamCollector(streamBody);
-    return Uint8ArrayBlobAdapter.mutate(await fromContext);
-};
-
-function extendedEncodeURIComponent(str) {
-    return encodeURIComponent(str).replace(/[!'()*]/g, function (c) {
-        return "%" + c.charCodeAt(0).toString(16).toUpperCase();
-    });
-}
-
-const deref = (schemaRef) => {
-    if (typeof schemaRef === "function") {
-        return schemaRef();
-    }
-    return schemaRef;
-};
-
-const operation = (namespace, name, traits, input, output) => ({
-    name,
-    namespace,
-    traits,
-    input,
-    output,
-});
-
-const schemaDeserializationMiddleware = (config) => (next, context) => async (args) => {
-    const { response } = await next(args);
-    const { operationSchema } = getSmithyContext(context);
-    const [, ns, n, t, i, o] = operationSchema ?? [];
-    try {
-        const parsed = await config.protocol.deserializeResponse(operation(ns, n, t, i, o), {
-            ...config,
-            ...context,
-        }, response);
-        return {
-            response,
-            output: parsed,
-        };
-    }
-    catch (error) {
-        Object.defineProperty(error, "$response", {
-            value: response,
-            enumerable: false,
-            writable: false,
-            configurable: false,
-        });
-        if (!("$metadata" in error)) {
-            const hint = `Deserialization error: to see the raw response, inspect the hidden field {error}.$response on this object.`;
-            try {
-                error.message += "\n  " + hint;
-            }
-            catch (e) {
-                if (!context.logger || context.logger?.constructor?.name === "NoOpLogger") {
-                    console.warn(hint);
-                }
-                else {
-                    context.logger?.warn?.(hint);
-                }
-            }
-            if (typeof error.$responseBodyText !== "undefined") {
-                if (error.$response) {
-                    error.$response.body = error.$responseBodyText;
-                }
-            }
-            try {
-                if (HttpResponse.isInstance(response)) {
-                    const { headers = {} } = response;
-                    const headerEntries = Object.entries(headers);
-                    error.$metadata = {
-                        httpStatusCode: response.statusCode,
-                        requestId: findHeader(/^x-[\w-]+-request-?id$/, headerEntries),
-                        extendedRequestId: findHeader(/^x-[\w-]+-id-2$/, headerEntries),
-                        cfId: findHeader(/^x-[\w-]+-cf-id$/, headerEntries),
-                    };
-                }
-            }
-            catch (e) {
-            }
-        }
-        throw error;
-    }
-};
-const findHeader = (pattern, headers) => {
-    return (headers.find(([k]) => {
-        return k.match(pattern);
-    }) || [void 0, void 0])[1];
-};
-
-const schemaSerializationMiddleware = (config) => (next, context) => async (args) => {
-    const { operationSchema } = getSmithyContext(context);
-    const [, ns, n, t, i, o] = operationSchema ?? [];
-    const endpoint = context.endpointV2?.url && config.urlParser
-        ? async () => config.urlParser(context.endpointV2.url)
-        : config.endpoint;
-    const request = await config.protocol.serializeRequest(operation(ns, n, t, i, o), args.input, {
-        ...config,
-        ...context,
-        endpoint,
-    });
-    return next({
-        ...args,
-        request,
-    });
-};
-
-const deserializerMiddlewareOption = {
-    name: "deserializerMiddleware",
-    step: "deserialize",
-    tags: ["DESERIALIZER"],
-    override: true,
-};
-const serializerMiddlewareOption = {
-    name: "serializerMiddleware",
-    step: "serialize",
-    tags: ["SERIALIZER"],
-    override: true,
-};
-function getSchemaSerdePlugin(config) {
-    return {
-        applyToStack: (commandStack) => {
-            commandStack.add(schemaSerializationMiddleware(config), serializerMiddlewareOption);
-            commandStack.add(schemaDeserializationMiddleware(config), deserializerMiddlewareOption);
-            config.protocol.setSerdeContext(config);
-        },
-    };
-}
-
-function translateTraits(indicator) {
-    if (typeof indicator === "object") {
-        return indicator;
-    }
-    indicator = indicator | 0;
-    const traits = {};
-    let i = 0;
-    for (const trait of [
-        "httpLabel",
-        "idempotent",
-        "idempotencyToken",
-        "sensitive",
-        "httpPayload",
-        "httpResponseCode",
-        "httpQueryParams",
-    ]) {
-        if (((indicator >> i++) & 1) === 1) {
-            traits[trait] = 1;
-        }
-    }
-    return traits;
-}
-
-const anno = {
-    it: Symbol.for("@smithy/nor-struct-it"),
-};
-class NormalizedSchema {
-    ref;
-    memberName;
-    static symbol = Symbol.for("@smithy/nor");
-    symbol = NormalizedSchema.symbol;
-    name;
-    schema;
-    _isMemberSchema;
-    traits;
-    memberTraits;
-    normalizedTraits;
-    constructor(ref, memberName) {
-        this.ref = ref;
-        this.memberName = memberName;
-        const traitStack = [];
-        let _ref = ref;
-        let schema = ref;
-        this._isMemberSchema = false;
-        while (isMemberSchema(_ref)) {
-            traitStack.push(_ref[1]);
-            _ref = _ref[0];
-            schema = deref(_ref);
-            this._isMemberSchema = true;
-        }
-        if (traitStack.length > 0) {
-            this.memberTraits = {};
-            for (let i = traitStack.length - 1; i >= 0; --i) {
-                const traitSet = traitStack[i];
-                Object.assign(this.memberTraits, translateTraits(traitSet));
-            }
-        }
-        else {
-            this.memberTraits = 0;
-        }
-        if (schema instanceof NormalizedSchema) {
-            const computedMemberTraits = this.memberTraits;
-            Object.assign(this, schema);
-            this.memberTraits = Object.assign({}, computedMemberTraits, schema.getMemberTraits(), this.getMemberTraits());
-            this.normalizedTraits = void 0;
-            this.memberName = memberName ?? schema.memberName;
-            return;
-        }
-        this.schema = deref(schema);
-        if (isStaticSchema(this.schema)) {
-            this.name = `${this.schema[1]}#${this.schema[2]}`;
-            this.traits = this.schema[3];
-        }
-        else {
-            this.name = this.memberName ?? String(schema);
-            this.traits = 0;
-        }
-        if (this._isMemberSchema && !memberName) {
-            throw new Error(`@smithy/core/schema - NormalizedSchema member init ${this.getName(true)} missing member name.`);
-        }
-    }
-    static [Symbol.hasInstance](lhs) {
-        const isPrototype = this.prototype.isPrototypeOf(lhs);
-        if (!isPrototype && typeof lhs === "object" && lhs !== null) {
-            const ns = lhs;
-            return ns.symbol === this.symbol;
-        }
-        return isPrototype;
-    }
-    static of(ref) {
-        const sc = deref(ref);
-        if (sc instanceof NormalizedSchema) {
-            return sc;
-        }
-        if (isMemberSchema(sc)) {
-            const [ns, traits] = sc;
-            if (ns instanceof NormalizedSchema) {
-                Object.assign(ns.getMergedTraits(), translateTraits(traits));
-                return ns;
-            }
-            throw new Error(`@smithy/core/schema - may not init unwrapped member schema=${JSON.stringify(ref, null, 2)}.`);
-        }
-        return new NormalizedSchema(sc);
-    }
-    getSchema() {
-        const sc = this.schema;
-        if (Array.isArray(sc) && sc[0] === 0) {
-            return sc[4];
-        }
-        return sc;
-    }
-    getName(withNamespace = false) {
-        const { name } = this;
-        const short = !withNamespace && name && name.includes("#");
-        return short ? name.split("#")[1] : name || undefined;
-    }
-    getMemberName() {
-        return this.memberName;
-    }
-    isMemberSchema() {
-        return this._isMemberSchema;
-    }
-    isListSchema() {
-        const sc = this.getSchema();
-        return typeof sc === "number"
-            ? sc >= 64 && sc < 128
-            : sc[0] === 1;
-    }
-    isMapSchema() {
-        const sc = this.getSchema();
-        return typeof sc === "number"
-            ? sc >= 128 && sc <= 0b1111_1111
-            : sc[0] === 2;
-    }
-    isStructSchema() {
-        const sc = this.getSchema();
-        if (typeof sc !== "object") {
-            return false;
-        }
-        const id = sc[0];
-        return (id === 3 ||
-            id === -3 ||
-            id === 4);
-    }
-    isUnionSchema() {
-        const sc = this.getSchema();
-        if (typeof sc !== "object") {
-            return false;
-        }
-        return sc[0] === 4;
-    }
-    isBlobSchema() {
-        const sc = this.getSchema();
-        return sc === 21 || sc === 42;
-    }
-    isTimestampSchema() {
-        const sc = this.getSchema();
-        return (typeof sc === "number" &&
-            sc >= 4 &&
-            sc <= 7);
-    }
-    isUnitSchema() {
-        return this.getSchema() === "unit";
-    }
-    isDocumentSchema() {
-        return this.getSchema() === 15;
-    }
-    isStringSchema() {
-        return this.getSchema() === 0;
-    }
-    isBooleanSchema() {
-        return this.getSchema() === 2;
-    }
-    isNumericSchema() {
-        return this.getSchema() === 1;
-    }
-    isBigIntegerSchema() {
-        return this.getSchema() === 17;
-    }
-    isBigDecimalSchema() {
-        return this.getSchema() === 19;
-    }
-    isStreaming() {
-        const { streaming } = this.getMergedTraits();
-        return !!streaming || this.getSchema() === 42;
-    }
-    isIdempotencyToken() {
-        return !!this.getMergedTraits().idempotencyToken;
-    }
-    getMergedTraits() {
-        return (this.normalizedTraits ??
-            (this.normalizedTraits = {
-                ...this.getOwnTraits(),
-                ...this.getMemberTraits(),
-            }));
-    }
-    getMemberTraits() {
-        return translateTraits(this.memberTraits);
-    }
-    getOwnTraits() {
-        return translateTraits(this.traits);
-    }
-    getKeySchema() {
-        const [isDoc, isMap] = [this.isDocumentSchema(), this.isMapSchema()];
-        if (!isDoc && !isMap) {
-            throw new Error(`@smithy/core/schema - cannot get key for non-map: ${this.getName(true)}`);
-        }
-        const schema = this.getSchema();
-        const memberSchema = isDoc
-            ? 15
-            : schema[4] ?? 0;
-        return member([memberSchema, 0], "key");
-    }
-    getValueSchema() {
-        const sc = this.getSchema();
-        const [isDoc, isMap, isList] = [this.isDocumentSchema(), this.isMapSchema(), this.isListSchema()];
-        const memberSchema = typeof sc === "number"
-            ? 0b0011_1111 & sc
-            : sc && typeof sc === "object" && (isMap || isList)
-                ? sc[3 + sc[0]]
-                : isDoc
-                    ? 15
-                    : void 0;
-        if (memberSchema != null) {
-            return member([memberSchema, 0], isMap ? "value" : "member");
-        }
-        throw new Error(`@smithy/core/schema - ${this.getName(true)} has no value member.`);
-    }
-    getMemberSchema(memberName) {
-        const struct = this.getSchema();
-        if (this.isStructSchema() && struct[4].includes(memberName)) {
-            const i = struct[4].indexOf(memberName);
-            const memberSchema = struct[5][i];
-            return member(isMemberSchema(memberSchema) ? memberSchema : [memberSchema, 0], memberName);
-        }
-        if (this.isDocumentSchema()) {
-            return member([15, 0], memberName);
-        }
-        throw new Error(`@smithy/core/schema - ${this.getName(true)} has no no member=${memberName}.`);
-    }
-    getMemberSchemas() {
-        const buffer = {};
-        try {
-            for (const [k, v] of this.structIterator()) {
-                buffer[k] = v;
-            }
-        }
-        catch (ignored) { }
-        return buffer;
-    }
-    getEventStreamMember() {
-        if (this.isStructSchema()) {
-            for (const [memberName, memberSchema] of this.structIterator()) {
-                if (memberSchema.isStreaming() && memberSchema.isStructSchema()) {
-                    return memberName;
-                }
-            }
-        }
-        return "";
-    }
-    *structIterator() {
-        if (this.isUnitSchema()) {
-            return;
-        }
-        if (!this.isStructSchema()) {
-            throw new Error("@smithy/core/schema - cannot iterate non-struct schema.");
-        }
-        const struct = this.getSchema();
-        const z = struct[4].length;
-        let it = struct[anno.it];
-        if (it && z === it.length) {
-            yield* it;
-            return;
-        }
-        it = Array(z);
-        for (let i = 0; i < z; ++i) {
-            const k = struct[4][i];
-            const v = member([struct[5][i], 0], k);
-            yield (it[i] = [k, v]);
-        }
-        struct[anno.it] = it;
-    }
-}
-function member(memberSchema, memberName) {
-    if (memberSchema instanceof NormalizedSchema) {
-        return Object.assign(memberSchema, {
-            memberName,
-            _isMemberSchema: true,
-        });
-    }
-    const internalCtorAccess = NormalizedSchema;
-    return new internalCtorAccess(memberSchema, memberName);
-}
-const isMemberSchema = (sc) => Array.isArray(sc) && sc.length === 2;
-const isStaticSchema = (sc) => Array.isArray(sc) && sc.length >= 5;
-
-class TypeRegistry {
-    namespace;
-    schemas;
-    exceptions;
-    static registries = new Map();
-    constructor(namespace, schemas = new Map(), exceptions = new Map()) {
-        this.namespace = namespace;
-        this.schemas = schemas;
-        this.exceptions = exceptions;
-    }
-    static for(namespace) {
-        if (!TypeRegistry.registries.has(namespace)) {
-            TypeRegistry.registries.set(namespace, new TypeRegistry(namespace));
-        }
-        return TypeRegistry.registries.get(namespace);
-    }
-    register(shapeId, schema) {
-        const qualifiedName = this.normalizeShapeId(shapeId);
-        const registry = TypeRegistry.for(qualifiedName.split("#")[0]);
-        registry.schemas.set(qualifiedName, schema);
-    }
-    getSchema(shapeId) {
-        const id = this.normalizeShapeId(shapeId);
-        if (!this.schemas.has(id)) {
-            throw new Error(`@smithy/core/schema - schema not found for ${id}`);
-        }
-        return this.schemas.get(id);
-    }
-    registerError(es, ctor) {
-        const $error = es;
-        const registry = TypeRegistry.for($error[1]);
-        registry.schemas.set($error[1] + "#" + $error[2], $error);
-        registry.exceptions.set($error, ctor);
-    }
-    getErrorCtor(es) {
-        const $error = es;
-        const registry = TypeRegistry.for($error[1]);
-        return registry.exceptions.get($error);
-    }
-    getBaseException() {
-        for (const exceptionKey of this.exceptions.keys()) {
-            if (Array.isArray(exceptionKey)) {
-                const [, ns, name] = exceptionKey;
-                const id = ns + "#" + name;
-                if (id.startsWith("smithy.ts.sdk.synthetic.") && id.endsWith("ServiceException")) {
-                    return exceptionKey;
-                }
-            }
-        }
-        return undefined;
-    }
-    find(predicate) {
-        return [...this.schemas.values()].find(predicate);
-    }
-    clear() {
-        this.schemas.clear();
-        this.exceptions.clear();
-    }
-    normalizeShapeId(shapeId) {
-        if (shapeId.includes("#")) {
-            return shapeId;
-        }
-        return this.namespace + "#" + shapeId;
-    }
-}
-
-const expectNumber = (value) => {
-    if (value === null || value === undefined) {
-        return undefined;
-    }
-    if (typeof value === "string") {
-        const parsed = parseFloat(value);
-        if (!Number.isNaN(parsed)) {
-            if (String(parsed) !== String(value)) {
-                logger.warn(stackTraceWarning(`Expected number but observed string: ${value}`));
-            }
-            return parsed;
-        }
-    }
-    if (typeof value === "number") {
-        return value;
-    }
-    throw new TypeError(`Expected number, got ${typeof value}: ${value}`);
-};
-const MAX_FLOAT = Math.ceil(2 ** 127 * (2 - 2 ** -23));
-const expectFloat32 = (value) => {
-    const expected = expectNumber(value);
-    if (expected !== undefined && !Number.isNaN(expected) && expected !== Infinity && expected !== -Infinity) {
-        if (Math.abs(expected) > MAX_FLOAT) {
-            throw new TypeError(`Expected 32-bit float, got ${value}`);
-        }
-    }
-    return expected;
-};
-const expectLong = (value) => {
-    if (value === null || value === undefined) {
-        return undefined;
-    }
-    if (Number.isInteger(value) && !Number.isNaN(value)) {
-        return value;
-    }
-    throw new TypeError(`Expected integer, got ${typeof value}: ${value}`);
-};
-const expectShort = (value) => expectSizedInt(value, 16);
-const expectByte = (value) => expectSizedInt(value, 8);
-const expectSizedInt = (value, size) => {
-    const expected = expectLong(value);
-    if (expected !== undefined && castInt(expected, size) !== expected) {
-        throw new TypeError(`Expected ${size}-bit integer, got ${value}`);
-    }
-    return expected;
-};
-const castInt = (value, size) => {
-    switch (size) {
-        case 32:
-            return Int32Array.of(value)[0];
-        case 16:
-            return Int16Array.of(value)[0];
-        case 8:
-            return Int8Array.of(value)[0];
-    }
-};
-const strictParseDouble = (value) => {
-    if (typeof value == "string") {
-        return expectNumber(parseNumber(value));
-    }
-    return expectNumber(value);
-};
-const strictParseFloat32 = (value) => {
-    if (typeof value == "string") {
-        return expectFloat32(parseNumber(value));
-    }
-    return expectFloat32(value);
-};
-const NUMBER_REGEX = /(-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?)|(-?Infinity)|(NaN)/g;
-const parseNumber = (value) => {
-    const matches = value.match(NUMBER_REGEX);
-    if (matches === null || matches[0].length !== value.length) {
-        throw new TypeError(`Expected real number, got implicit NaN`);
-    }
-    return parseFloat(value);
-};
-const strictParseShort = (value) => {
-    if (typeof value === "string") {
-        return expectShort(parseNumber(value));
-    }
-    return expectShort(value);
-};
-const strictParseByte = (value) => {
-    if (typeof value === "string") {
-        return expectByte(parseNumber(value));
-    }
-    return expectByte(value);
-};
-const stackTraceWarning = (message) => {
-    return String(new TypeError(message).stack || message)
-        .split("\n")
-        .slice(0, 5)
-        .filter((s) => !s.includes("stackTraceWarning"))
-        .join("\n");
-};
-const logger = {
-    warn: console.warn,
-};
-
-const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-function dateToUtcString(date) {
-    const year = date.getUTCFullYear();
-    const month = date.getUTCMonth();
-    const dayOfWeek = date.getUTCDay();
-    const dayOfMonthInt = date.getUTCDate();
-    const hoursInt = date.getUTCHours();
-    const minutesInt = date.getUTCMinutes();
-    const secondsInt = date.getUTCSeconds();
-    const dayOfMonthString = dayOfMonthInt < 10 ? `0${dayOfMonthInt}` : `${dayOfMonthInt}`;
-    const hoursString = hoursInt < 10 ? `0${hoursInt}` : `${hoursInt}`;
-    const minutesString = minutesInt < 10 ? `0${minutesInt}` : `${minutesInt}`;
-    const secondsString = secondsInt < 10 ? `0${secondsInt}` : `${secondsInt}`;
-    return `${DAYS[dayOfWeek]}, ${dayOfMonthString} ${MONTHS[month]} ${year} ${hoursString}:${minutesString}:${secondsString} GMT`;
-}
-const RFC3339 = new RegExp(/^(\d{4})-(\d{2})-(\d{2})[tT](\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?[zZ]$/);
-const parseRfc3339DateTime = (value) => {
-    if (value === null || value === undefined) {
-        return undefined;
-    }
-    if (typeof value !== "string") {
-        throw new TypeError("RFC-3339 date-times must be expressed as strings");
-    }
-    const match = RFC3339.exec(value);
-    if (!match) {
-        throw new TypeError("Invalid RFC-3339 date-time value");
-    }
-    const [_, yearStr, monthStr, dayStr, hours, minutes, seconds, fractionalMilliseconds] = match;
-    const year = strictParseShort(stripLeadingZeroes(yearStr));
-    const month = parseDateValue(monthStr, "month", 1, 12);
-    const day = parseDateValue(dayStr, "day", 1, 31);
-    return buildDate(year, month, day, { hours, minutes, seconds, fractionalMilliseconds });
-};
-const RFC3339_WITH_OFFSET$1 = new RegExp(/^(\d{4})-(\d{2})-(\d{2})[tT](\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?(([-+]\d{2}\:\d{2})|[zZ])$/);
-const parseRfc3339DateTimeWithOffset = (value) => {
-    if (value === null || value === undefined) {
-        return undefined;
-    }
-    if (typeof value !== "string") {
-        throw new TypeError("RFC-3339 date-times must be expressed as strings");
-    }
-    const match = RFC3339_WITH_OFFSET$1.exec(value);
-    if (!match) {
-        throw new TypeError("Invalid RFC-3339 date-time value");
-    }
-    const [_, yearStr, monthStr, dayStr, hours, minutes, seconds, fractionalMilliseconds, offsetStr] = match;
-    const year = strictParseShort(stripLeadingZeroes(yearStr));
-    const month = parseDateValue(monthStr, "month", 1, 12);
-    const day = parseDateValue(dayStr, "day", 1, 31);
-    const date = buildDate(year, month, day, { hours, minutes, seconds, fractionalMilliseconds });
-    if (offsetStr.toUpperCase() != "Z") {
-        date.setTime(date.getTime() - parseOffsetToMilliseconds(offsetStr));
-    }
-    return date;
-};
-const IMF_FIXDATE$1 = new RegExp(/^(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun), (\d{2}) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{4}) (\d{1,2}):(\d{2}):(\d{2})(?:\.(\d+))? GMT$/);
-const RFC_850_DATE$1 = new RegExp(/^(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday), (\d{2})-(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)-(\d{2}) (\d{1,2}):(\d{2}):(\d{2})(?:\.(\d+))? GMT$/);
-const ASC_TIME$1 = new RegExp(/^(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) ( [1-9]|\d{2}) (\d{1,2}):(\d{2}):(\d{2})(?:\.(\d+))? (\d{4})$/);
-const parseRfc7231DateTime = (value) => {
-    if (value === null || value === undefined) {
-        return undefined;
-    }
-    if (typeof value !== "string") {
-        throw new TypeError("RFC-7231 date-times must be expressed as strings");
-    }
-    let match = IMF_FIXDATE$1.exec(value);
-    if (match) {
-        const [_, dayStr, monthStr, yearStr, hours, minutes, seconds, fractionalMilliseconds] = match;
-        return buildDate(strictParseShort(stripLeadingZeroes(yearStr)), parseMonthByShortName(monthStr), parseDateValue(dayStr, "day", 1, 31), { hours, minutes, seconds, fractionalMilliseconds });
-    }
-    match = RFC_850_DATE$1.exec(value);
-    if (match) {
-        const [_, dayStr, monthStr, yearStr, hours, minutes, seconds, fractionalMilliseconds] = match;
-        return adjustRfc850Year(buildDate(parseTwoDigitYear(yearStr), parseMonthByShortName(monthStr), parseDateValue(dayStr, "day", 1, 31), {
-            hours,
-            minutes,
-            seconds,
-            fractionalMilliseconds,
-        }));
-    }
-    match = ASC_TIME$1.exec(value);
-    if (match) {
-        const [_, monthStr, dayStr, hours, minutes, seconds, fractionalMilliseconds, yearStr] = match;
-        return buildDate(strictParseShort(stripLeadingZeroes(yearStr)), parseMonthByShortName(monthStr), parseDateValue(dayStr.trimLeft(), "day", 1, 31), { hours, minutes, seconds, fractionalMilliseconds });
-    }
-    throw new TypeError("Invalid RFC-7231 date-time value");
-};
-const parseEpochTimestamp = (value) => {
-    if (value === null || value === undefined) {
-        return undefined;
-    }
-    let valueAsDouble;
-    if (typeof value === "number") {
-        valueAsDouble = value;
-    }
-    else if (typeof value === "string") {
-        valueAsDouble = strictParseDouble(value);
-    }
-    else if (typeof value === "object" && value.tag === 1) {
-        valueAsDouble = value.value;
-    }
-    else {
-        throw new TypeError("Epoch timestamps must be expressed as floating point numbers or their string representation");
-    }
-    if (Number.isNaN(valueAsDouble) || valueAsDouble === Infinity || valueAsDouble === -Infinity) {
-        throw new TypeError("Epoch timestamps must be valid, non-Infinite, non-NaN numerics");
-    }
-    return new Date(Math.round(valueAsDouble * 1000));
-};
-const buildDate = (year, month, day, time) => {
-    const adjustedMonth = month - 1;
-    validateDayOfMonth(year, adjustedMonth, day);
-    return new Date(Date.UTC(year, adjustedMonth, day, parseDateValue(time.hours, "hour", 0, 23), parseDateValue(time.minutes, "minute", 0, 59), parseDateValue(time.seconds, "seconds", 0, 60), parseMilliseconds(time.fractionalMilliseconds)));
-};
-const parseTwoDigitYear = (value) => {
-    const thisYear = new Date().getUTCFullYear();
-    const valueInThisCentury = Math.floor(thisYear / 100) * 100 + strictParseShort(stripLeadingZeroes(value));
-    if (valueInThisCentury < thisYear) {
-        return valueInThisCentury + 100;
-    }
-    return valueInThisCentury;
-};
-const FIFTY_YEARS_IN_MILLIS = 50 * 365 * 24 * 60 * 60 * 1000;
-const adjustRfc850Year = (input) => {
-    if (input.getTime() - new Date().getTime() > FIFTY_YEARS_IN_MILLIS) {
-        return new Date(Date.UTC(input.getUTCFullYear() - 100, input.getUTCMonth(), input.getUTCDate(), input.getUTCHours(), input.getUTCMinutes(), input.getUTCSeconds(), input.getUTCMilliseconds()));
-    }
-    return input;
-};
-const parseMonthByShortName = (value) => {
-    const monthIdx = MONTHS.indexOf(value);
-    if (monthIdx < 0) {
-        throw new TypeError(`Invalid month: ${value}`);
-    }
-    return monthIdx + 1;
-};
-const DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-const validateDayOfMonth = (year, month, day) => {
-    let maxDays = DAYS_IN_MONTH[month];
-    if (month === 1 && isLeapYear(year)) {
-        maxDays = 29;
-    }
-    if (day > maxDays) {
-        throw new TypeError(`Invalid day for ${MONTHS[month]} in ${year}: ${day}`);
-    }
-};
-const isLeapYear = (year) => {
-    return year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
-};
-const parseDateValue = (value, type, lower, upper) => {
-    const dateVal = strictParseByte(stripLeadingZeroes(value));
-    if (dateVal < lower || dateVal > upper) {
-        throw new TypeError(`${type} must be between ${lower} and ${upper}, inclusive`);
-    }
-    return dateVal;
-};
-const parseMilliseconds = (value) => {
-    if (value === null || value === undefined) {
-        return 0;
-    }
-    return strictParseFloat32("0." + value) * 1000;
-};
-const parseOffsetToMilliseconds = (value) => {
-    const directionStr = value[0];
-    let direction = 1;
-    if (directionStr == "+") {
-        direction = 1;
-    }
-    else if (directionStr == "-") {
-        direction = -1;
-    }
-    else {
-        throw new TypeError(`Offset direction, ${directionStr}, must be "+" or "-"`);
-    }
-    const hour = Number(value.substring(1, 3));
-    const minute = Number(value.substring(4, 6));
-    return direction * (hour * 60 + minute) * 60 * 1000;
-};
-const stripLeadingZeroes = (value) => {
-    let idx = 0;
-    while (idx < value.length - 1 && value.charAt(idx) === "0") {
-        idx++;
-    }
-    if (idx === 0) {
-        return value;
-    }
-    return value.slice(idx);
-};
-
-const randomUUID = crypto__default.randomUUID.bind(crypto__default);
-
-const decimalToHex = Array.from({ length: 256 }, (_, i) => i.toString(16).padStart(2, "0"));
-const v4 = () => {
-    if (randomUUID) {
-        return randomUUID();
-    }
-    const rnds = new Uint8Array(16);
-    crypto.getRandomValues(rnds);
-    rnds[6] = (rnds[6] & 0x0f) | 0x40;
-    rnds[8] = (rnds[8] & 0x3f) | 0x80;
-    return (decimalToHex[rnds[0]] +
-        decimalToHex[rnds[1]] +
-        decimalToHex[rnds[2]] +
-        decimalToHex[rnds[3]] +
-        "-" +
-        decimalToHex[rnds[4]] +
-        decimalToHex[rnds[5]] +
-        "-" +
-        decimalToHex[rnds[6]] +
-        decimalToHex[rnds[7]] +
-        "-" +
-        decimalToHex[rnds[8]] +
-        decimalToHex[rnds[9]] +
-        "-" +
-        decimalToHex[rnds[10]] +
-        decimalToHex[rnds[11]] +
-        decimalToHex[rnds[12]] +
-        decimalToHex[rnds[13]] +
-        decimalToHex[rnds[14]] +
-        decimalToHex[rnds[15]]);
-};
-
-const LazyJsonString = function LazyJsonString(val) {
-    const str = Object.assign(new String(val), {
-        deserializeJSON() {
-            return JSON.parse(String(val));
-        },
-        toString() {
-            return String(val);
-        },
-        toJSON() {
-            return String(val);
-        },
-    });
-    return str;
-};
-LazyJsonString.from = (object) => {
-    if (object && typeof object === "object" && (object instanceof LazyJsonString || "deserializeJSON" in object)) {
-        return object;
-    }
-    else if (typeof object === "string" || Object.getPrototypeOf(object) === String.prototype) {
-        return LazyJsonString(String(object));
-    }
-    return LazyJsonString(JSON.stringify(object));
-};
-LazyJsonString.fromObject = LazyJsonString.from;
-
-function quoteHeader(part) {
-    if (part.includes(",") || part.includes('"')) {
-        part = `"${part.replace(/"/g, '\\"')}"`;
-    }
-    return part;
-}
-
-const ddd = `(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)(?:[ne|u?r]?s?day)?`;
-const mmm = `(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)`;
-const time = `(\\d?\\d):(\\d{2}):(\\d{2})(?:\\.(\\d+))?`;
-const date = `(\\d?\\d)`;
-const year = `(\\d{4})`;
-const RFC3339_WITH_OFFSET = new RegExp(/^(\d{4})-(\d\d)-(\d\d)[tT](\d\d):(\d\d):(\d\d)(\.(\d+))?(([-+]\d\d:\d\d)|[zZ])$/);
-const IMF_FIXDATE = new RegExp(`^${ddd}, ${date} ${mmm} ${year} ${time} GMT$`);
-const RFC_850_DATE = new RegExp(`^${ddd}, ${date}-${mmm}-(\\d\\d) ${time} GMT$`);
-const ASC_TIME = new RegExp(`^${ddd} ${mmm} ( [1-9]|\\d\\d) ${time} ${year}$`);
-const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-const _parseEpochTimestamp = (value) => {
-    if (value == null) {
-        return void 0;
-    }
-    let num = NaN;
-    if (typeof value === "number") {
-        num = value;
-    }
-    else if (typeof value === "string") {
-        if (!/^-?\d*\.?\d+$/.test(value)) {
-            throw new TypeError(`parseEpochTimestamp - numeric string invalid.`);
-        }
-        num = Number.parseFloat(value);
-    }
-    else if (typeof value === "object" && value.tag === 1) {
-        num = value.value;
-    }
-    if (isNaN(num) || Math.abs(num) === Infinity) {
-        throw new TypeError("Epoch timestamps must be valid finite numbers.");
-    }
-    return new Date(Math.round(num * 1000));
-};
-const _parseRfc3339DateTimeWithOffset = (value) => {
-    if (value == null) {
-        return void 0;
-    }
-    if (typeof value !== "string") {
-        throw new TypeError("RFC3339 timestamps must be strings");
-    }
-    const matches = RFC3339_WITH_OFFSET.exec(value);
-    if (!matches) {
-        throw new TypeError(`Invalid RFC3339 timestamp format ${value}`);
-    }
-    const [, yearStr, monthStr, dayStr, hours, minutes, seconds, , ms, offsetStr] = matches;
-    range(monthStr, 1, 12);
-    range(dayStr, 1, 31);
-    range(hours, 0, 23);
-    range(minutes, 0, 59);
-    range(seconds, 0, 60);
-    const date = new Date(Date.UTC(Number(yearStr), Number(monthStr) - 1, Number(dayStr), Number(hours), Number(minutes), Number(seconds), Number(ms) ? Math.round(parseFloat(`0.${ms}`) * 1000) : 0));
-    date.setUTCFullYear(Number(yearStr));
-    if (offsetStr.toUpperCase() != "Z") {
-        const [, sign, offsetH, offsetM] = /([+-])(\d\d):(\d\d)/.exec(offsetStr) || [void 0, "+", 0, 0];
-        const scalar = sign === "-" ? 1 : -1;
-        date.setTime(date.getTime() + scalar * (Number(offsetH) * 60 * 60 * 1000 + Number(offsetM) * 60 * 1000));
-    }
-    return date;
-};
-const _parseRfc7231DateTime = (value) => {
-    if (value == null) {
-        return void 0;
-    }
-    if (typeof value !== "string") {
-        throw new TypeError("RFC7231 timestamps must be strings.");
-    }
-    let day;
-    let month;
-    let year;
-    let hour;
-    let minute;
-    let second;
-    let fraction;
-    let matches;
-    if ((matches = IMF_FIXDATE.exec(value))) {
-        [, day, month, year, hour, minute, second, fraction] = matches;
-    }
-    else if ((matches = RFC_850_DATE.exec(value))) {
-        [, day, month, year, hour, minute, second, fraction] = matches;
-        year = (Number(year) + 1900).toString();
-    }
-    else if ((matches = ASC_TIME.exec(value))) {
-        [, month, day, hour, minute, second, fraction, year] = matches;
-    }
-    if (year && second) {
-        const timestamp = Date.UTC(Number(year), months.indexOf(month), Number(day), Number(hour), Number(minute), Number(second), fraction ? Math.round(parseFloat(`0.${fraction}`) * 1000) : 0);
-        range(day, 1, 31);
-        range(hour, 0, 23);
-        range(minute, 0, 59);
-        range(second, 0, 60);
-        const date = new Date(timestamp);
-        date.setUTCFullYear(Number(year));
-        return date;
-    }
-    throw new TypeError(`Invalid RFC7231 date-time value ${value}.`);
-};
-function range(v, min, max) {
-    const _v = Number(v);
-    if (_v < min || _v > max) {
-        throw new Error(`Value ${_v} out of range [${min}, ${max}]`);
-    }
-}
-
-function splitEvery(value, delimiter, numDelimiters) {
-    if (!Number.isInteger(numDelimiters)) {
-        throw new Error("Invalid number of delimiters (" + numDelimiters + ") for splitEvery.");
-    }
-    const segments = value.split(delimiter);
-    const compoundSegments = [];
-    let currentSegment = "";
-    for (let i = 0; i < segments.length; i++) {
-        if (currentSegment === "") {
-            currentSegment = segments[i];
-        }
-        else {
-            currentSegment += delimiter + segments[i];
-        }
-        if ((i + 1) % numDelimiters === 0) {
-            compoundSegments.push(currentSegment);
-            currentSegment = "";
-        }
-    }
-    if (currentSegment !== "") {
-        compoundSegments.push(currentSegment);
-    }
-    return compoundSegments;
-}
-
-const splitHeader = (value) => {
-    const z = value.length;
-    const values = [];
-    let withinQuotes = false;
-    let prevChar = undefined;
-    let anchor = 0;
-    for (let i = 0; i < z; ++i) {
-        const char = value[i];
-        switch (char) {
-            case `"`:
-                if (prevChar !== "\\") {
-                    withinQuotes = !withinQuotes;
-                }
-                break;
-            case ",":
-                if (!withinQuotes) {
-                    values.push(value.slice(anchor, i));
-                    anchor = i + 1;
-                }
-                break;
-        }
-        prevChar = char;
-    }
-    values.push(value.slice(anchor));
-    return values.map((v) => {
-        v = v.trim();
-        const z = v.length;
-        if (z < 2) {
-            return v;
-        }
-        if (v[0] === `"` && v[z - 1] === `"`) {
-            v = v.slice(1, z - 1);
-        }
-        return v.replace(/\\"/g, '"');
-    });
-};
-
-const format = /^-?\d*(\.\d+)?$/;
-class NumericValue {
-    string;
-    type;
-    constructor(string, type) {
-        this.string = string;
-        this.type = type;
-        if (!format.test(string)) {
-            throw new Error(`@smithy/core/serde - NumericValue must only contain [0-9], at most one decimal point ".", and an optional negation prefix "-".`);
-        }
-    }
-    toString() {
-        return this.string;
-    }
-    static [Symbol.hasInstance](object) {
-        if (!object || typeof object !== "object") {
-            return false;
-        }
-        const _nv = object;
-        return NumericValue.prototype.isPrototypeOf(object) || (_nv.type === "bigDecimal" && format.test(_nv.string));
-    }
-}
-
-class SerdeContext {
-    serdeContext;
-    setSerdeContext(serdeContext) {
-        this.serdeContext = serdeContext;
-    }
-}
-
-class HttpProtocol extends SerdeContext {
-    options;
-    constructor(options) {
-        super();
-        this.options = options;
-    }
-    getRequestType() {
-        return HttpRequest;
-    }
-    getResponseType() {
-        return HttpResponse;
-    }
-    setSerdeContext(serdeContext) {
-        this.serdeContext = serdeContext;
-        this.serializer.setSerdeContext(serdeContext);
-        this.deserializer.setSerdeContext(serdeContext);
-        if (this.getPayloadCodec()) {
-            this.getPayloadCodec().setSerdeContext(serdeContext);
-        }
-    }
-    updateServiceEndpoint(request, endpoint) {
-        if ("url" in endpoint) {
-            request.protocol = endpoint.url.protocol;
-            request.hostname = endpoint.url.hostname;
-            request.port = endpoint.url.port ? Number(endpoint.url.port) : undefined;
-            request.path = endpoint.url.pathname;
-            request.fragment = endpoint.url.hash || void 0;
-            request.username = endpoint.url.username || void 0;
-            request.password = endpoint.url.password || void 0;
-            if (!request.query) {
-                request.query = {};
-            }
-            for (const [k, v] of endpoint.url.searchParams.entries()) {
-                request.query[k] = v;
-            }
-            return request;
-        }
-        else {
-            request.protocol = endpoint.protocol;
-            request.hostname = endpoint.hostname;
-            request.port = endpoint.port ? Number(endpoint.port) : undefined;
-            request.path = endpoint.path;
-            request.query = {
-                ...endpoint.query,
-            };
-            return request;
-        }
-    }
-    setHostPrefix(request, operationSchema, input) {
-        if (this.serdeContext?.disableHostPrefix) {
-            return;
-        }
-        const inputNs = NormalizedSchema.of(operationSchema.input);
-        const opTraits = translateTraits(operationSchema.traits ?? {});
-        if (opTraits.endpoint) {
-            let hostPrefix = opTraits.endpoint?.[0];
-            if (typeof hostPrefix === "string") {
-                const hostLabelInputs = [...inputNs.structIterator()].filter(([, member]) => member.getMergedTraits().hostLabel);
-                for (const [name] of hostLabelInputs) {
-                    const replacement = input[name];
-                    if (typeof replacement !== "string") {
-                        throw new Error(`@smithy/core/schema - ${name} in input must be a string as hostLabel.`);
-                    }
-                    hostPrefix = hostPrefix.replace(`{${name}}`, replacement);
-                }
-                request.hostname = hostPrefix + request.hostname;
-            }
-        }
-    }
-    deserializeMetadata(output) {
-        return {
-            httpStatusCode: output.statusCode,
-            requestId: output.headers["x-amzn-requestid"] ?? output.headers["x-amzn-request-id"] ?? output.headers["x-amz-request-id"],
-            extendedRequestId: output.headers["x-amz-id-2"],
-            cfId: output.headers["x-amz-cf-id"],
-        };
-    }
-    async serializeEventStream({ eventStream, requestSchema, initialRequest, }) {
-        const eventStreamSerde = await this.loadEventStreamCapability();
-        return eventStreamSerde.serializeEventStream({
-            eventStream,
-            requestSchema,
-            initialRequest,
-        });
-    }
-    async deserializeEventStream({ response, responseSchema, initialResponseContainer, }) {
-        const eventStreamSerde = await this.loadEventStreamCapability();
-        return eventStreamSerde.deserializeEventStream({
-            response,
-            responseSchema,
-            initialResponseContainer,
-        });
-    }
-    async loadEventStreamCapability() {
-        const { EventStreamSerde } = await Promise.resolve().then(function () { return index$9; });
-        return new EventStreamSerde({
-            marshaller: this.getEventStreamMarshaller(),
-            serializer: this.serializer,
-            deserializer: this.deserializer,
-            serdeContext: this.serdeContext,
-            defaultContentType: this.getDefaultContentType(),
-        });
-    }
-    getDefaultContentType() {
-        throw new Error(`@smithy/core/protocols - ${this.constructor.name} getDefaultContentType() implementation missing.`);
-    }
-    async deserializeHttpMessage(schema, context, response, arg4, arg5) {
-        return [];
-    }
-    getEventStreamMarshaller() {
-        const context = this.serdeContext;
-        if (!context.eventStreamMarshaller) {
-            throw new Error("@smithy/core - HttpProtocol: eventStreamMarshaller missing in serdeContext.");
-        }
-        return context.eventStreamMarshaller;
-    }
-}
-
-class HttpBindingProtocol extends HttpProtocol {
-    async serializeRequest(operationSchema, _input, context) {
-        const input = {
-            ...(_input ?? {}),
-        };
-        const serializer = this.serializer;
-        const query = {};
-        const headers = {};
-        const endpoint = await context.endpoint();
-        const ns = NormalizedSchema.of(operationSchema?.input);
-        const schema = ns.getSchema();
-        let hasNonHttpBindingMember = false;
-        let payload;
-        const request = new HttpRequest({
-            protocol: "",
-            hostname: "",
-            port: undefined,
-            path: "",
-            fragment: undefined,
-            query: query,
-            headers: headers,
-            body: undefined,
-        });
-        if (endpoint) {
-            this.updateServiceEndpoint(request, endpoint);
-            this.setHostPrefix(request, operationSchema, input);
-            const opTraits = translateTraits(operationSchema.traits);
-            if (opTraits.http) {
-                request.method = opTraits.http[0];
-                const [path, search] = opTraits.http[1].split("?");
-                if (request.path == "/") {
-                    request.path = path;
-                }
-                else {
-                    request.path += path;
-                }
-                const traitSearchParams = new URLSearchParams(search ?? "");
-                Object.assign(query, Object.fromEntries(traitSearchParams));
-            }
-        }
-        for (const [memberName, memberNs] of ns.structIterator()) {
-            const memberTraits = memberNs.getMergedTraits() ?? {};
-            const inputMemberValue = input[memberName];
-            if (inputMemberValue == null && !memberNs.isIdempotencyToken()) {
-                if (memberTraits.httpLabel) {
-                    if (request.path.includes(`{${memberName}+}`) || request.path.includes(`{${memberName}}`)) {
-                        throw new Error(`No value provided for input HTTP label: ${memberName}.`);
-                    }
-                }
-                continue;
-            }
-            if (memberTraits.httpPayload) {
-                const isStreaming = memberNs.isStreaming();
-                if (isStreaming) {
-                    const isEventStream = memberNs.isStructSchema();
-                    if (isEventStream) {
-                        if (input[memberName]) {
-                            payload = await this.serializeEventStream({
-                                eventStream: input[memberName],
-                                requestSchema: ns,
-                            });
-                        }
-                    }
-                    else {
-                        payload = inputMemberValue;
-                    }
-                }
-                else {
-                    serializer.write(memberNs, inputMemberValue);
-                    payload = serializer.flush();
-                }
-                delete input[memberName];
-            }
-            else if (memberTraits.httpLabel) {
-                serializer.write(memberNs, inputMemberValue);
-                const replacement = serializer.flush();
-                if (request.path.includes(`{${memberName}+}`)) {
-                    request.path = request.path.replace(`{${memberName}+}`, replacement.split("/").map(extendedEncodeURIComponent).join("/"));
-                }
-                else if (request.path.includes(`{${memberName}}`)) {
-                    request.path = request.path.replace(`{${memberName}}`, extendedEncodeURIComponent(replacement));
-                }
-                delete input[memberName];
-            }
-            else if (memberTraits.httpHeader) {
-                serializer.write(memberNs, inputMemberValue);
-                headers[memberTraits.httpHeader.toLowerCase()] = String(serializer.flush());
-                delete input[memberName];
-            }
-            else if (typeof memberTraits.httpPrefixHeaders === "string") {
-                for (const [key, val] of Object.entries(inputMemberValue)) {
-                    const amalgam = memberTraits.httpPrefixHeaders + key;
-                    serializer.write([memberNs.getValueSchema(), { httpHeader: amalgam }], val);
-                    headers[amalgam.toLowerCase()] = serializer.flush();
-                }
-                delete input[memberName];
-            }
-            else if (memberTraits.httpQuery || memberTraits.httpQueryParams) {
-                this.serializeQuery(memberNs, inputMemberValue, query);
-                delete input[memberName];
-            }
-            else {
-                hasNonHttpBindingMember = true;
-            }
-        }
-        if (hasNonHttpBindingMember && input) {
-            serializer.write(schema, input);
-            payload = serializer.flush();
-        }
-        request.headers = headers;
-        request.query = query;
-        request.body = payload;
-        return request;
-    }
-    serializeQuery(ns, data, query) {
-        const serializer = this.serializer;
-        const traits = ns.getMergedTraits();
-        if (traits.httpQueryParams) {
-            for (const [key, val] of Object.entries(data)) {
-                if (!(key in query)) {
-                    const valueSchema = ns.getValueSchema();
-                    Object.assign(valueSchema.getMergedTraits(), {
-                        ...traits,
-                        httpQuery: key,
-                        httpQueryParams: undefined,
-                    });
-                    this.serializeQuery(valueSchema, val, query);
-                }
-            }
-            return;
-        }
-        if (ns.isListSchema()) {
-            const sparse = !!ns.getMergedTraits().sparse;
-            const buffer = [];
-            for (const item of data) {
-                serializer.write([ns.getValueSchema(), traits], item);
-                const serializable = serializer.flush();
-                if (sparse || serializable !== undefined) {
-                    buffer.push(serializable);
-                }
-            }
-            query[traits.httpQuery] = buffer;
-        }
-        else {
-            serializer.write([ns, traits], data);
-            query[traits.httpQuery] = serializer.flush();
-        }
-    }
-    async deserializeResponse(operationSchema, context, response) {
-        const deserializer = this.deserializer;
-        const ns = NormalizedSchema.of(operationSchema.output);
-        const dataObject = {};
-        if (response.statusCode >= 300) {
-            const bytes = await collectBody(response.body, context);
-            if (bytes.byteLength > 0) {
-                Object.assign(dataObject, await deserializer.read(15, bytes));
-            }
-            await this.handleError(operationSchema, context, response, dataObject, this.deserializeMetadata(response));
-            throw new Error("@smithy/core/protocols - HTTP Protocol error handler failed to throw.");
-        }
-        for (const header in response.headers) {
-            const value = response.headers[header];
-            delete response.headers[header];
-            response.headers[header.toLowerCase()] = value;
-        }
-        const nonHttpBindingMembers = await this.deserializeHttpMessage(ns, context, response, dataObject);
-        if (nonHttpBindingMembers.length) {
-            const bytes = await collectBody(response.body, context);
-            if (bytes.byteLength > 0) {
-                const dataFromBody = await deserializer.read(ns, bytes);
-                for (const member of nonHttpBindingMembers) {
-                    dataObject[member] = dataFromBody[member];
-                }
-            }
-        }
-        else if (nonHttpBindingMembers.discardResponseBody) {
-            await collectBody(response.body, context);
-        }
-        dataObject.$metadata = this.deserializeMetadata(response);
-        return dataObject;
-    }
-    async deserializeHttpMessage(schema, context, response, arg4, arg5) {
-        let dataObject;
-        if (arg4 instanceof Set) {
-            dataObject = arg5;
-        }
-        else {
-            dataObject = arg4;
-        }
-        let discardResponseBody = true;
-        const deserializer = this.deserializer;
-        const ns = NormalizedSchema.of(schema);
-        const nonHttpBindingMembers = [];
-        for (const [memberName, memberSchema] of ns.structIterator()) {
-            const memberTraits = memberSchema.getMemberTraits();
-            if (memberTraits.httpPayload) {
-                discardResponseBody = false;
-                const isStreaming = memberSchema.isStreaming();
-                if (isStreaming) {
-                    const isEventStream = memberSchema.isStructSchema();
-                    if (isEventStream) {
-                        dataObject[memberName] = await this.deserializeEventStream({
-                            response,
-                            responseSchema: ns,
-                        });
-                    }
-                    else {
-                        dataObject[memberName] = sdkStreamMixin(response.body);
-                    }
-                }
-                else if (response.body) {
-                    const bytes = await collectBody(response.body, context);
-                    if (bytes.byteLength > 0) {
-                        dataObject[memberName] = await deserializer.read(memberSchema, bytes);
-                    }
-                }
-            }
-            else if (memberTraits.httpHeader) {
-                const key = String(memberTraits.httpHeader).toLowerCase();
-                const value = response.headers[key];
-                if (null != value) {
-                    if (memberSchema.isListSchema()) {
-                        const headerListValueSchema = memberSchema.getValueSchema();
-                        headerListValueSchema.getMergedTraits().httpHeader = key;
-                        let sections;
-                        if (headerListValueSchema.isTimestampSchema() &&
-                            headerListValueSchema.getSchema() === 4) {
-                            sections = splitEvery(value, ",", 2);
-                        }
-                        else {
-                            sections = splitHeader(value);
-                        }
-                        const list = [];
-                        for (const section of sections) {
-                            list.push(await deserializer.read(headerListValueSchema, section.trim()));
-                        }
-                        dataObject[memberName] = list;
-                    }
-                    else {
-                        dataObject[memberName] = await deserializer.read(memberSchema, value);
-                    }
-                }
-            }
-            else if (memberTraits.httpPrefixHeaders !== undefined) {
-                dataObject[memberName] = {};
-                for (const [header, value] of Object.entries(response.headers)) {
-                    if (header.startsWith(memberTraits.httpPrefixHeaders)) {
-                        const valueSchema = memberSchema.getValueSchema();
-                        valueSchema.getMergedTraits().httpHeader = header;
-                        dataObject[memberName][header.slice(memberTraits.httpPrefixHeaders.length)] = await deserializer.read(valueSchema, value);
-                    }
-                }
-            }
-            else if (memberTraits.httpResponseCode) {
-                dataObject[memberName] = response.statusCode;
-            }
-            else {
-                nonHttpBindingMembers.push(memberName);
-            }
-        }
-        nonHttpBindingMembers.discardResponseBody = discardResponseBody;
-        return nonHttpBindingMembers;
-    }
-}
-
-class RpcProtocol extends HttpProtocol {
-    async serializeRequest(operationSchema, input, context) {
-        const serializer = this.serializer;
-        const query = {};
-        const headers = {};
-        const endpoint = await context.endpoint();
-        const ns = NormalizedSchema.of(operationSchema?.input);
-        const schema = ns.getSchema();
-        let payload;
-        const request = new HttpRequest({
-            protocol: "",
-            hostname: "",
-            port: undefined,
-            path: "/",
-            fragment: undefined,
-            query: query,
-            headers: headers,
-            body: undefined,
-        });
-        if (endpoint) {
-            this.updateServiceEndpoint(request, endpoint);
-            this.setHostPrefix(request, operationSchema, input);
-        }
-        const _input = {
-            ...input,
-        };
-        if (input) {
-            const eventStreamMember = ns.getEventStreamMember();
-            if (eventStreamMember) {
-                if (_input[eventStreamMember]) {
-                    const initialRequest = {};
-                    for (const [memberName, memberSchema] of ns.structIterator()) {
-                        if (memberName !== eventStreamMember && _input[memberName]) {
-                            serializer.write(memberSchema, _input[memberName]);
-                            initialRequest[memberName] = serializer.flush();
-                        }
-                    }
-                    payload = await this.serializeEventStream({
-                        eventStream: _input[eventStreamMember],
-                        requestSchema: ns,
-                        initialRequest,
-                    });
-                }
-            }
-            else {
-                serializer.write(schema, _input);
-                payload = serializer.flush();
-            }
-        }
-        request.headers = headers;
-        request.query = query;
-        request.body = payload;
-        request.method = "POST";
-        return request;
-    }
-    async deserializeResponse(operationSchema, context, response) {
-        const deserializer = this.deserializer;
-        const ns = NormalizedSchema.of(operationSchema.output);
-        const dataObject = {};
-        if (response.statusCode >= 300) {
-            const bytes = await collectBody(response.body, context);
-            if (bytes.byteLength > 0) {
-                Object.assign(dataObject, await deserializer.read(15, bytes));
-            }
-            await this.handleError(operationSchema, context, response, dataObject, this.deserializeMetadata(response));
-            throw new Error("@smithy/core/protocols - RPC Protocol error handler failed to throw.");
-        }
-        for (const header in response.headers) {
-            const value = response.headers[header];
-            delete response.headers[header];
-            response.headers[header.toLowerCase()] = value;
-        }
-        const eventStreamMember = ns.getEventStreamMember();
-        if (eventStreamMember) {
-            dataObject[eventStreamMember] = await this.deserializeEventStream({
-                response,
-                responseSchema: ns,
-                initialResponseContainer: dataObject,
-            });
-        }
-        else {
-            const bytes = await collectBody(response.body, context);
-            if (bytes.byteLength > 0) {
-                Object.assign(dataObject, await deserializer.read(ns, bytes));
-            }
-        }
-        dataObject.$metadata = this.deserializeMetadata(response);
-        return dataObject;
-    }
-}
-
-function determineTimestampFormat(ns, settings) {
-    if (settings.timestampFormat.useTrait) {
-        if (ns.isTimestampSchema() &&
-            (ns.getSchema() === 5 ||
-                ns.getSchema() === 6 ||
-                ns.getSchema() === 7)) {
-            return ns.getSchema();
-        }
-    }
-    const { httpLabel, httpPrefixHeaders, httpHeader, httpQuery } = ns.getMergedTraits();
-    const bindingFormat = settings.httpBindings
-        ? typeof httpPrefixHeaders === "string" || Boolean(httpHeader)
-            ? 6
-            : Boolean(httpQuery) || Boolean(httpLabel)
-                ? 5
-                : undefined
-        : undefined;
-    return bindingFormat ?? settings.timestampFormat.default;
-}
-
-class FromStringShapeDeserializer extends SerdeContext {
-    settings;
-    constructor(settings) {
-        super();
-        this.settings = settings;
-    }
-    read(_schema, data) {
-        const ns = NormalizedSchema.of(_schema);
-        if (ns.isListSchema()) {
-            return splitHeader(data).map((item) => this.read(ns.getValueSchema(), item));
-        }
-        if (ns.isBlobSchema()) {
-            return (this.serdeContext?.base64Decoder ?? fromBase64)(data);
-        }
-        if (ns.isTimestampSchema()) {
-            const format = determineTimestampFormat(ns, this.settings);
-            switch (format) {
-                case 5:
-                    return _parseRfc3339DateTimeWithOffset(data);
-                case 6:
-                    return _parseRfc7231DateTime(data);
-                case 7:
-                    return _parseEpochTimestamp(data);
-                default:
-                    console.warn("Missing timestamp format, parsing value with Date constructor:", data);
-                    return new Date(data);
-            }
-        }
-        if (ns.isStringSchema()) {
-            const mediaType = ns.getMergedTraits().mediaType;
-            let intermediateValue = data;
-            if (mediaType) {
-                if (ns.getMergedTraits().httpHeader) {
-                    intermediateValue = this.base64ToUtf8(intermediateValue);
-                }
-                const isJson = mediaType === "application/json" || mediaType.endsWith("+json");
-                if (isJson) {
-                    intermediateValue = LazyJsonString.from(intermediateValue);
-                }
-                return intermediateValue;
-            }
-        }
-        if (ns.isNumericSchema()) {
-            return Number(data);
-        }
-        if (ns.isBigIntegerSchema()) {
-            return BigInt(data);
-        }
-        if (ns.isBigDecimalSchema()) {
-            return new NumericValue(data, "bigDecimal");
-        }
-        if (ns.isBooleanSchema()) {
-            return String(data).toLowerCase() === "true";
-        }
-        return data;
-    }
-    base64ToUtf8(base64String) {
-        return (this.serdeContext?.utf8Encoder ?? toUtf8)((this.serdeContext?.base64Decoder ?? fromBase64)(base64String));
-    }
-}
-
-class HttpInterceptingShapeDeserializer extends SerdeContext {
-    codecDeserializer;
-    stringDeserializer;
-    constructor(codecDeserializer, codecSettings) {
-        super();
-        this.codecDeserializer = codecDeserializer;
-        this.stringDeserializer = new FromStringShapeDeserializer(codecSettings);
-    }
-    setSerdeContext(serdeContext) {
-        this.stringDeserializer.setSerdeContext(serdeContext);
-        this.codecDeserializer.setSerdeContext(serdeContext);
-        this.serdeContext = serdeContext;
-    }
-    read(schema, data) {
-        const ns = NormalizedSchema.of(schema);
-        const traits = ns.getMergedTraits();
-        const toString = this.serdeContext?.utf8Encoder ?? toUtf8;
-        if (traits.httpHeader || traits.httpResponseCode) {
-            return this.stringDeserializer.read(ns, toString(data));
-        }
-        if (traits.httpPayload) {
-            if (ns.isBlobSchema()) {
-                const toBytes = this.serdeContext?.utf8Decoder ?? fromUtf8;
-                if (typeof data === "string") {
-                    return toBytes(data);
-                }
-                return data;
-            }
-            else if (ns.isStringSchema()) {
-                if ("byteLength" in data) {
-                    return toString(data);
-                }
-                return data;
-            }
-        }
-        return this.codecDeserializer.read(ns, data);
-    }
-}
-
-class ToStringShapeSerializer extends SerdeContext {
-    settings;
-    stringBuffer = "";
-    constructor(settings) {
-        super();
-        this.settings = settings;
-    }
-    write(schema, value) {
-        const ns = NormalizedSchema.of(schema);
-        switch (typeof value) {
-            case "object":
-                if (value === null) {
-                    this.stringBuffer = "null";
-                    return;
-                }
-                if (ns.isTimestampSchema()) {
-                    if (!(value instanceof Date)) {
-                        throw new Error(`@smithy/core/protocols - received non-Date value ${value} when schema expected Date in ${ns.getName(true)}`);
-                    }
-                    const format = determineTimestampFormat(ns, this.settings);
-                    switch (format) {
-                        case 5:
-                            this.stringBuffer = value.toISOString().replace(".000Z", "Z");
-                            break;
-                        case 6:
-                            this.stringBuffer = dateToUtcString(value);
-                            break;
-                        case 7:
-                            this.stringBuffer = String(value.getTime() / 1000);
-                            break;
-                        default:
-                            console.warn("Missing timestamp format, using epoch seconds", value);
-                            this.stringBuffer = String(value.getTime() / 1000);
-                    }
-                    return;
-                }
-                if (ns.isBlobSchema() && "byteLength" in value) {
-                    this.stringBuffer = (this.serdeContext?.base64Encoder ?? toBase64)(value);
-                    return;
-                }
-                if (ns.isListSchema() && Array.isArray(value)) {
-                    let buffer = "";
-                    for (const item of value) {
-                        this.write([ns.getValueSchema(), ns.getMergedTraits()], item);
-                        const headerItem = this.flush();
-                        const serialized = ns.getValueSchema().isTimestampSchema() ? headerItem : quoteHeader(headerItem);
-                        if (buffer !== "") {
-                            buffer += ", ";
-                        }
-                        buffer += serialized;
-                    }
-                    this.stringBuffer = buffer;
-                    return;
-                }
-                this.stringBuffer = JSON.stringify(value, null, 2);
-                break;
-            case "string":
-                const mediaType = ns.getMergedTraits().mediaType;
-                let intermediateValue = value;
-                if (mediaType) {
-                    const isJson = mediaType === "application/json" || mediaType.endsWith("+json");
-                    if (isJson) {
-                        intermediateValue = LazyJsonString.from(intermediateValue);
-                    }
-                    if (ns.getMergedTraits().httpHeader) {
-                        this.stringBuffer = (this.serdeContext?.base64Encoder ?? toBase64)(intermediateValue.toString());
-                        return;
-                    }
-                }
-                this.stringBuffer = value;
-                break;
-            default:
-                if (ns.isIdempotencyToken()) {
-                    this.stringBuffer = v4();
-                }
-                else {
-                    this.stringBuffer = String(value);
-                }
-        }
-    }
-    flush() {
-        const buffer = this.stringBuffer;
-        this.stringBuffer = "";
-        return buffer;
-    }
-}
-
-class HttpInterceptingShapeSerializer {
-    codecSerializer;
-    stringSerializer;
-    buffer;
-    constructor(codecSerializer, codecSettings, stringSerializer = new ToStringShapeSerializer(codecSettings)) {
-        this.codecSerializer = codecSerializer;
-        this.stringSerializer = stringSerializer;
-    }
-    setSerdeContext(serdeContext) {
-        this.codecSerializer.setSerdeContext(serdeContext);
-        this.stringSerializer.setSerdeContext(serdeContext);
-    }
-    write(schema, value) {
-        const ns = NormalizedSchema.of(schema);
-        const traits = ns.getMergedTraits();
-        if (traits.httpHeader || traits.httpLabel || traits.httpQuery) {
-            this.stringSerializer.write(ns, value);
-            this.buffer = this.stringSerializer.flush();
-            return;
-        }
-        return this.codecSerializer.write(ns, value);
-    }
-    flush() {
-        if (this.buffer !== undefined) {
-            const buffer = this.buffer;
-            this.buffer = undefined;
-            return buffer;
-        }
-        return this.codecSerializer.flush();
-    }
-}
-
-function setFeature$1(context, feature, value) {
-    if (!context.__smithy_context) {
-        context.__smithy_context = {
-            features: {},
-        };
-    }
-    else if (!context.__smithy_context.features) {
-        context.__smithy_context.features = {};
-    }
-    context.__smithy_context.features[feature] = value;
-}
-
-class DefaultIdentityProviderConfig {
-    authSchemes = new Map();
-    constructor(config) {
-        for (const [key, value] of Object.entries(config)) {
-            if (value !== undefined) {
-                this.authSchemes.set(key, value);
-            }
-        }
-    }
-    getIdentityProvider(schemeId) {
-        return this.authSchemes.get(schemeId);
-    }
-}
-
-class NoAuthSigner {
-    async sign(httpRequest, identity, signingProperties) {
-        return httpRequest;
-    }
-}
-
-const createIsIdentityExpiredFunction = (expirationMs) => function isIdentityExpired(identity) {
-    return doesIdentityRequireRefresh(identity) && identity.expiration.getTime() - Date.now() < expirationMs;
-};
-const EXPIRATION_MS = 300_000;
-const isIdentityExpired = createIsIdentityExpiredFunction(EXPIRATION_MS);
-const doesIdentityRequireRefresh = (identity) => identity.expiration !== undefined;
-const memoizeIdentityProvider = (provider, isExpired, requiresRefresh) => {
-    if (provider === undefined) {
-        return undefined;
-    }
-    const normalizedProvider = typeof provider !== "function" ? async () => Promise.resolve(provider) : provider;
-    let resolved;
-    let pending;
-    let hasResult;
-    let isConstant = false;
-    const coalesceProvider = async (options) => {
-        if (!pending) {
-            pending = normalizedProvider(options);
-        }
-        try {
-            resolved = await pending;
-            hasResult = true;
-            isConstant = false;
-        }
-        finally {
-            pending = undefined;
-        }
-        return resolved;
-    };
-    if (isExpired === undefined) {
-        return async (options) => {
-            if (!hasResult || options?.forceRefresh) {
-                resolved = await coalesceProvider(options);
-            }
-            return resolved;
-        };
-    }
-    return async (options) => {
-        if (!hasResult || options?.forceRefresh) {
-            resolved = await coalesceProvider(options);
-        }
-        if (isConstant) {
-            return resolved;
-        }
-        if (!requiresRefresh(resolved)) {
-            isConstant = true;
-            return resolved;
-        }
-        if (isExpired(resolved)) {
-            await coalesceProvider(options);
-            return resolved;
-        }
-        return resolved;
-    };
-};
-
-const DEFAULT_UA_APP_ID = undefined;
-function isValidUserAgentAppId(appId) {
-    if (appId === undefined) {
-        return true;
-    }
-    return typeof appId === "string" && appId.length <= 50;
-}
-function resolveUserAgentConfig(input) {
-    const normalizedAppIdProvider = normalizeProvider(input.userAgentAppId ?? DEFAULT_UA_APP_ID);
-    const { customUserAgent } = input;
-    return Object.assign(input, {
-        customUserAgent: typeof customUserAgent === "string" ? [[customUserAgent]] : customUserAgent,
-        userAgentAppId: async () => {
-            const appId = await normalizedAppIdProvider();
-            if (!isValidUserAgentAppId(appId)) {
-                const logger = input.logger?.constructor?.name === "NoOpLogger" || !input.logger ? console : input.logger;
-                if (typeof appId !== "string") {
-                    logger?.warn("userAgentAppId must be a string or undefined.");
-                }
-                else if (appId.length > 50) {
-                    logger?.warn("The provided userAgentAppId exceeds the maximum length of 50 characters.");
-                }
-            }
-            return appId;
-        },
-    });
-}
-
-class EndpointCache {
-    capacity;
-    data = new Map();
-    parameters = [];
-    constructor({ size, params }) {
-        this.capacity = size ?? 50;
-        if (params) {
-            this.parameters = params;
-        }
-    }
-    get(endpointParams, resolver) {
-        const key = this.hash(endpointParams);
-        if (key === false) {
-            return resolver();
-        }
-        if (!this.data.has(key)) {
-            if (this.data.size > this.capacity + 10) {
-                const keys = this.data.keys();
-                let i = 0;
-                while (true) {
-                    const { value, done } = keys.next();
-                    this.data.delete(value);
-                    if (done || ++i > 10) {
-                        break;
-                    }
-                }
-            }
-            this.data.set(key, resolver());
-        }
-        return this.data.get(key);
-    }
-    size() {
-        return this.data.size;
-    }
-    hash(endpointParams) {
-        let buffer = "";
-        const { parameters } = this;
-        if (parameters.length === 0) {
-            return false;
-        }
-        for (const param of parameters) {
-            const val = String(endpointParams[param] ?? "");
-            if (val.includes("|;")) {
-                return false;
-            }
-            buffer += val + "|;";
-        }
-        return buffer;
-    }
-}
-
-const IP_V4_REGEX = new RegExp(`^(?:25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]\\d|\\d)(?:\\.(?:25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]\\d|\\d)){3}$`);
-const isIpAddress = (value) => IP_V4_REGEX.test(value) || (value.startsWith("[") && value.endsWith("]"));
-
-const VALID_HOST_LABEL_REGEX = new RegExp(`^(?!.*-$)(?!-)[a-zA-Z0-9-]{1,63}$`);
-const isValidHostLabel = (value, allowSubDomains = false) => {
-    if (!allowSubDomains) {
-        return VALID_HOST_LABEL_REGEX.test(value);
-    }
-    const labels = value.split(".");
-    for (const label of labels) {
-        if (!isValidHostLabel(label)) {
-            return false;
-        }
-    }
-    return true;
-};
-
-const customEndpointFunctions = {};
-
-const debugId = "endpoints";
-
-function toDebugString(input) {
-    if (typeof input !== "object" || input == null) {
-        return input;
-    }
-    if ("ref" in input) {
-        return `$${toDebugString(input.ref)}`;
-    }
-    if ("fn" in input) {
-        return `${input.fn}(${(input.argv || []).map(toDebugString).join(", ")})`;
-    }
-    return JSON.stringify(input, null, 2);
-}
-
-class EndpointError extends Error {
-    constructor(message) {
-        super(message);
-        this.name = "EndpointError";
-    }
-}
-
-const booleanEquals = (value1, value2) => value1 === value2;
-
-const getAttrPathList = (path) => {
-    const parts = path.split(".");
-    const pathList = [];
-    for (const part of parts) {
-        const squareBracketIndex = part.indexOf("[");
-        if (squareBracketIndex !== -1) {
-            if (part.indexOf("]") !== part.length - 1) {
-                throw new EndpointError(`Path: '${path}' does not end with ']'`);
-            }
-            const arrayIndex = part.slice(squareBracketIndex + 1, -1);
-            if (Number.isNaN(parseInt(arrayIndex))) {
-                throw new EndpointError(`Invalid array index: '${arrayIndex}' in path: '${path}'`);
-            }
-            if (squareBracketIndex !== 0) {
-                pathList.push(part.slice(0, squareBracketIndex));
-            }
-            pathList.push(arrayIndex);
-        }
-        else {
-            pathList.push(part);
-        }
-    }
-    return pathList;
-};
-
-const getAttr = (value, path) => getAttrPathList(path).reduce((acc, index) => {
-    if (typeof acc !== "object") {
-        throw new EndpointError(`Index '${index}' in '${path}' not found in '${JSON.stringify(value)}'`);
-    }
-    else if (Array.isArray(acc)) {
-        return acc[parseInt(index)];
-    }
-    return acc[index];
-}, value);
-
-const isSet = (value) => value != null;
-
-const not = (value) => !value;
-
-const DEFAULT_PORTS = {
-    [EndpointURLScheme.HTTP]: 80,
-    [EndpointURLScheme.HTTPS]: 443,
-};
-const parseURL = (value) => {
-    const whatwgURL = (() => {
-        try {
-            if (value instanceof URL) {
-                return value;
-            }
-            if (typeof value === "object" && "hostname" in value) {
-                const { hostname, port, protocol = "", path = "", query = {} } = value;
-                const url = new URL(`${protocol}//${hostname}${port ? `:${port}` : ""}${path}`);
-                url.search = Object.entries(query)
-                    .map(([k, v]) => `${k}=${v}`)
-                    .join("&");
-                return url;
-            }
-            return new URL(value);
-        }
-        catch (error) {
-            return null;
-        }
-    })();
-    if (!whatwgURL) {
-        console.error(`Unable to parse ${JSON.stringify(value)} as a whatwg URL.`);
-        return null;
-    }
-    const urlString = whatwgURL.href;
-    const { host, hostname, pathname, protocol, search } = whatwgURL;
-    if (search) {
-        return null;
-    }
-    const scheme = protocol.slice(0, -1);
-    if (!Object.values(EndpointURLScheme).includes(scheme)) {
-        return null;
-    }
-    const isIp = isIpAddress(hostname);
-    const inputContainsDefaultPort = urlString.includes(`${host}:${DEFAULT_PORTS[scheme]}`) ||
-        (typeof value === "string" && value.includes(`${host}:${DEFAULT_PORTS[scheme]}`));
-    const authority = `${host}${inputContainsDefaultPort ? `:${DEFAULT_PORTS[scheme]}` : ``}`;
-    return {
-        scheme,
-        authority,
-        path: pathname,
-        normalizedPath: pathname.endsWith("/") ? pathname : `${pathname}/`,
-        isIp,
-    };
-};
-
-const stringEquals = (value1, value2) => value1 === value2;
-
-const substring = (input, start, stop, reverse) => {
-    if (start >= stop || input.length < stop) {
-        return null;
-    }
-    if (!reverse) {
-        return input.substring(start, stop);
-    }
-    return input.substring(input.length - stop, input.length - start);
-};
-
-const uriEncode = (value) => encodeURIComponent(value).replace(/[!*'()]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
-
-const endpointFunctions = {
-    booleanEquals,
-    getAttr,
-    isSet,
-    isValidHostLabel,
-    not,
-    parseURL,
-    stringEquals,
-    substring,
-    uriEncode,
-};
-
-const evaluateTemplate = (template, options) => {
-    const evaluatedTemplateArr = [];
-    const templateContext = {
-        ...options.endpointParams,
-        ...options.referenceRecord,
-    };
-    let currentIndex = 0;
-    while (currentIndex < template.length) {
-        const openingBraceIndex = template.indexOf("{", currentIndex);
-        if (openingBraceIndex === -1) {
-            evaluatedTemplateArr.push(template.slice(currentIndex));
-            break;
-        }
-        evaluatedTemplateArr.push(template.slice(currentIndex, openingBraceIndex));
-        const closingBraceIndex = template.indexOf("}", openingBraceIndex);
-        if (closingBraceIndex === -1) {
-            evaluatedTemplateArr.push(template.slice(openingBraceIndex));
-            break;
-        }
-        if (template[openingBraceIndex + 1] === "{" && template[closingBraceIndex + 1] === "}") {
-            evaluatedTemplateArr.push(template.slice(openingBraceIndex + 1, closingBraceIndex));
-            currentIndex = closingBraceIndex + 2;
-        }
-        const parameterName = template.substring(openingBraceIndex + 1, closingBraceIndex);
-        if (parameterName.includes("#")) {
-            const [refName, attrName] = parameterName.split("#");
-            evaluatedTemplateArr.push(getAttr(templateContext[refName], attrName));
-        }
-        else {
-            evaluatedTemplateArr.push(templateContext[parameterName]);
-        }
-        currentIndex = closingBraceIndex + 1;
-    }
-    return evaluatedTemplateArr.join("");
-};
-
-const getReferenceValue = ({ ref }, options) => {
-    const referenceRecord = {
-        ...options.endpointParams,
-        ...options.referenceRecord,
-    };
-    return referenceRecord[ref];
-};
-
-const evaluateExpression = (obj, keyName, options) => {
-    if (typeof obj === "string") {
-        return evaluateTemplate(obj, options);
-    }
-    else if (obj["fn"]) {
-        return group$2.callFunction(obj, options);
-    }
-    else if (obj["ref"]) {
-        return getReferenceValue(obj, options);
-    }
-    throw new EndpointError(`'${keyName}': ${String(obj)} is not a string, function or reference.`);
-};
-const callFunction = ({ fn, argv }, options) => {
-    const evaluatedArgs = argv.map((arg) => ["boolean", "number"].includes(typeof arg) ? arg : group$2.evaluateExpression(arg, "arg", options));
-    const fnSegments = fn.split(".");
-    if (fnSegments[0] in customEndpointFunctions && fnSegments[1] != null) {
-        return customEndpointFunctions[fnSegments[0]][fnSegments[1]](...evaluatedArgs);
-    }
-    return endpointFunctions[fn](...evaluatedArgs);
-};
-const group$2 = {
-    evaluateExpression,
-    callFunction,
-};
-
-const evaluateCondition = ({ assign, ...fnArgs }, options) => {
-    if (assign && assign in options.referenceRecord) {
-        throw new EndpointError(`'${assign}' is already defined in Reference Record.`);
-    }
-    const value = callFunction(fnArgs, options);
-    options.logger?.debug?.(`${debugId} evaluateCondition: ${toDebugString(fnArgs)} = ${toDebugString(value)}`);
-    return {
-        result: value === "" ? true : !!value,
-        ...(assign != null && { toAssign: { name: assign, value } }),
-    };
-};
-
-const evaluateConditions = (conditions = [], options) => {
-    const conditionsReferenceRecord = {};
-    for (const condition of conditions) {
-        const { result, toAssign } = evaluateCondition(condition, {
-            ...options,
-            referenceRecord: {
-                ...options.referenceRecord,
-                ...conditionsReferenceRecord,
-            },
-        });
-        if (!result) {
-            return { result };
-        }
-        if (toAssign) {
-            conditionsReferenceRecord[toAssign.name] = toAssign.value;
-            options.logger?.debug?.(`${debugId} assign: ${toAssign.name} := ${toDebugString(toAssign.value)}`);
-        }
-    }
-    return { result: true, referenceRecord: conditionsReferenceRecord };
-};
-
-const getEndpointHeaders = (headers, options) => Object.entries(headers).reduce((acc, [headerKey, headerVal]) => ({
-    ...acc,
-    [headerKey]: headerVal.map((headerValEntry) => {
-        const processedExpr = evaluateExpression(headerValEntry, "Header value entry", options);
-        if (typeof processedExpr !== "string") {
-            throw new EndpointError(`Header '${headerKey}' value '${processedExpr}' is not a string`);
-        }
-        return processedExpr;
-    }),
-}), {});
-
-const getEndpointProperties = (properties, options) => Object.entries(properties).reduce((acc, [propertyKey, propertyVal]) => ({
-    ...acc,
-    [propertyKey]: group$1.getEndpointProperty(propertyVal, options),
-}), {});
-const getEndpointProperty = (property, options) => {
-    if (Array.isArray(property)) {
-        return property.map((propertyEntry) => getEndpointProperty(propertyEntry, options));
-    }
-    switch (typeof property) {
-        case "string":
-            return evaluateTemplate(property, options);
-        case "object":
-            if (property === null) {
-                throw new EndpointError(`Unexpected endpoint property: ${property}`);
-            }
-            return group$1.getEndpointProperties(property, options);
-        case "boolean":
-            return property;
-        default:
-            throw new EndpointError(`Unexpected endpoint property type: ${typeof property}`);
-    }
-};
-const group$1 = {
-    getEndpointProperty,
-    getEndpointProperties,
-};
-
-const getEndpointUrl = (endpointUrl, options) => {
-    const expression = evaluateExpression(endpointUrl, "Endpoint URL", options);
-    if (typeof expression === "string") {
-        try {
-            return new URL(expression);
-        }
-        catch (error) {
-            console.error(`Failed to construct URL with ${expression}`, error);
-            throw error;
-        }
-    }
-    throw new EndpointError(`Endpoint URL must be a string, got ${typeof expression}`);
-};
-
-const evaluateEndpointRule = (endpointRule, options) => {
-    const { conditions, endpoint } = endpointRule;
-    const { result, referenceRecord } = evaluateConditions(conditions, options);
-    if (!result) {
-        return;
-    }
-    const endpointRuleOptions = {
-        ...options,
-        referenceRecord: { ...options.referenceRecord, ...referenceRecord },
-    };
-    const { url, properties, headers } = endpoint;
-    options.logger?.debug?.(`${debugId} Resolving endpoint from template: ${toDebugString(endpoint)}`);
-    return {
-        ...(headers != undefined && {
-            headers: getEndpointHeaders(headers, endpointRuleOptions),
-        }),
-        ...(properties != undefined && {
-            properties: getEndpointProperties(properties, endpointRuleOptions),
-        }),
-        url: getEndpointUrl(url, endpointRuleOptions),
-    };
-};
-
-const evaluateErrorRule = (errorRule, options) => {
-    const { conditions, error } = errorRule;
-    const { result, referenceRecord } = evaluateConditions(conditions, options);
-    if (!result) {
-        return;
-    }
-    throw new EndpointError(evaluateExpression(error, "Error", {
-        ...options,
-        referenceRecord: { ...options.referenceRecord, ...referenceRecord },
-    }));
-};
-
-const evaluateRules = (rules, options) => {
-    for (const rule of rules) {
-        if (rule.type === "endpoint") {
-            const endpointOrUndefined = evaluateEndpointRule(rule, options);
-            if (endpointOrUndefined) {
-                return endpointOrUndefined;
-            }
-        }
-        else if (rule.type === "error") {
-            evaluateErrorRule(rule, options);
-        }
-        else if (rule.type === "tree") {
-            const endpointOrUndefined = group.evaluateTreeRule(rule, options);
-            if (endpointOrUndefined) {
-                return endpointOrUndefined;
-            }
-        }
-        else {
-            throw new EndpointError(`Unknown endpoint rule: ${rule}`);
-        }
-    }
-    throw new EndpointError(`Rules evaluation failed`);
-};
-const evaluateTreeRule = (treeRule, options) => {
-    const { conditions, rules } = treeRule;
-    const { result, referenceRecord } = evaluateConditions(conditions, options);
-    if (!result) {
-        return;
-    }
-    return group.evaluateRules(rules, {
-        ...options,
-        referenceRecord: { ...options.referenceRecord, ...referenceRecord },
-    });
-};
-const group = {
-    evaluateRules,
-    evaluateTreeRule,
-};
-
-const resolveEndpoint = (ruleSetObject, options) => {
-    const { endpointParams, logger } = options;
-    const { parameters, rules } = ruleSetObject;
-    options.logger?.debug?.(`${debugId} Initial EndpointParams: ${toDebugString(endpointParams)}`);
-    const paramsWithDefault = Object.entries(parameters)
-        .filter(([, v]) => v.default != null)
-        .map(([k, v]) => [k, v.default]);
-    if (paramsWithDefault.length > 0) {
-        for (const [paramKey, paramDefaultValue] of paramsWithDefault) {
-            endpointParams[paramKey] = endpointParams[paramKey] ?? paramDefaultValue;
-        }
-    }
-    const requiredParams = Object.entries(parameters)
-        .filter(([, v]) => v.required)
-        .map(([k]) => k);
-    for (const requiredParam of requiredParams) {
-        if (endpointParams[requiredParam] == null) {
-            throw new EndpointError(`Missing required parameter: '${requiredParam}'`);
-        }
-    }
-    const endpoint = evaluateRules(rules, { endpointParams, logger, referenceRecord: {} });
-    options.logger?.debug?.(`${debugId} Resolved endpoint: ${toDebugString(endpoint)}`);
-    return endpoint;
-};
-
-const isVirtualHostableS3Bucket = (value, allowSubDomains = false) => {
-    if (allowSubDomains) {
-        for (const label of value.split(".")) {
-            if (!isVirtualHostableS3Bucket(label)) {
-                return false;
-            }
-        }
-        return true;
-    }
-    if (!isValidHostLabel(value)) {
-        return false;
-    }
-    if (value.length < 3 || value.length > 63) {
-        return false;
-    }
-    if (value !== value.toLowerCase()) {
-        return false;
-    }
-    if (isIpAddress(value)) {
-        return false;
-    }
-    return true;
-};
-
-const ARN_DELIMITER = ":";
-const RESOURCE_DELIMITER = "/";
-const parseArn = (value) => {
-    const segments = value.split(ARN_DELIMITER);
-    if (segments.length < 6)
-        return null;
-    const [arn, partition, service, region, accountId, ...resourcePath] = segments;
-    if (arn !== "arn" || partition === "" || service === "" || resourcePath.join(ARN_DELIMITER) === "")
-        return null;
-    const resourceId = resourcePath.map((resource) => resource.split(RESOURCE_DELIMITER)).flat();
-    return {
-        partition,
-        service,
-        region,
-        accountId,
-        resourceId,
-    };
-};
-
-var partitions = [
-	{
-		id: "aws",
-		outputs: {
-			dnsSuffix: "amazonaws.com",
-			dualStackDnsSuffix: "api.aws",
-			implicitGlobalRegion: "us-east-1",
-			name: "aws",
-			supportsDualStack: true,
-			supportsFIPS: true
-		},
-		regionRegex: "^(us|eu|ap|sa|ca|me|af|il|mx)\\-\\w+\\-\\d+$",
-		regions: {
-			"af-south-1": {
-				description: "Africa (Cape Town)"
-			},
-			"ap-east-1": {
-				description: "Asia Pacific (Hong Kong)"
-			},
-			"ap-east-2": {
-				description: "Asia Pacific (Taipei)"
-			},
-			"ap-northeast-1": {
-				description: "Asia Pacific (Tokyo)"
-			},
-			"ap-northeast-2": {
-				description: "Asia Pacific (Seoul)"
-			},
-			"ap-northeast-3": {
-				description: "Asia Pacific (Osaka)"
-			},
-			"ap-south-1": {
-				description: "Asia Pacific (Mumbai)"
-			},
-			"ap-south-2": {
-				description: "Asia Pacific (Hyderabad)"
-			},
-			"ap-southeast-1": {
-				description: "Asia Pacific (Singapore)"
-			},
-			"ap-southeast-2": {
-				description: "Asia Pacific (Sydney)"
-			},
-			"ap-southeast-3": {
-				description: "Asia Pacific (Jakarta)"
-			},
-			"ap-southeast-4": {
-				description: "Asia Pacific (Melbourne)"
-			},
-			"ap-southeast-5": {
-				description: "Asia Pacific (Malaysia)"
-			},
-			"ap-southeast-6": {
-				description: "Asia Pacific (New Zealand)"
-			},
-			"ap-southeast-7": {
-				description: "Asia Pacific (Thailand)"
-			},
-			"aws-global": {
-				description: "aws global region"
-			},
-			"ca-central-1": {
-				description: "Canada (Central)"
-			},
-			"ca-west-1": {
-				description: "Canada West (Calgary)"
-			},
-			"eu-central-1": {
-				description: "Europe (Frankfurt)"
-			},
-			"eu-central-2": {
-				description: "Europe (Zurich)"
-			},
-			"eu-north-1": {
-				description: "Europe (Stockholm)"
-			},
-			"eu-south-1": {
-				description: "Europe (Milan)"
-			},
-			"eu-south-2": {
-				description: "Europe (Spain)"
-			},
-			"eu-west-1": {
-				description: "Europe (Ireland)"
-			},
-			"eu-west-2": {
-				description: "Europe (London)"
-			},
-			"eu-west-3": {
-				description: "Europe (Paris)"
-			},
-			"il-central-1": {
-				description: "Israel (Tel Aviv)"
-			},
-			"me-central-1": {
-				description: "Middle East (UAE)"
-			},
-			"me-south-1": {
-				description: "Middle East (Bahrain)"
-			},
-			"mx-central-1": {
-				description: "Mexico (Central)"
-			},
-			"sa-east-1": {
-				description: "South America (Sao Paulo)"
-			},
-			"us-east-1": {
-				description: "US East (N. Virginia)"
-			},
-			"us-east-2": {
-				description: "US East (Ohio)"
-			},
-			"us-west-1": {
-				description: "US West (N. California)"
-			},
-			"us-west-2": {
-				description: "US West (Oregon)"
-			}
-		}
-	},
-	{
-		id: "aws-cn",
-		outputs: {
-			dnsSuffix: "amazonaws.com.cn",
-			dualStackDnsSuffix: "api.amazonwebservices.com.cn",
-			implicitGlobalRegion: "cn-northwest-1",
-			name: "aws-cn",
-			supportsDualStack: true,
-			supportsFIPS: true
-		},
-		regionRegex: "^cn\\-\\w+\\-\\d+$",
-		regions: {
-			"aws-cn-global": {
-				description: "aws-cn global region"
-			},
-			"cn-north-1": {
-				description: "China (Beijing)"
-			},
-			"cn-northwest-1": {
-				description: "China (Ningxia)"
-			}
-		}
-	},
-	{
-		id: "aws-eusc",
-		outputs: {
-			dnsSuffix: "amazonaws.eu",
-			dualStackDnsSuffix: "api.amazonwebservices.eu",
-			implicitGlobalRegion: "eusc-de-east-1",
-			name: "aws-eusc",
-			supportsDualStack: true,
-			supportsFIPS: true
-		},
-		regionRegex: "^eusc\\-(de)\\-\\w+\\-\\d+$",
-		regions: {
-			"eusc-de-east-1": {
-				description: "AWS European Sovereign Cloud (Germany)"
-			}
-		}
-	},
-	{
-		id: "aws-iso",
-		outputs: {
-			dnsSuffix: "c2s.ic.gov",
-			dualStackDnsSuffix: "api.aws.ic.gov",
-			implicitGlobalRegion: "us-iso-east-1",
-			name: "aws-iso",
-			supportsDualStack: true,
-			supportsFIPS: true
-		},
-		regionRegex: "^us\\-iso\\-\\w+\\-\\d+$",
-		regions: {
-			"aws-iso-global": {
-				description: "aws-iso global region"
-			},
-			"us-iso-east-1": {
-				description: "US ISO East"
-			},
-			"us-iso-west-1": {
-				description: "US ISO WEST"
-			}
-		}
-	},
-	{
-		id: "aws-iso-b",
-		outputs: {
-			dnsSuffix: "sc2s.sgov.gov",
-			dualStackDnsSuffix: "api.aws.scloud",
-			implicitGlobalRegion: "us-isob-east-1",
-			name: "aws-iso-b",
-			supportsDualStack: true,
-			supportsFIPS: true
-		},
-		regionRegex: "^us\\-isob\\-\\w+\\-\\d+$",
-		regions: {
-			"aws-iso-b-global": {
-				description: "aws-iso-b global region"
-			},
-			"us-isob-east-1": {
-				description: "US ISOB East (Ohio)"
-			},
-			"us-isob-west-1": {
-				description: "US ISOB West"
-			}
-		}
-	},
-	{
-		id: "aws-iso-e",
-		outputs: {
-			dnsSuffix: "cloud.adc-e.uk",
-			dualStackDnsSuffix: "api.cloud-aws.adc-e.uk",
-			implicitGlobalRegion: "eu-isoe-west-1",
-			name: "aws-iso-e",
-			supportsDualStack: true,
-			supportsFIPS: true
-		},
-		regionRegex: "^eu\\-isoe\\-\\w+\\-\\d+$",
-		regions: {
-			"aws-iso-e-global": {
-				description: "aws-iso-e global region"
-			},
-			"eu-isoe-west-1": {
-				description: "EU ISOE West"
-			}
-		}
-	},
-	{
-		id: "aws-iso-f",
-		outputs: {
-			dnsSuffix: "csp.hci.ic.gov",
-			dualStackDnsSuffix: "api.aws.hci.ic.gov",
-			implicitGlobalRegion: "us-isof-south-1",
-			name: "aws-iso-f",
-			supportsDualStack: true,
-			supportsFIPS: true
-		},
-		regionRegex: "^us\\-isof\\-\\w+\\-\\d+$",
-		regions: {
-			"aws-iso-f-global": {
-				description: "aws-iso-f global region"
-			},
-			"us-isof-east-1": {
-				description: "US ISOF EAST"
-			},
-			"us-isof-south-1": {
-				description: "US ISOF SOUTH"
-			}
-		}
-	},
-	{
-		id: "aws-us-gov",
-		outputs: {
-			dnsSuffix: "amazonaws.com",
-			dualStackDnsSuffix: "api.aws",
-			implicitGlobalRegion: "us-gov-west-1",
-			name: "aws-us-gov",
-			supportsDualStack: true,
-			supportsFIPS: true
-		},
-		regionRegex: "^us\\-gov\\-\\w+\\-\\d+$",
-		regions: {
-			"aws-us-gov-global": {
-				description: "aws-us-gov global region"
-			},
-			"us-gov-east-1": {
-				description: "AWS GovCloud (US-East)"
-			},
-			"us-gov-west-1": {
-				description: "AWS GovCloud (US-West)"
-			}
-		}
-	}
-];
-var partitionsInfo = {
-	partitions: partitions};
-
-let selectedPartitionsInfo = partitionsInfo;
-const partition = (value) => {
-    const { partitions } = selectedPartitionsInfo;
-    for (const partition of partitions) {
-        const { regions, outputs } = partition;
-        for (const [region, regionData] of Object.entries(regions)) {
-            if (region === value) {
-                return {
-                    ...outputs,
-                    ...regionData,
-                };
-            }
-        }
-    }
-    for (const partition of partitions) {
-        const { regionRegex, outputs } = partition;
-        if (new RegExp(regionRegex).test(value)) {
-            return {
-                ...outputs,
-            };
-        }
-    }
-    const DEFAULT_PARTITION = partitions.find((partition) => partition.id === "aws");
-    if (!DEFAULT_PARTITION) {
-        throw new Error("Provided region was not found in the partition array or regex," +
-            " and default partition with id 'aws' doesn't exist.");
-    }
-    return {
-        ...DEFAULT_PARTITION.outputs,
-    };
-};
-
-const awsEndpointFunctions = {
-    isVirtualHostableS3Bucket: isVirtualHostableS3Bucket,
-    parseArn: parseArn,
-    partition: partition,
-};
-customEndpointFunctions.aws = awsEndpointFunctions;
-
-function parseQueryString(querystring) {
-    const query = {};
-    querystring = querystring.replace(/^\?/, "");
-    if (querystring) {
-        for (const pair of querystring.split("&")) {
-            let [key, value = null] = pair.split("=");
-            key = decodeURIComponent(key);
-            if (value) {
-                value = decodeURIComponent(value);
-            }
-            if (!(key in query)) {
-                query[key] = value;
-            }
-            else if (Array.isArray(query[key])) {
-                query[key].push(value);
-            }
-            else {
-                query[key] = [query[key], value];
-            }
-        }
-    }
-    return query;
-}
-
-const parseUrl = (url) => {
-    if (typeof url === "string") {
-        return parseUrl(new URL(url));
-    }
-    const { hostname, pathname, port, protocol, search } = url;
-    let query;
-    if (search) {
-        query = parseQueryString(search);
-    }
-    return {
-        hostname,
-        port: port ? parseInt(port) : undefined,
-        protocol,
-        path: pathname,
-        query,
-    };
-};
-
-const state = {
-    warningEmitted: false,
-};
-const emitWarningIfUnsupportedVersion$1 = (version) => {
-    if (version && !state.warningEmitted && parseInt(version.substring(1, version.indexOf("."))) < 20) {
-        state.warningEmitted = true;
-        process.emitWarning(`NodeDeprecationWarning: The AWS SDK for JavaScript (v3) will
-no longer support Node.js ${version} in January 2026.
-
-To continue receiving updates to AWS services, bug fixes, and security
-updates please upgrade to a supported Node.js LTS version.
-
-More information can be found at: https://a.co/c895JFp`);
-    }
-};
-
-function setCredentialFeature(credentials, feature, value) {
-    if (!credentials.$source) {
-        credentials.$source = {};
-    }
-    credentials.$source[feature] = value;
-    return credentials;
-}
-
-function setFeature(context, feature, value) {
-    if (!context.__aws_sdk_context) {
-        context.__aws_sdk_context = {
-            features: {},
-        };
-    }
-    else if (!context.__aws_sdk_context.features) {
-        context.__aws_sdk_context.features = {};
-    }
-    context.__aws_sdk_context.features[feature] = value;
-}
 
 const getDateHeader = (response) => HttpResponse.isInstance(response) ? response.headers?.date ?? response.headers?.Date : undefined;
 
@@ -37883,6 +40525,7 @@ class AwsSdkSigV4Signer {
                 signingName = second?.signingName ?? signingName;
             }
         }
+        signingProperties._preRequestSystemClockOffset = config.systemClockOffset;
         const signedRequest = await signer.sign(httpRequest, {
             signingDate: getSkewCorrectedDate(config.systemClockOffset),
             signingRegion: signingRegion,
@@ -37892,14 +40535,18 @@ class AwsSdkSigV4Signer {
     }
     errorHandler(signingProperties) {
         return (error) => {
-            const serverTime = error.ServerTime ?? getDateHeader(error.$response);
+            const errorException = error;
+            const serverTime = errorException.ServerTime ?? getDateHeader(errorException.$response);
             if (serverTime) {
                 const config = throwSigningPropertyError("config", signingProperties.config);
-                const initialSystemClockOffset = config.systemClockOffset;
-                config.systemClockOffset = getUpdatedSystemClockOffset(serverTime, config.systemClockOffset);
-                const clockSkewCorrected = config.systemClockOffset !== initialSystemClockOffset;
-                if (clockSkewCorrected && error.$metadata) {
-                    error.$metadata.clockSkewCorrected = true;
+                const preRequestOffset = signingProperties._preRequestSystemClockOffset;
+                const newOffset = getUpdatedSystemClockOffset(serverTime, config.systemClockOffset);
+                const isLocalCorrection = newOffset !== config.systemClockOffset;
+                const isConcurrentCorrection = preRequestOffset !== undefined && preRequestOffset !== newOffset;
+                const clockSkewCorrected = isLocalCorrection || isConcurrentCorrection;
+                if (clockSkewCorrected && errorException.$metadata) {
+                    config.systemClockOffset = newOffset;
+                    errorException.$metadata.clockSkewCorrected = true;
                 }
             }
             throw error;
@@ -37911,6 +40558,25 @@ class AwsSdkSigV4Signer {
             const config = throwSigningPropertyError("config", signingProperties.config);
             config.systemClockOffset = getUpdatedSystemClockOffset(dateHeader, config.systemClockOffset);
         }
+    }
+}
+
+class AwsSdkSigV4ASigner extends AwsSdkSigV4Signer {
+    async sign(httpRequest, identity, signingProperties) {
+        if (!HttpRequest.isInstance(httpRequest)) {
+            throw new Error("The request is not an instance of `HttpRequest` and cannot be signed");
+        }
+        const { config, signer, signingRegion, signingRegionSet, signingName } = await validateSigningProperties(signingProperties);
+        const configResolvedSigningRegionSet = await config.sigv4aSigningRegionSet?.();
+        const multiRegionOverride = (configResolvedSigningRegionSet ??
+            signingRegionSet ?? [signingRegion]).join(",");
+        signingProperties._preRequestSystemClockOffset = config.systemClockOffset;
+        const signedRequest = await signer.sign(httpRequest, {
+            signingDate: getSkewCorrectedDate(config.systemClockOffset),
+            signingRegion: multiRegionOverride,
+            signingService: signingName,
+        });
+        return signedRequest;
     }
 }
 
@@ -37939,97 +40605,154 @@ const NODE_AUTH_SCHEME_PREFERENCE_OPTIONS = {
     default: [],
 };
 
-class ProviderError extends Error {
-    name = "ProviderError";
-    tryNextLink;
-    constructor(message, options = true) {
-        let logger;
-        let tryNextLink = true;
-        if (typeof options === "boolean") {
-            logger = undefined;
-            tryNextLink = options;
+const resolveAwsSdkSigV4AConfig = (config) => {
+    config.sigv4aSigningRegionSet = normalizeProvider(config.sigv4aSigningRegionSet);
+    return config;
+};
+const NODE_SIGV4A_CONFIG_OPTIONS = {
+    environmentVariableSelector(env) {
+        if (env.AWS_SIGV4A_SIGNING_REGION_SET) {
+            return env.AWS_SIGV4A_SIGNING_REGION_SET.split(",").map((_) => _.trim());
         }
-        else if (options != null && typeof options === "object") {
-            logger = options.logger;
-            tryNextLink = options.tryNextLink ?? true;
+        throw new ProviderError("AWS_SIGV4A_SIGNING_REGION_SET not set in env.", {
+            tryNextLink: true,
+        });
+    },
+    configFileSelector(profile) {
+        if (profile.sigv4a_signing_region_set) {
+            return (profile.sigv4a_signing_region_set ?? "").split(",").map((_) => _.trim());
         }
-        super(message);
-        this.tryNextLink = tryNextLink;
-        Object.setPrototypeOf(this, ProviderError.prototype);
-        logger?.debug?.(`@smithy/property-provider ${tryNextLink ? "->" : "(!)"} ${message}`);
-    }
-    static from(error, options = true) {
-        return Object.assign(new this(error.message, options), error);
-    }
-}
-
-class CredentialsProviderError extends ProviderError {
-    name = "CredentialsProviderError";
-    constructor(message, options = true) {
-        super(message, options);
-        Object.setPrototypeOf(this, CredentialsProviderError.prototype);
-    }
-}
-
-class TokenProviderError extends ProviderError {
-    name = "TokenProviderError";
-    constructor(message, options = true) {
-        super(message, options);
-        Object.setPrototypeOf(this, TokenProviderError.prototype);
-    }
-}
-
-const chain = (...providers) => async () => {
-    if (providers.length === 0) {
-        throw new ProviderError("No providers in chain");
-    }
-    let lastProviderError;
-    for (const provider of providers) {
-        try {
-            const credentials = await provider();
-            return credentials;
-        }
-        catch (err) {
-            lastProviderError = err;
-            if (err?.tryNextLink) {
-                continue;
-            }
-            throw err;
-        }
-    }
-    throw lastProviderError;
+        throw new ProviderError("sigv4a_signing_region_set not set in profile.", {
+            tryNextLink: true,
+        });
+    },
+    default: undefined,
 };
 
-const fromStatic$1 = (staticValue) => () => Promise.resolve(staticValue);
-
-const memoize = (provider, isExpired, requiresRefresh) => {
-    let resolved;
-    let pending;
-    let hasResult;
-    let isConstant = false;
-    const coalesceProvider = async () => {
-        if (!pending) {
-            pending = provider();
+class HeaderFormatter {
+    format(headers) {
+        const chunks = [];
+        for (const headerName of Object.keys(headers)) {
+            const bytes = fromUtf8$2(headerName);
+            chunks.push(Uint8Array.from([bytes.byteLength]), bytes, this.formatHeaderValue(headers[headerName]));
         }
-        try {
-            resolved = await pending;
-            hasResult = true;
-            isConstant = false;
+        const out = new Uint8Array(chunks.reduce((carry, bytes) => carry + bytes.byteLength, 0));
+        let position = 0;
+        for (const chunk of chunks) {
+            out.set(chunk, position);
+            position += chunk.byteLength;
         }
-        finally {
-            pending = undefined;
+        return out;
+    }
+    formatHeaderValue(header) {
+        switch (header.type) {
+            case "boolean":
+                return Uint8Array.from([header.value ? 0 : 1]);
+            case "byte":
+                return Uint8Array.from([2, header.value]);
+            case "short":
+                const shortView = new DataView(new ArrayBuffer(3));
+                shortView.setUint8(0, 3);
+                shortView.setInt16(1, header.value, false);
+                return new Uint8Array(shortView.buffer);
+            case "integer":
+                const intView = new DataView(new ArrayBuffer(5));
+                intView.setUint8(0, 4);
+                intView.setInt32(1, header.value, false);
+                return new Uint8Array(intView.buffer);
+            case "long":
+                const longBytes = new Uint8Array(9);
+                longBytes[0] = 5;
+                longBytes.set(header.value.bytes, 1);
+                return longBytes;
+            case "binary":
+                const binView = new DataView(new ArrayBuffer(3 + header.value.byteLength));
+                binView.setUint8(0, 6);
+                binView.setUint16(1, header.value.byteLength, false);
+                const binBytes = new Uint8Array(binView.buffer);
+                binBytes.set(header.value, 3);
+                return binBytes;
+            case "string":
+                const utf8Bytes = fromUtf8$2(header.value);
+                const strView = new DataView(new ArrayBuffer(3 + utf8Bytes.byteLength));
+                strView.setUint8(0, 7);
+                strView.setUint16(1, utf8Bytes.byteLength, false);
+                const strBytes = new Uint8Array(strView.buffer);
+                strBytes.set(utf8Bytes, 3);
+                return strBytes;
+            case "timestamp":
+                const tsBytes = new Uint8Array(9);
+                tsBytes[0] = 8;
+                tsBytes.set(Int64$1.fromNumber(header.value.valueOf()).bytes, 1);
+                return tsBytes;
+            case "uuid":
+                if (!UUID_PATTERN$1.test(header.value)) {
+                    throw new Error(`Invalid UUID received: ${header.value}`);
+                }
+                const uuidBytes = new Uint8Array(17);
+                uuidBytes[0] = 9;
+                uuidBytes.set(fromHex(header.value.replace(/\-/g, "")), 1);
+                return uuidBytes;
         }
-        return resolved;
-    };
-    {
-        return async (options) => {
-            if (!hasResult || options?.forceRefresh) {
-                resolved = await coalesceProvider();
-            }
-            return resolved;
-        };
+    }
+}
+var HEADER_VALUE_TYPE$1;
+(function (HEADER_VALUE_TYPE) {
+    HEADER_VALUE_TYPE[HEADER_VALUE_TYPE["boolTrue"] = 0] = "boolTrue";
+    HEADER_VALUE_TYPE[HEADER_VALUE_TYPE["boolFalse"] = 1] = "boolFalse";
+    HEADER_VALUE_TYPE[HEADER_VALUE_TYPE["byte"] = 2] = "byte";
+    HEADER_VALUE_TYPE[HEADER_VALUE_TYPE["short"] = 3] = "short";
+    HEADER_VALUE_TYPE[HEADER_VALUE_TYPE["integer"] = 4] = "integer";
+    HEADER_VALUE_TYPE[HEADER_VALUE_TYPE["long"] = 5] = "long";
+    HEADER_VALUE_TYPE[HEADER_VALUE_TYPE["byteArray"] = 6] = "byteArray";
+    HEADER_VALUE_TYPE[HEADER_VALUE_TYPE["string"] = 7] = "string";
+    HEADER_VALUE_TYPE[HEADER_VALUE_TYPE["timestamp"] = 8] = "timestamp";
+    HEADER_VALUE_TYPE[HEADER_VALUE_TYPE["uuid"] = 9] = "uuid";
+})(HEADER_VALUE_TYPE$1 || (HEADER_VALUE_TYPE$1 = {}));
+const UUID_PATTERN$1 = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
+let Int64$1 = class Int64 {
+    bytes;
+    constructor(bytes) {
+        this.bytes = bytes;
+        if (bytes.byteLength !== 8) {
+            throw new Error("Int64 buffers must be exactly 8 bytes");
+        }
+    }
+    static fromNumber(number) {
+        if (number > 9_223_372_036_854_775_807 || number < -9223372036854776e3) {
+            throw new Error(`${number} is too large (or, if negative, too small) to represent as an Int64`);
+        }
+        const bytes = new Uint8Array(8);
+        for (let i = 7, remaining = Math.abs(Math.round(number)); i > -1 && remaining > 0; i--, remaining /= 256) {
+            bytes[i] = remaining;
+        }
+        if (number < 0) {
+            negate$1(bytes);
+        }
+        return new Int64(bytes);
+    }
+    valueOf() {
+        const bytes = this.bytes.slice(0);
+        const negative = bytes[0] & 0b10000000;
+        if (negative) {
+            negate$1(bytes);
+        }
+        return parseInt(toHex(bytes), 16) * (negative ? -1 : 1);
+    }
+    toString() {
+        return String(this.valueOf());
     }
 };
+function negate$1(bytes) {
+    for (let i = 0; i < 8; i++) {
+        bytes[i] ^= 0xff;
+    }
+    for (let i = 7; i > -1; i--) {
+        bytes[i]++;
+        if (bytes[i] !== 0)
+            break;
+    }
+}
 
 const ALGORITHM_QUERY_PARAM = "X-Amz-Algorithm";
 const CREDENTIAL_QUERY_PARAM = "X-Amz-Credential";
@@ -38070,230 +40793,6 @@ const UNSIGNED_PAYLOAD = "UNSIGNED-PAYLOAD";
 const MAX_CACHE_SIZE = 50;
 const KEY_TYPE_IDENTIFIER = "aws4_request";
 const MAX_PRESIGNED_TTL = 60 * 60 * 24 * 7;
-
-const signingKeyCache = {};
-const cacheQueue = [];
-const createScope = (shortDate, region, service) => `${shortDate}/${region}/${service}/${KEY_TYPE_IDENTIFIER}`;
-const getSigningKey = async (sha256Constructor, credentials, shortDate, region, service) => {
-    const credsHash = await hmac(sha256Constructor, credentials.secretAccessKey, credentials.accessKeyId);
-    const cacheKey = `${shortDate}:${region}:${service}:${toHex(credsHash)}:${credentials.sessionToken}`;
-    if (cacheKey in signingKeyCache) {
-        return signingKeyCache[cacheKey];
-    }
-    cacheQueue.push(cacheKey);
-    while (cacheQueue.length > MAX_CACHE_SIZE) {
-        delete signingKeyCache[cacheQueue.shift()];
-    }
-    let key = `AWS4${credentials.secretAccessKey}`;
-    for (const signable of [shortDate, region, service, KEY_TYPE_IDENTIFIER]) {
-        key = await hmac(sha256Constructor, key, signable);
-    }
-    return (signingKeyCache[cacheKey] = key);
-};
-const hmac = (ctor, secret, data) => {
-    const hash = new ctor(secret);
-    hash.update(toUint8Array(data));
-    return hash.digest();
-};
-
-const getCanonicalHeaders = ({ headers }, unsignableHeaders, signableHeaders) => {
-    const canonical = {};
-    for (const headerName of Object.keys(headers).sort()) {
-        if (headers[headerName] == undefined) {
-            continue;
-        }
-        const canonicalHeaderName = headerName.toLowerCase();
-        if (canonicalHeaderName in ALWAYS_UNSIGNABLE_HEADERS ||
-            unsignableHeaders?.has(canonicalHeaderName) ||
-            PROXY_HEADER_PATTERN.test(canonicalHeaderName) ||
-            SEC_HEADER_PATTERN.test(canonicalHeaderName)) {
-            if (!signableHeaders || (signableHeaders && !signableHeaders.has(canonicalHeaderName))) {
-                continue;
-            }
-        }
-        canonical[canonicalHeaderName] = headers[headerName].trim().replace(/\s+/g, " ");
-    }
-    return canonical;
-};
-
-const getPayloadHash = async ({ headers, body }, hashConstructor) => {
-    for (const headerName of Object.keys(headers)) {
-        if (headerName.toLowerCase() === SHA256_HEADER) {
-            return headers[headerName];
-        }
-    }
-    if (body == undefined) {
-        return "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
-    }
-    else if (typeof body === "string" || ArrayBuffer.isView(body) || isArrayBuffer(body)) {
-        const hashCtor = new hashConstructor();
-        hashCtor.update(toUint8Array(body));
-        return toHex(await hashCtor.digest());
-    }
-    return UNSIGNED_PAYLOAD;
-};
-
-class HeaderFormatter {
-    format(headers) {
-        const chunks = [];
-        for (const headerName of Object.keys(headers)) {
-            const bytes = fromUtf8(headerName);
-            chunks.push(Uint8Array.from([bytes.byteLength]), bytes, this.formatHeaderValue(headers[headerName]));
-        }
-        const out = new Uint8Array(chunks.reduce((carry, bytes) => carry + bytes.byteLength, 0));
-        let position = 0;
-        for (const chunk of chunks) {
-            out.set(chunk, position);
-            position += chunk.byteLength;
-        }
-        return out;
-    }
-    formatHeaderValue(header) {
-        switch (header.type) {
-            case "boolean":
-                return Uint8Array.from([header.value ? 0 : 1]);
-            case "byte":
-                return Uint8Array.from([2, header.value]);
-            case "short":
-                const shortView = new DataView(new ArrayBuffer(3));
-                shortView.setUint8(0, 3);
-                shortView.setInt16(1, header.value, false);
-                return new Uint8Array(shortView.buffer);
-            case "integer":
-                const intView = new DataView(new ArrayBuffer(5));
-                intView.setUint8(0, 4);
-                intView.setInt32(1, header.value, false);
-                return new Uint8Array(intView.buffer);
-            case "long":
-                const longBytes = new Uint8Array(9);
-                longBytes[0] = 5;
-                longBytes.set(header.value.bytes, 1);
-                return longBytes;
-            case "binary":
-                const binView = new DataView(new ArrayBuffer(3 + header.value.byteLength));
-                binView.setUint8(0, 6);
-                binView.setUint16(1, header.value.byteLength, false);
-                const binBytes = new Uint8Array(binView.buffer);
-                binBytes.set(header.value, 3);
-                return binBytes;
-            case "string":
-                const utf8Bytes = fromUtf8(header.value);
-                const strView = new DataView(new ArrayBuffer(3 + utf8Bytes.byteLength));
-                strView.setUint8(0, 7);
-                strView.setUint16(1, utf8Bytes.byteLength, false);
-                const strBytes = new Uint8Array(strView.buffer);
-                strBytes.set(utf8Bytes, 3);
-                return strBytes;
-            case "timestamp":
-                const tsBytes = new Uint8Array(9);
-                tsBytes[0] = 8;
-                tsBytes.set(Int64.fromNumber(header.value.valueOf()).bytes, 1);
-                return tsBytes;
-            case "uuid":
-                if (!UUID_PATTERN.test(header.value)) {
-                    throw new Error(`Invalid UUID received: ${header.value}`);
-                }
-                const uuidBytes = new Uint8Array(17);
-                uuidBytes[0] = 9;
-                uuidBytes.set(fromHex(header.value.replace(/\-/g, "")), 1);
-                return uuidBytes;
-        }
-    }
-}
-var HEADER_VALUE_TYPE;
-(function (HEADER_VALUE_TYPE) {
-    HEADER_VALUE_TYPE[HEADER_VALUE_TYPE["boolTrue"] = 0] = "boolTrue";
-    HEADER_VALUE_TYPE[HEADER_VALUE_TYPE["boolFalse"] = 1] = "boolFalse";
-    HEADER_VALUE_TYPE[HEADER_VALUE_TYPE["byte"] = 2] = "byte";
-    HEADER_VALUE_TYPE[HEADER_VALUE_TYPE["short"] = 3] = "short";
-    HEADER_VALUE_TYPE[HEADER_VALUE_TYPE["integer"] = 4] = "integer";
-    HEADER_VALUE_TYPE[HEADER_VALUE_TYPE["long"] = 5] = "long";
-    HEADER_VALUE_TYPE[HEADER_VALUE_TYPE["byteArray"] = 6] = "byteArray";
-    HEADER_VALUE_TYPE[HEADER_VALUE_TYPE["string"] = 7] = "string";
-    HEADER_VALUE_TYPE[HEADER_VALUE_TYPE["timestamp"] = 8] = "timestamp";
-    HEADER_VALUE_TYPE[HEADER_VALUE_TYPE["uuid"] = 9] = "uuid";
-})(HEADER_VALUE_TYPE || (HEADER_VALUE_TYPE = {}));
-const UUID_PATTERN = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
-class Int64 {
-    bytes;
-    constructor(bytes) {
-        this.bytes = bytes;
-        if (bytes.byteLength !== 8) {
-            throw new Error("Int64 buffers must be exactly 8 bytes");
-        }
-    }
-    static fromNumber(number) {
-        if (number > 9_223_372_036_854_775_807 || number < -9223372036854776e3) {
-            throw new Error(`${number} is too large (or, if negative, too small) to represent as an Int64`);
-        }
-        const bytes = new Uint8Array(8);
-        for (let i = 7, remaining = Math.abs(Math.round(number)); i > -1 && remaining > 0; i--, remaining /= 256) {
-            bytes[i] = remaining;
-        }
-        if (number < 0) {
-            negate(bytes);
-        }
-        return new Int64(bytes);
-    }
-    valueOf() {
-        const bytes = this.bytes.slice(0);
-        const negative = bytes[0] & 0b10000000;
-        if (negative) {
-            negate(bytes);
-        }
-        return parseInt(toHex(bytes), 16) * (negative ? -1 : 1);
-    }
-    toString() {
-        return String(this.valueOf());
-    }
-}
-function negate(bytes) {
-    for (let i = 0; i < 8; i++) {
-        bytes[i] ^= 0xff;
-    }
-    for (let i = 7; i > -1; i--) {
-        bytes[i]++;
-        if (bytes[i] !== 0)
-            break;
-    }
-}
-
-const hasHeader = (soughtHeader, headers) => {
-    soughtHeader = soughtHeader.toLowerCase();
-    for (const headerName of Object.keys(headers)) {
-        if (soughtHeader === headerName.toLowerCase()) {
-            return true;
-        }
-    }
-    return false;
-};
-
-const moveHeadersToQuery = (request, options = {}) => {
-    const { headers, query = {} } = HttpRequest.clone(request);
-    for (const name of Object.keys(headers)) {
-        const lname = name.toLowerCase();
-        if ((lname.slice(0, 6) === "x-amz-" && !options.unhoistableHeaders?.has(lname)) ||
-            options.hoistableHeaders?.has(lname)) {
-            query[name] = headers[name];
-            delete headers[name];
-        }
-    }
-    return {
-        ...request,
-        headers,
-        query,
-    };
-};
-
-const prepareRequest = (request) => {
-    request = HttpRequest.clone(request);
-    for (const headerName of Object.keys(request.headers)) {
-        if (GENERATED_HEADERS.indexOf(headerName.toLowerCase()) > -1) {
-            delete request.headers[headerName];
-        }
-    }
-    return request;
-};
 
 const getCanonicalQuery = ({ query = {} }) => {
     const keys = [];
@@ -38413,6 +40912,105 @@ ${toHex(hashedRequest)}`;
     }
 }
 
+const signingKeyCache = {};
+const cacheQueue = [];
+const createScope = (shortDate, region, service) => `${shortDate}/${region}/${service}/${KEY_TYPE_IDENTIFIER}`;
+const getSigningKey = async (sha256Constructor, credentials, shortDate, region, service) => {
+    const credsHash = await hmac(sha256Constructor, credentials.secretAccessKey, credentials.accessKeyId);
+    const cacheKey = `${shortDate}:${region}:${service}:${toHex(credsHash)}:${credentials.sessionToken}`;
+    if (cacheKey in signingKeyCache) {
+        return signingKeyCache[cacheKey];
+    }
+    cacheQueue.push(cacheKey);
+    while (cacheQueue.length > MAX_CACHE_SIZE) {
+        delete signingKeyCache[cacheQueue.shift()];
+    }
+    let key = `AWS4${credentials.secretAccessKey}`;
+    for (const signable of [shortDate, region, service, KEY_TYPE_IDENTIFIER]) {
+        key = await hmac(sha256Constructor, key, signable);
+    }
+    return (signingKeyCache[cacheKey] = key);
+};
+const hmac = (ctor, secret, data) => {
+    const hash = new ctor(secret);
+    hash.update(toUint8Array(data));
+    return hash.digest();
+};
+
+const getCanonicalHeaders = ({ headers }, unsignableHeaders, signableHeaders) => {
+    const canonical = {};
+    for (const headerName of Object.keys(headers).sort()) {
+        if (headers[headerName] == undefined) {
+            continue;
+        }
+        const canonicalHeaderName = headerName.toLowerCase();
+        if (canonicalHeaderName in ALWAYS_UNSIGNABLE_HEADERS ||
+            unsignableHeaders?.has(canonicalHeaderName) ||
+            PROXY_HEADER_PATTERN.test(canonicalHeaderName) ||
+            SEC_HEADER_PATTERN.test(canonicalHeaderName)) {
+            if (!signableHeaders || (signableHeaders && !signableHeaders.has(canonicalHeaderName))) {
+                continue;
+            }
+        }
+        canonical[canonicalHeaderName] = headers[headerName].trim().replace(/\s+/g, " ");
+    }
+    return canonical;
+};
+
+const getPayloadHash = async ({ headers, body }, hashConstructor) => {
+    for (const headerName of Object.keys(headers)) {
+        if (headerName.toLowerCase() === SHA256_HEADER) {
+            return headers[headerName];
+        }
+    }
+    if (body == undefined) {
+        return "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+    }
+    else if (typeof body === "string" || ArrayBuffer.isView(body) || isArrayBuffer(body)) {
+        const hashCtor = new hashConstructor();
+        hashCtor.update(toUint8Array(body));
+        return toHex(await hashCtor.digest());
+    }
+    return UNSIGNED_PAYLOAD;
+};
+
+const hasHeader = (soughtHeader, headers) => {
+    soughtHeader = soughtHeader.toLowerCase();
+    for (const headerName of Object.keys(headers)) {
+        if (soughtHeader === headerName.toLowerCase()) {
+            return true;
+        }
+    }
+    return false;
+};
+
+const moveHeadersToQuery = (request, options = {}) => {
+    const { headers, query = {} } = HttpRequest.clone(request);
+    for (const name of Object.keys(headers)) {
+        const lname = name.toLowerCase();
+        if ((lname.slice(0, 6) === "x-amz-" && !options.unhoistableHeaders?.has(lname)) ||
+            options.hoistableHeaders?.has(lname)) {
+            query[name] = headers[name];
+            delete headers[name];
+        }
+    }
+    return {
+        ...request,
+        headers,
+        query,
+    };
+};
+
+const prepareRequest = (request) => {
+    request = HttpRequest.clone(request);
+    for (const headerName of Object.keys(request.headers)) {
+        if (GENERATED_HEADERS.indexOf(headerName.toLowerCase()) > -1) {
+            delete request.headers[headerName];
+        }
+    }
+    return request;
+};
+
 class SignatureV4 extends SignatureV4Base {
     headerFormatter = new HeaderFormatter();
     constructor({ applyChecksum, credentials, region, service, sha256, uriEscapePath = true, }) {
@@ -38462,7 +41060,7 @@ class SignatureV4 extends SignatureV4Base {
             return this.signRequest(toSign, options);
         }
     }
-    async signEvent({ headers, payload }, { signingDate = new Date(), priorSignature, signingRegion, signingService }) {
+    async signEvent({ headers, payload }, { signingDate = new Date(), priorSignature, signingRegion, signingService, eventStreamCredentials, }) {
         const region = signingRegion ?? (await this.regionProvider());
         const { shortDate, longDate } = this.formatDate(signingDate);
         const scope = createScope(shortDate, region, signingService ?? this.service);
@@ -38478,9 +41076,14 @@ class SignatureV4 extends SignatureV4Base {
             hashedHeaders,
             hashedPayload,
         ].join("\n");
-        return this.signString(stringToSign, { signingDate, signingRegion: region, signingService });
+        return this.signString(stringToSign, {
+            signingDate,
+            signingRegion: region,
+            signingService,
+            eventStreamCredentials,
+        });
     }
-    async signMessage(signableMessage, { signingDate = new Date(), signingRegion, signingService }) {
+    async signMessage(signableMessage, { signingDate = new Date(), signingRegion, signingService, eventStreamCredentials }) {
         const promise = this.signEvent({
             headers: this.headerFormatter.format(signableMessage.message.headers),
             payload: signableMessage.message.body,
@@ -38489,13 +41092,14 @@ class SignatureV4 extends SignatureV4Base {
             signingRegion,
             signingService,
             priorSignature: signableMessage.priorSignature,
+            eventStreamCredentials,
         });
         return promise.then((signature) => {
             return { message: signableMessage.message, signature };
         });
     }
-    async signString(stringToSign, { signingDate = new Date(), signingRegion, signingService } = {}) {
-        const credentials = await this.credentialProvider();
+    async signString(stringToSign, { signingDate = new Date(), signingRegion, signingService, eventStreamCredentials, } = {}) {
+        const credentials = eventStreamCredentials ?? (await this.credentialProvider());
         this.validateResolvedCredentials(credentials);
         const region = signingRegion ?? (await this.regionProvider());
         const { shortDate } = this.formatDate(signingDate);
@@ -38673,4898 +41277,6 @@ function bindCallerConfig(config, credentialsProvider) {
     fn.configBound = true;
     return fn;
 }
-
-const getAllAliases = (name, aliases) => {
-    const _aliases = [];
-    if (name) {
-        _aliases.push(name);
-    }
-    if (aliases) {
-        for (const alias of aliases) {
-            _aliases.push(alias);
-        }
-    }
-    return _aliases;
-};
-const getMiddlewareNameWithAliases = (name, aliases) => {
-    return `${name || "anonymous"}${aliases && aliases.length > 0 ? ` (a.k.a. ${aliases.join(",")})` : ""}`;
-};
-const constructStack = () => {
-    let absoluteEntries = [];
-    let relativeEntries = [];
-    let identifyOnResolve = false;
-    const entriesNameSet = new Set();
-    const sort = (entries) => entries.sort((a, b) => stepWeights[b.step] - stepWeights[a.step] ||
-        priorityWeights[b.priority || "normal"] - priorityWeights[a.priority || "normal"]);
-    const removeByName = (toRemove) => {
-        let isRemoved = false;
-        const filterCb = (entry) => {
-            const aliases = getAllAliases(entry.name, entry.aliases);
-            if (aliases.includes(toRemove)) {
-                isRemoved = true;
-                for (const alias of aliases) {
-                    entriesNameSet.delete(alias);
-                }
-                return false;
-            }
-            return true;
-        };
-        absoluteEntries = absoluteEntries.filter(filterCb);
-        relativeEntries = relativeEntries.filter(filterCb);
-        return isRemoved;
-    };
-    const removeByReference = (toRemove) => {
-        let isRemoved = false;
-        const filterCb = (entry) => {
-            if (entry.middleware === toRemove) {
-                isRemoved = true;
-                for (const alias of getAllAliases(entry.name, entry.aliases)) {
-                    entriesNameSet.delete(alias);
-                }
-                return false;
-            }
-            return true;
-        };
-        absoluteEntries = absoluteEntries.filter(filterCb);
-        relativeEntries = relativeEntries.filter(filterCb);
-        return isRemoved;
-    };
-    const cloneTo = (toStack) => {
-        absoluteEntries.forEach((entry) => {
-            toStack.add(entry.middleware, { ...entry });
-        });
-        relativeEntries.forEach((entry) => {
-            toStack.addRelativeTo(entry.middleware, { ...entry });
-        });
-        toStack.identifyOnResolve?.(stack.identifyOnResolve());
-        return toStack;
-    };
-    const expandRelativeMiddlewareList = (from) => {
-        const expandedMiddlewareList = [];
-        from.before.forEach((entry) => {
-            if (entry.before.length === 0 && entry.after.length === 0) {
-                expandedMiddlewareList.push(entry);
-            }
-            else {
-                expandedMiddlewareList.push(...expandRelativeMiddlewareList(entry));
-            }
-        });
-        expandedMiddlewareList.push(from);
-        from.after.reverse().forEach((entry) => {
-            if (entry.before.length === 0 && entry.after.length === 0) {
-                expandedMiddlewareList.push(entry);
-            }
-            else {
-                expandedMiddlewareList.push(...expandRelativeMiddlewareList(entry));
-            }
-        });
-        return expandedMiddlewareList;
-    };
-    const getMiddlewareList = (debug = false) => {
-        const normalizedAbsoluteEntries = [];
-        const normalizedRelativeEntries = [];
-        const normalizedEntriesNameMap = {};
-        absoluteEntries.forEach((entry) => {
-            const normalizedEntry = {
-                ...entry,
-                before: [],
-                after: [],
-            };
-            for (const alias of getAllAliases(normalizedEntry.name, normalizedEntry.aliases)) {
-                normalizedEntriesNameMap[alias] = normalizedEntry;
-            }
-            normalizedAbsoluteEntries.push(normalizedEntry);
-        });
-        relativeEntries.forEach((entry) => {
-            const normalizedEntry = {
-                ...entry,
-                before: [],
-                after: [],
-            };
-            for (const alias of getAllAliases(normalizedEntry.name, normalizedEntry.aliases)) {
-                normalizedEntriesNameMap[alias] = normalizedEntry;
-            }
-            normalizedRelativeEntries.push(normalizedEntry);
-        });
-        normalizedRelativeEntries.forEach((entry) => {
-            if (entry.toMiddleware) {
-                const toMiddleware = normalizedEntriesNameMap[entry.toMiddleware];
-                if (toMiddleware === undefined) {
-                    if (debug) {
-                        return;
-                    }
-                    throw new Error(`${entry.toMiddleware} is not found when adding ` +
-                        `${getMiddlewareNameWithAliases(entry.name, entry.aliases)} ` +
-                        `middleware ${entry.relation} ${entry.toMiddleware}`);
-                }
-                if (entry.relation === "after") {
-                    toMiddleware.after.push(entry);
-                }
-                if (entry.relation === "before") {
-                    toMiddleware.before.push(entry);
-                }
-            }
-        });
-        const mainChain = sort(normalizedAbsoluteEntries)
-            .map(expandRelativeMiddlewareList)
-            .reduce((wholeList, expandedMiddlewareList) => {
-            wholeList.push(...expandedMiddlewareList);
-            return wholeList;
-        }, []);
-        return mainChain;
-    };
-    const stack = {
-        add: (middleware, options = {}) => {
-            const { name, override, aliases: _aliases } = options;
-            const entry = {
-                step: "initialize",
-                priority: "normal",
-                middleware,
-                ...options,
-            };
-            const aliases = getAllAliases(name, _aliases);
-            if (aliases.length > 0) {
-                if (aliases.some((alias) => entriesNameSet.has(alias))) {
-                    if (!override)
-                        throw new Error(`Duplicate middleware name '${getMiddlewareNameWithAliases(name, _aliases)}'`);
-                    for (const alias of aliases) {
-                        const toOverrideIndex = absoluteEntries.findIndex((entry) => entry.name === alias || entry.aliases?.some((a) => a === alias));
-                        if (toOverrideIndex === -1) {
-                            continue;
-                        }
-                        const toOverride = absoluteEntries[toOverrideIndex];
-                        if (toOverride.step !== entry.step || entry.priority !== toOverride.priority) {
-                            throw new Error(`"${getMiddlewareNameWithAliases(toOverride.name, toOverride.aliases)}" middleware with ` +
-                                `${toOverride.priority} priority in ${toOverride.step} step cannot ` +
-                                `be overridden by "${getMiddlewareNameWithAliases(name, _aliases)}" middleware with ` +
-                                `${entry.priority} priority in ${entry.step} step.`);
-                        }
-                        absoluteEntries.splice(toOverrideIndex, 1);
-                    }
-                }
-                for (const alias of aliases) {
-                    entriesNameSet.add(alias);
-                }
-            }
-            absoluteEntries.push(entry);
-        },
-        addRelativeTo: (middleware, options) => {
-            const { name, override, aliases: _aliases } = options;
-            const entry = {
-                middleware,
-                ...options,
-            };
-            const aliases = getAllAliases(name, _aliases);
-            if (aliases.length > 0) {
-                if (aliases.some((alias) => entriesNameSet.has(alias))) {
-                    if (!override)
-                        throw new Error(`Duplicate middleware name '${getMiddlewareNameWithAliases(name, _aliases)}'`);
-                    for (const alias of aliases) {
-                        const toOverrideIndex = relativeEntries.findIndex((entry) => entry.name === alias || entry.aliases?.some((a) => a === alias));
-                        if (toOverrideIndex === -1) {
-                            continue;
-                        }
-                        const toOverride = relativeEntries[toOverrideIndex];
-                        if (toOverride.toMiddleware !== entry.toMiddleware || toOverride.relation !== entry.relation) {
-                            throw new Error(`"${getMiddlewareNameWithAliases(toOverride.name, toOverride.aliases)}" middleware ` +
-                                `${toOverride.relation} "${toOverride.toMiddleware}" middleware cannot be overridden ` +
-                                `by "${getMiddlewareNameWithAliases(name, _aliases)}" middleware ${entry.relation} ` +
-                                `"${entry.toMiddleware}" middleware.`);
-                        }
-                        relativeEntries.splice(toOverrideIndex, 1);
-                    }
-                }
-                for (const alias of aliases) {
-                    entriesNameSet.add(alias);
-                }
-            }
-            relativeEntries.push(entry);
-        },
-        clone: () => cloneTo(constructStack()),
-        use: (plugin) => {
-            plugin.applyToStack(stack);
-        },
-        remove: (toRemove) => {
-            if (typeof toRemove === "string")
-                return removeByName(toRemove);
-            else
-                return removeByReference(toRemove);
-        },
-        removeByTag: (toRemove) => {
-            let isRemoved = false;
-            const filterCb = (entry) => {
-                const { tags, name, aliases: _aliases } = entry;
-                if (tags && tags.includes(toRemove)) {
-                    const aliases = getAllAliases(name, _aliases);
-                    for (const alias of aliases) {
-                        entriesNameSet.delete(alias);
-                    }
-                    isRemoved = true;
-                    return false;
-                }
-                return true;
-            };
-            absoluteEntries = absoluteEntries.filter(filterCb);
-            relativeEntries = relativeEntries.filter(filterCb);
-            return isRemoved;
-        },
-        concat: (from) => {
-            const cloned = cloneTo(constructStack());
-            cloned.use(from);
-            cloned.identifyOnResolve(identifyOnResolve || cloned.identifyOnResolve() || (from.identifyOnResolve?.() ?? false));
-            return cloned;
-        },
-        applyToStack: cloneTo,
-        identify: () => {
-            return getMiddlewareList(true).map((mw) => {
-                const step = mw.step ??
-                    mw.relation +
-                        " " +
-                        mw.toMiddleware;
-                return getMiddlewareNameWithAliases(mw.name, mw.aliases) + " - " + step;
-            });
-        },
-        identifyOnResolve(toggle) {
-            if (typeof toggle === "boolean")
-                identifyOnResolve = toggle;
-            return identifyOnResolve;
-        },
-        resolve: (handler, context) => {
-            for (const middleware of getMiddlewareList()
-                .map((entry) => entry.middleware)
-                .reverse()) {
-                handler = middleware(handler, context);
-            }
-            if (identifyOnResolve) {
-                console.log(stack.identify());
-            }
-            return handler;
-        },
-    };
-    return stack;
-};
-const stepWeights = {
-    initialize: 5,
-    serialize: 4,
-    build: 3,
-    finalizeRequest: 2,
-    deserialize: 1,
-};
-const priorityWeights = {
-    high: 3,
-    normal: 2,
-    low: 1,
-};
-
-class Client {
-    config;
-    middlewareStack = constructStack();
-    initConfig;
-    handlers;
-    constructor(config) {
-        this.config = config;
-        const { protocol, protocolSettings } = config;
-        if (protocolSettings) {
-            if (typeof protocol === "function") {
-                config.protocol = new protocol(protocolSettings);
-            }
-        }
-    }
-    send(command, optionsOrCb, cb) {
-        const options = typeof optionsOrCb !== "function" ? optionsOrCb : undefined;
-        const callback = typeof optionsOrCb === "function" ? optionsOrCb : cb;
-        const useHandlerCache = options === undefined && this.config.cacheMiddleware === true;
-        let handler;
-        if (useHandlerCache) {
-            if (!this.handlers) {
-                this.handlers = new WeakMap();
-            }
-            const handlers = this.handlers;
-            if (handlers.has(command.constructor)) {
-                handler = handlers.get(command.constructor);
-            }
-            else {
-                handler = command.resolveMiddleware(this.middlewareStack, this.config, options);
-                handlers.set(command.constructor, handler);
-            }
-        }
-        else {
-            delete this.handlers;
-            handler = command.resolveMiddleware(this.middlewareStack, this.config, options);
-        }
-        if (callback) {
-            handler(command)
-                .then((result) => callback(null, result.output), (err) => callback(err))
-                .catch(() => { });
-        }
-        else {
-            return handler(command).then((result) => result.output);
-        }
-    }
-    destroy() {
-        this.config?.requestHandler?.destroy?.();
-        delete this.handlers;
-    }
-}
-
-const SENSITIVE_STRING = "***SensitiveInformation***";
-function schemaLogFilter(schema, data) {
-    if (data == null) {
-        return data;
-    }
-    const ns = NormalizedSchema.of(schema);
-    if (ns.getMergedTraits().sensitive) {
-        return SENSITIVE_STRING;
-    }
-    if (ns.isListSchema()) {
-        const isSensitive = !!ns.getValueSchema().getMergedTraits().sensitive;
-        if (isSensitive) {
-            return SENSITIVE_STRING;
-        }
-    }
-    else if (ns.isMapSchema()) {
-        const isSensitive = !!ns.getKeySchema().getMergedTraits().sensitive || !!ns.getValueSchema().getMergedTraits().sensitive;
-        if (isSensitive) {
-            return SENSITIVE_STRING;
-        }
-    }
-    else if (ns.isStructSchema() && typeof data === "object") {
-        const object = data;
-        const newObject = {};
-        for (const [member, memberNs] of ns.structIterator()) {
-            if (object[member] != null) {
-                newObject[member] = schemaLogFilter(memberNs, object[member]);
-            }
-        }
-        return newObject;
-    }
-    return data;
-}
-
-class Command {
-    middlewareStack = constructStack();
-    schema;
-    static classBuilder() {
-        return new ClassBuilder();
-    }
-    resolveMiddlewareWithContext(clientStack, configuration, options, { middlewareFn, clientName, commandName, inputFilterSensitiveLog, outputFilterSensitiveLog, smithyContext, additionalContext, CommandCtor, }) {
-        for (const mw of middlewareFn.bind(this)(CommandCtor, clientStack, configuration, options)) {
-            this.middlewareStack.use(mw);
-        }
-        const stack = clientStack.concat(this.middlewareStack);
-        const { logger } = configuration;
-        const handlerExecutionContext = {
-            logger,
-            clientName,
-            commandName,
-            inputFilterSensitiveLog,
-            outputFilterSensitiveLog,
-            [SMITHY_CONTEXT_KEY]: {
-                commandInstance: this,
-                ...smithyContext,
-            },
-            ...additionalContext,
-        };
-        const { requestHandler } = configuration;
-        return stack.resolve((request) => requestHandler.handle(request.request, options || {}), handlerExecutionContext);
-    }
-}
-class ClassBuilder {
-    _init = () => { };
-    _ep = {};
-    _middlewareFn = () => [];
-    _commandName = "";
-    _clientName = "";
-    _additionalContext = {};
-    _smithyContext = {};
-    _inputFilterSensitiveLog = undefined;
-    _outputFilterSensitiveLog = undefined;
-    _serializer = null;
-    _deserializer = null;
-    _operationSchema;
-    init(cb) {
-        this._init = cb;
-    }
-    ep(endpointParameterInstructions) {
-        this._ep = endpointParameterInstructions;
-        return this;
-    }
-    m(middlewareSupplier) {
-        this._middlewareFn = middlewareSupplier;
-        return this;
-    }
-    s(service, operation, smithyContext = {}) {
-        this._smithyContext = {
-            service,
-            operation,
-            ...smithyContext,
-        };
-        return this;
-    }
-    c(additionalContext = {}) {
-        this._additionalContext = additionalContext;
-        return this;
-    }
-    n(clientName, commandName) {
-        this._clientName = clientName;
-        this._commandName = commandName;
-        return this;
-    }
-    f(inputFilter = (_) => _, outputFilter = (_) => _) {
-        this._inputFilterSensitiveLog = inputFilter;
-        this._outputFilterSensitiveLog = outputFilter;
-        return this;
-    }
-    ser(serializer) {
-        this._serializer = serializer;
-        return this;
-    }
-    de(deserializer) {
-        this._deserializer = deserializer;
-        return this;
-    }
-    sc(operation) {
-        this._operationSchema = operation;
-        this._smithyContext.operationSchema = operation;
-        return this;
-    }
-    build() {
-        const closure = this;
-        let CommandRef;
-        return (CommandRef = class extends Command {
-            input;
-            static getEndpointParameterInstructions() {
-                return closure._ep;
-            }
-            constructor(...[input]) {
-                super();
-                this.input = input ?? {};
-                closure._init(this);
-                this.schema = closure._operationSchema;
-            }
-            resolveMiddleware(stack, configuration, options) {
-                const op = closure._operationSchema;
-                const input = op?.[4] ?? op?.input;
-                const output = op?.[5] ?? op?.output;
-                return this.resolveMiddlewareWithContext(stack, configuration, options, {
-                    CommandCtor: CommandRef,
-                    middlewareFn: closure._middlewareFn,
-                    clientName: closure._clientName,
-                    commandName: closure._commandName,
-                    inputFilterSensitiveLog: closure._inputFilterSensitiveLog ?? (op ? schemaLogFilter.bind(null, input) : (_) => _),
-                    outputFilterSensitiveLog: closure._outputFilterSensitiveLog ?? (op ? schemaLogFilter.bind(null, output) : (_) => _),
-                    smithyContext: closure._smithyContext,
-                    additionalContext: closure._additionalContext,
-                });
-            }
-            serialize = closure._serializer;
-            deserialize = closure._deserializer;
-        });
-    }
-}
-
-class ServiceException extends Error {
-    $fault;
-    $response;
-    $retryable;
-    $metadata;
-    constructor(options) {
-        super(options.message);
-        Object.setPrototypeOf(this, Object.getPrototypeOf(this).constructor.prototype);
-        this.name = options.name;
-        this.$fault = options.$fault;
-        this.$metadata = options.$metadata;
-    }
-    static isInstance(value) {
-        if (!value)
-            return false;
-        const candidate = value;
-        return (ServiceException.prototype.isPrototypeOf(candidate) ||
-            (Boolean(candidate.$fault) &&
-                Boolean(candidate.$metadata) &&
-                (candidate.$fault === "client" || candidate.$fault === "server")));
-    }
-    static [Symbol.hasInstance](instance) {
-        if (!instance)
-            return false;
-        const candidate = instance;
-        if (this === ServiceException) {
-            return ServiceException.isInstance(instance);
-        }
-        if (ServiceException.isInstance(instance)) {
-            if (candidate.name && this.name) {
-                return this.prototype.isPrototypeOf(instance) || candidate.name === this.name;
-            }
-            return this.prototype.isPrototypeOf(instance);
-        }
-        return false;
-    }
-}
-const decorateServiceException = (exception, additions = {}) => {
-    Object.entries(additions)
-        .filter(([, v]) => v !== undefined)
-        .forEach(([k, v]) => {
-        if (exception[k] == undefined || exception[k] === "") {
-            exception[k] = v;
-        }
-    });
-    const message = exception.message || exception.Message || "UnknownError";
-    exception.message = message;
-    delete exception.Message;
-    return exception;
-};
-
-const loadConfigsForDefaultMode = (mode) => {
-    switch (mode) {
-        case "standard":
-            return {
-                retryMode: "standard",
-                connectionTimeout: 3100,
-            };
-        case "in-region":
-            return {
-                retryMode: "standard",
-                connectionTimeout: 1100,
-            };
-        case "cross-region":
-            return {
-                retryMode: "standard",
-                connectionTimeout: 3100,
-            };
-        case "mobile":
-            return {
-                retryMode: "standard",
-                connectionTimeout: 30000,
-            };
-        default:
-            return {};
-    }
-};
-
-let warningEmitted = false;
-const emitWarningIfUnsupportedVersion = (version) => {
-    if (version && !warningEmitted && parseInt(version.substring(1, version.indexOf("."))) < 16) {
-        warningEmitted = true;
-    }
-};
-
-const getChecksumConfiguration = (runtimeConfig) => {
-    const checksumAlgorithms = [];
-    for (const id in AlgorithmId) {
-        const algorithmId = AlgorithmId[id];
-        if (runtimeConfig[algorithmId] === undefined) {
-            continue;
-        }
-        checksumAlgorithms.push({
-            algorithmId: () => algorithmId,
-            checksumConstructor: () => runtimeConfig[algorithmId],
-        });
-    }
-    return {
-        addChecksumAlgorithm(algo) {
-            checksumAlgorithms.push(algo);
-        },
-        checksumAlgorithms() {
-            return checksumAlgorithms;
-        },
-    };
-};
-const resolveChecksumRuntimeConfig = (clientConfig) => {
-    const runtimeConfig = {};
-    clientConfig.checksumAlgorithms().forEach((checksumAlgorithm) => {
-        runtimeConfig[checksumAlgorithm.algorithmId()] = checksumAlgorithm.checksumConstructor();
-    });
-    return runtimeConfig;
-};
-
-const getRetryConfiguration = (runtimeConfig) => {
-    return {
-        setRetryStrategy(retryStrategy) {
-            runtimeConfig.retryStrategy = retryStrategy;
-        },
-        retryStrategy() {
-            return runtimeConfig.retryStrategy;
-        },
-    };
-};
-const resolveRetryRuntimeConfig = (retryStrategyConfiguration) => {
-    const runtimeConfig = {};
-    runtimeConfig.retryStrategy = retryStrategyConfiguration.retryStrategy();
-    return runtimeConfig;
-};
-
-const getDefaultExtensionConfiguration = (runtimeConfig) => {
-    return Object.assign(getChecksumConfiguration(runtimeConfig), getRetryConfiguration(runtimeConfig));
-};
-const resolveDefaultRuntimeConfig = (config) => {
-    return Object.assign(resolveChecksumRuntimeConfig(config), resolveRetryRuntimeConfig(config));
-};
-
-const getValueFromTextNode = (obj) => {
-    const textNodeName = "#text";
-    for (const key in obj) {
-        if (obj.hasOwnProperty(key) && obj[key][textNodeName] !== undefined) {
-            obj[key] = obj[key][textNodeName];
-        }
-        else if (typeof obj[key] === "object" && obj[key] !== null) {
-            obj[key] = getValueFromTextNode(obj[key]);
-        }
-    }
-    return obj;
-};
-
-class NoOpLogger {
-    trace() { }
-    debug() { }
-    info() { }
-    warn() { }
-    error() { }
-}
-
-const _json = (obj) => {
-    if (obj == null) {
-        return {};
-    }
-    if (Array.isArray(obj)) {
-        return obj.filter((_) => _ != null).map(_json);
-    }
-    if (typeof obj === "object") {
-        const target = {};
-        for (const key of Object.keys(obj)) {
-            if (obj[key] == null) {
-                continue;
-            }
-            target[key] = _json(obj[key]);
-        }
-        return target;
-    }
-    return obj;
-};
-
-class ProtocolLib {
-    queryCompat;
-    constructor(queryCompat = false) {
-        this.queryCompat = queryCompat;
-    }
-    resolveRestContentType(defaultContentType, inputSchema) {
-        const members = inputSchema.getMemberSchemas();
-        const httpPayloadMember = Object.values(members).find((m) => {
-            return !!m.getMergedTraits().httpPayload;
-        });
-        if (httpPayloadMember) {
-            const mediaType = httpPayloadMember.getMergedTraits().mediaType;
-            if (mediaType) {
-                return mediaType;
-            }
-            else if (httpPayloadMember.isStringSchema()) {
-                return "text/plain";
-            }
-            else if (httpPayloadMember.isBlobSchema()) {
-                return "application/octet-stream";
-            }
-            else {
-                return defaultContentType;
-            }
-        }
-        else if (!inputSchema.isUnitSchema()) {
-            const hasBody = Object.values(members).find((m) => {
-                const { httpQuery, httpQueryParams, httpHeader, httpLabel, httpPrefixHeaders } = m.getMergedTraits();
-                const noPrefixHeaders = httpPrefixHeaders === void 0;
-                return !httpQuery && !httpQueryParams && !httpHeader && !httpLabel && noPrefixHeaders;
-            });
-            if (hasBody) {
-                return defaultContentType;
-            }
-        }
-    }
-    async getErrorSchemaOrThrowBaseException(errorIdentifier, defaultNamespace, response, dataObject, metadata, getErrorSchema) {
-        let namespace = defaultNamespace;
-        let errorName = errorIdentifier;
-        if (errorIdentifier.includes("#")) {
-            [namespace, errorName] = errorIdentifier.split("#");
-        }
-        const errorMetadata = {
-            $metadata: metadata,
-            $fault: response.statusCode < 500 ? "client" : "server",
-        };
-        const registry = TypeRegistry.for(namespace);
-        try {
-            const errorSchema = getErrorSchema?.(registry, errorName) ?? registry.getSchema(errorIdentifier);
-            return { errorSchema, errorMetadata };
-        }
-        catch (e) {
-            dataObject.message = dataObject.message ?? dataObject.Message ?? "UnknownError";
-            const synthetic = TypeRegistry.for("smithy.ts.sdk.synthetic." + namespace);
-            const baseExceptionSchema = synthetic.getBaseException();
-            if (baseExceptionSchema) {
-                const ErrorCtor = synthetic.getErrorCtor(baseExceptionSchema) ?? Error;
-                throw this.decorateServiceException(Object.assign(new ErrorCtor({ name: errorName }), errorMetadata), dataObject);
-            }
-            throw this.decorateServiceException(Object.assign(new Error(errorName), errorMetadata), dataObject);
-        }
-    }
-    decorateServiceException(exception, additions = {}) {
-        if (this.queryCompat) {
-            const msg = exception.Message ?? additions.Message;
-            const error = decorateServiceException(exception, additions);
-            if (msg) {
-                error.message = msg;
-            }
-            error.Error = {
-                ...error.Error,
-                Type: error.Error.Type,
-                Code: error.Error.Code,
-                Message: error.Error.message ?? error.Error.Message ?? msg,
-            };
-            const reqId = error.$metadata.requestId;
-            if (reqId) {
-                error.RequestId = reqId;
-            }
-            return error;
-        }
-        return decorateServiceException(exception, additions);
-    }
-    setQueryCompatError(output, response) {
-        const queryErrorHeader = response.headers?.["x-amzn-query-error"];
-        if (output !== undefined && queryErrorHeader != null) {
-            const [Code, Type] = queryErrorHeader.split(";");
-            const entries = Object.entries(output);
-            const Error = {
-                Code,
-                Type,
-            };
-            Object.assign(output, Error);
-            for (const [k, v] of entries) {
-                Error[k === "message" ? "Message" : k] = v;
-            }
-            delete Error.__type;
-            output.Error = Error;
-        }
-    }
-    queryCompatOutput(queryCompatErrorData, errorData) {
-        if (queryCompatErrorData.Error) {
-            errorData.Error = queryCompatErrorData.Error;
-        }
-        if (queryCompatErrorData.Type) {
-            errorData.Type = queryCompatErrorData.Type;
-        }
-        if (queryCompatErrorData.Code) {
-            errorData.Code = queryCompatErrorData.Code;
-        }
-    }
-    findQueryCompatibleError(registry, errorName) {
-        try {
-            return registry.getSchema(errorName);
-        }
-        catch (e) {
-            return registry.find((schema) => NormalizedSchema.of(schema).getMergedTraits().awsQueryError?.[0] === errorName);
-        }
-    }
-}
-
-class SerdeContextConfig {
-    serdeContext;
-    setSerdeContext(serdeContext) {
-        this.serdeContext = serdeContext;
-    }
-}
-
-class UnionSerde {
-    from;
-    to;
-    keys;
-    constructor(from, to) {
-        this.from = from;
-        this.to = to;
-        this.keys = new Set(Object.keys(this.from).filter((k) => k !== "__type"));
-    }
-    mark(key) {
-        this.keys.delete(key);
-    }
-    hasUnknown() {
-        return this.keys.size === 1 && Object.keys(this.to).length === 0;
-    }
-    writeUnknown() {
-        if (this.hasUnknown()) {
-            const k = this.keys.values().next().value;
-            const v = this.from[k];
-            this.to.$unknown = [k, v];
-        }
-    }
-}
-
-function jsonReviver(key, value, context) {
-    if (context?.source) {
-        const numericString = context.source;
-        if (typeof value === "number") {
-            if (value > Number.MAX_SAFE_INTEGER || value < Number.MIN_SAFE_INTEGER || numericString !== String(value)) {
-                const isFractional = numericString.includes(".");
-                if (isFractional) {
-                    return new NumericValue(numericString, "bigDecimal");
-                }
-                else {
-                    return BigInt(numericString);
-                }
-            }
-        }
-    }
-    return value;
-}
-
-const collectBodyString = (streamBody, context) => collectBody(streamBody, context).then((body) => (context?.utf8Encoder ?? toUtf8)(body));
-
-const parseJsonBody = (streamBody, context) => collectBodyString(streamBody, context).then((encoded) => {
-    if (encoded.length) {
-        try {
-            return JSON.parse(encoded);
-        }
-        catch (e) {
-            if (e?.name === "SyntaxError") {
-                Object.defineProperty(e, "$responseBodyText", {
-                    value: encoded,
-                });
-            }
-            throw e;
-        }
-    }
-    return {};
-});
-const loadRestJsonErrorCode = (output, data) => {
-    const findKey = (object, key) => Object.keys(object).find((k) => k.toLowerCase() === key.toLowerCase());
-    const sanitizeErrorCode = (rawValue) => {
-        let cleanValue = rawValue;
-        if (typeof cleanValue === "number") {
-            cleanValue = cleanValue.toString();
-        }
-        if (cleanValue.indexOf(",") >= 0) {
-            cleanValue = cleanValue.split(",")[0];
-        }
-        if (cleanValue.indexOf(":") >= 0) {
-            cleanValue = cleanValue.split(":")[0];
-        }
-        if (cleanValue.indexOf("#") >= 0) {
-            cleanValue = cleanValue.split("#")[1];
-        }
-        return cleanValue;
-    };
-    const headerKey = findKey(output.headers, "x-amzn-errortype");
-    if (headerKey !== undefined) {
-        return sanitizeErrorCode(output.headers[headerKey]);
-    }
-    if (data && typeof data === "object") {
-        const codeKey = findKey(data, "code");
-        if (codeKey && data[codeKey] !== undefined) {
-            return sanitizeErrorCode(data[codeKey]);
-        }
-        if (data["__type"] !== undefined) {
-            return sanitizeErrorCode(data["__type"]);
-        }
-    }
-};
-
-class JsonShapeDeserializer extends SerdeContextConfig {
-    settings;
-    constructor(settings) {
-        super();
-        this.settings = settings;
-    }
-    async read(schema, data) {
-        return this._read(schema, typeof data === "string" ? JSON.parse(data, jsonReviver) : await parseJsonBody(data, this.serdeContext));
-    }
-    readObject(schema, data) {
-        return this._read(schema, data);
-    }
-    _read(schema, value) {
-        const isObject = value !== null && typeof value === "object";
-        const ns = NormalizedSchema.of(schema);
-        if (isObject) {
-            if (ns.isStructSchema()) {
-                const record = value;
-                const union = ns.isUnionSchema();
-                const out = {};
-                let nameMap = void 0;
-                const { jsonName } = this.settings;
-                if (jsonName) {
-                    nameMap = {};
-                }
-                let unionSerde;
-                if (union) {
-                    unionSerde = new UnionSerde(record, out);
-                }
-                for (const [memberName, memberSchema] of ns.structIterator()) {
-                    let fromKey = memberName;
-                    if (jsonName) {
-                        fromKey = memberSchema.getMergedTraits().jsonName ?? fromKey;
-                        nameMap[fromKey] = memberName;
-                    }
-                    if (union) {
-                        unionSerde.mark(fromKey);
-                    }
-                    if (record[fromKey] != null) {
-                        out[memberName] = this._read(memberSchema, record[fromKey]);
-                    }
-                }
-                if (union) {
-                    unionSerde.writeUnknown();
-                }
-                else if (typeof record.__type === "string") {
-                    for (const [k, v] of Object.entries(record)) {
-                        const t = jsonName ? nameMap[k] ?? k : k;
-                        if (!(t in out)) {
-                            out[t] = v;
-                        }
-                    }
-                }
-                return out;
-            }
-            if (Array.isArray(value) && ns.isListSchema()) {
-                const listMember = ns.getValueSchema();
-                const out = [];
-                const sparse = !!ns.getMergedTraits().sparse;
-                for (const item of value) {
-                    if (sparse || item != null) {
-                        out.push(this._read(listMember, item));
-                    }
-                }
-                return out;
-            }
-            if (ns.isMapSchema()) {
-                const mapMember = ns.getValueSchema();
-                const out = {};
-                const sparse = !!ns.getMergedTraits().sparse;
-                for (const [_k, _v] of Object.entries(value)) {
-                    if (sparse || _v != null) {
-                        out[_k] = this._read(mapMember, _v);
-                    }
-                }
-                return out;
-            }
-        }
-        if (ns.isBlobSchema() && typeof value === "string") {
-            return fromBase64(value);
-        }
-        const mediaType = ns.getMergedTraits().mediaType;
-        if (ns.isStringSchema() && typeof value === "string" && mediaType) {
-            const isJson = mediaType === "application/json" || mediaType.endsWith("+json");
-            if (isJson) {
-                return LazyJsonString.from(value);
-            }
-            return value;
-        }
-        if (ns.isTimestampSchema() && value != null) {
-            const format = determineTimestampFormat(ns, this.settings);
-            switch (format) {
-                case 5:
-                    return parseRfc3339DateTimeWithOffset(value);
-                case 6:
-                    return parseRfc7231DateTime(value);
-                case 7:
-                    return parseEpochTimestamp(value);
-                default:
-                    console.warn("Missing timestamp format, parsing value with Date constructor:", value);
-                    return new Date(value);
-            }
-        }
-        if (ns.isBigIntegerSchema() && (typeof value === "number" || typeof value === "string")) {
-            return BigInt(value);
-        }
-        if (ns.isBigDecimalSchema() && value != undefined) {
-            if (value instanceof NumericValue) {
-                return value;
-            }
-            const untyped = value;
-            if (untyped.type === "bigDecimal" && "string" in untyped) {
-                return new NumericValue(untyped.string, untyped.type);
-            }
-            return new NumericValue(String(value), "bigDecimal");
-        }
-        if (ns.isNumericSchema() && typeof value === "string") {
-            switch (value) {
-                case "Infinity":
-                    return Infinity;
-                case "-Infinity":
-                    return -Infinity;
-                case "NaN":
-                    return NaN;
-            }
-            return value;
-        }
-        if (ns.isDocumentSchema()) {
-            if (isObject) {
-                const out = Array.isArray(value) ? [] : {};
-                for (const [k, v] of Object.entries(value)) {
-                    if (v instanceof NumericValue) {
-                        out[k] = v;
-                    }
-                    else {
-                        out[k] = this._read(ns, v);
-                    }
-                }
-                return out;
-            }
-            else {
-                return structuredClone(value);
-            }
-        }
-        return value;
-    }
-}
-
-const NUMERIC_CONTROL_CHAR = String.fromCharCode(925);
-class JsonReplacer {
-    values = new Map();
-    counter = 0;
-    stage = 0;
-    createReplacer() {
-        if (this.stage === 1) {
-            throw new Error("@aws-sdk/core/protocols - JsonReplacer already created.");
-        }
-        if (this.stage === 2) {
-            throw new Error("@aws-sdk/core/protocols - JsonReplacer exhausted.");
-        }
-        this.stage = 1;
-        return (key, value) => {
-            if (value instanceof NumericValue) {
-                const v = `${NUMERIC_CONTROL_CHAR + "nv" + this.counter++}_` + value.string;
-                this.values.set(`"${v}"`, value.string);
-                return v;
-            }
-            if (typeof value === "bigint") {
-                const s = value.toString();
-                const v = `${NUMERIC_CONTROL_CHAR + "b" + this.counter++}_` + s;
-                this.values.set(`"${v}"`, s);
-                return v;
-            }
-            return value;
-        };
-    }
-    replaceInJson(json) {
-        if (this.stage === 0) {
-            throw new Error("@aws-sdk/core/protocols - JsonReplacer not created yet.");
-        }
-        if (this.stage === 2) {
-            throw new Error("@aws-sdk/core/protocols - JsonReplacer exhausted.");
-        }
-        this.stage = 2;
-        if (this.counter === 0) {
-            return json;
-        }
-        for (const [key, value] of this.values) {
-            json = json.replace(key, value);
-        }
-        return json;
-    }
-}
-
-class JsonShapeSerializer extends SerdeContextConfig {
-    settings;
-    buffer;
-    useReplacer = false;
-    rootSchema;
-    constructor(settings) {
-        super();
-        this.settings = settings;
-    }
-    write(schema, value) {
-        this.rootSchema = NormalizedSchema.of(schema);
-        this.buffer = this._write(this.rootSchema, value);
-    }
-    writeDiscriminatedDocument(schema, value) {
-        this.write(schema, value);
-        if (typeof this.buffer === "object") {
-            this.buffer.__type = NormalizedSchema.of(schema).getName(true);
-        }
-    }
-    flush() {
-        const { rootSchema, useReplacer } = this;
-        this.rootSchema = undefined;
-        this.useReplacer = false;
-        if (rootSchema?.isStructSchema() || rootSchema?.isDocumentSchema()) {
-            if (!useReplacer) {
-                return JSON.stringify(this.buffer);
-            }
-            const replacer = new JsonReplacer();
-            return replacer.replaceInJson(JSON.stringify(this.buffer, replacer.createReplacer(), 0));
-        }
-        return this.buffer;
-    }
-    _write(schema, value, container) {
-        const isObject = value !== null && typeof value === "object";
-        const ns = NormalizedSchema.of(schema);
-        if (isObject) {
-            if (ns.isStructSchema()) {
-                const record = value;
-                const out = {};
-                const { jsonName } = this.settings;
-                let nameMap = void 0;
-                if (jsonName) {
-                    nameMap = {};
-                }
-                for (const [memberName, memberSchema] of ns.structIterator()) {
-                    const serializableValue = this._write(memberSchema, record[memberName], ns);
-                    if (serializableValue !== undefined) {
-                        let targetKey = memberName;
-                        if (jsonName) {
-                            targetKey = memberSchema.getMergedTraits().jsonName ?? memberName;
-                            nameMap[memberName] = targetKey;
-                        }
-                        out[targetKey] = serializableValue;
-                    }
-                }
-                if (ns.isUnionSchema() && Object.keys(out).length === 0) {
-                    const { $unknown } = record;
-                    if (Array.isArray($unknown)) {
-                        const [k, v] = $unknown;
-                        out[k] = this._write(15, v);
-                    }
-                }
-                else if (typeof record.__type === "string") {
-                    for (const [k, v] of Object.entries(record)) {
-                        const targetKey = jsonName ? nameMap[k] ?? k : k;
-                        if (!(targetKey in out)) {
-                            out[targetKey] = this._write(15, v);
-                        }
-                    }
-                }
-                return out;
-            }
-            if (Array.isArray(value) && ns.isListSchema()) {
-                const listMember = ns.getValueSchema();
-                const out = [];
-                const sparse = !!ns.getMergedTraits().sparse;
-                for (const item of value) {
-                    if (sparse || item != null) {
-                        out.push(this._write(listMember, item));
-                    }
-                }
-                return out;
-            }
-            if (ns.isMapSchema()) {
-                const mapMember = ns.getValueSchema();
-                const out = {};
-                const sparse = !!ns.getMergedTraits().sparse;
-                for (const [_k, _v] of Object.entries(value)) {
-                    if (sparse || _v != null) {
-                        out[_k] = this._write(mapMember, _v);
-                    }
-                }
-                return out;
-            }
-            if (value instanceof Uint8Array && (ns.isBlobSchema() || ns.isDocumentSchema())) {
-                if (ns === this.rootSchema) {
-                    return value;
-                }
-                return (this.serdeContext?.base64Encoder ?? toBase64)(value);
-            }
-            if (value instanceof Date && (ns.isTimestampSchema() || ns.isDocumentSchema())) {
-                const format = determineTimestampFormat(ns, this.settings);
-                switch (format) {
-                    case 5:
-                        return value.toISOString().replace(".000Z", "Z");
-                    case 6:
-                        return dateToUtcString(value);
-                    case 7:
-                        return value.getTime() / 1000;
-                    default:
-                        console.warn("Missing timestamp format, using epoch seconds", value);
-                        return value.getTime() / 1000;
-                }
-            }
-            if (value instanceof NumericValue) {
-                this.useReplacer = true;
-            }
-        }
-        if (value === null && container?.isStructSchema()) {
-            return void 0;
-        }
-        if (ns.isStringSchema()) {
-            if (typeof value === "undefined" && ns.isIdempotencyToken()) {
-                return v4();
-            }
-            const mediaType = ns.getMergedTraits().mediaType;
-            if (value != null && mediaType) {
-                const isJson = mediaType === "application/json" || mediaType.endsWith("+json");
-                if (isJson) {
-                    return LazyJsonString.from(value);
-                }
-            }
-            return value;
-        }
-        if (typeof value === "number" && ns.isNumericSchema()) {
-            if (Math.abs(value) === Infinity || isNaN(value)) {
-                return String(value);
-            }
-            return value;
-        }
-        if (typeof value === "string" && ns.isBlobSchema()) {
-            if (ns === this.rootSchema) {
-                return value;
-            }
-            return (this.serdeContext?.base64Encoder ?? toBase64)(value);
-        }
-        if (typeof value === "bigint") {
-            this.useReplacer = true;
-        }
-        if (ns.isDocumentSchema()) {
-            if (isObject) {
-                const out = Array.isArray(value) ? [] : {};
-                for (const [k, v] of Object.entries(value)) {
-                    if (v instanceof NumericValue) {
-                        this.useReplacer = true;
-                        out[k] = v;
-                    }
-                    else {
-                        out[k] = this._write(ns, v);
-                    }
-                }
-                return out;
-            }
-            else {
-                return structuredClone(value);
-            }
-        }
-        return value;
-    }
-}
-
-class JsonCodec extends SerdeContextConfig {
-    settings;
-    constructor(settings) {
-        super();
-        this.settings = settings;
-    }
-    createSerializer() {
-        const serializer = new JsonShapeSerializer(this.settings);
-        serializer.setSerdeContext(this.serdeContext);
-        return serializer;
-    }
-    createDeserializer() {
-        const deserializer = new JsonShapeDeserializer(this.settings);
-        deserializer.setSerdeContext(this.serdeContext);
-        return deserializer;
-    }
-}
-
-class AwsJsonRpcProtocol extends RpcProtocol {
-    serializer;
-    deserializer;
-    serviceTarget;
-    codec;
-    mixin;
-    awsQueryCompatible;
-    constructor({ defaultNamespace, serviceTarget, awsQueryCompatible, jsonCodec, }) {
-        super({
-            defaultNamespace,
-        });
-        this.serviceTarget = serviceTarget;
-        this.codec =
-            jsonCodec ??
-                new JsonCodec({
-                    timestampFormat: {
-                        useTrait: true,
-                        default: 7,
-                    },
-                    jsonName: false,
-                });
-        this.serializer = this.codec.createSerializer();
-        this.deserializer = this.codec.createDeserializer();
-        this.awsQueryCompatible = !!awsQueryCompatible;
-        this.mixin = new ProtocolLib(this.awsQueryCompatible);
-    }
-    async serializeRequest(operationSchema, input, context) {
-        const request = await super.serializeRequest(operationSchema, input, context);
-        if (!request.path.endsWith("/")) {
-            request.path += "/";
-        }
-        Object.assign(request.headers, {
-            "content-type": `application/x-amz-json-${this.getJsonRpcVersion()}`,
-            "x-amz-target": `${this.serviceTarget}.${operationSchema.name}`,
-        });
-        if (this.awsQueryCompatible) {
-            request.headers["x-amzn-query-mode"] = "true";
-        }
-        if (deref(operationSchema.input) === "unit" || !request.body) {
-            request.body = "{}";
-        }
-        return request;
-    }
-    getPayloadCodec() {
-        return this.codec;
-    }
-    async handleError(operationSchema, context, response, dataObject, metadata) {
-        if (this.awsQueryCompatible) {
-            this.mixin.setQueryCompatError(dataObject, response);
-        }
-        const errorIdentifier = loadRestJsonErrorCode(response, dataObject) ?? "Unknown";
-        const { errorSchema, errorMetadata } = await this.mixin.getErrorSchemaOrThrowBaseException(errorIdentifier, this.options.defaultNamespace, response, dataObject, metadata, this.awsQueryCompatible ? this.mixin.findQueryCompatibleError : undefined);
-        const ns = NormalizedSchema.of(errorSchema);
-        const message = dataObject.message ?? dataObject.Message ?? "Unknown";
-        const ErrorCtor = TypeRegistry.for(errorSchema[1]).getErrorCtor(errorSchema) ?? Error;
-        const exception = new ErrorCtor(message);
-        const output = {};
-        for (const [name, member] of ns.structIterator()) {
-            if (dataObject[name] != null) {
-                output[name] = this.codec.createDeserializer().readObject(member, dataObject[name]);
-            }
-        }
-        if (this.awsQueryCompatible) {
-            this.mixin.queryCompatOutput(dataObject, output);
-        }
-        throw this.mixin.decorateServiceException(Object.assign(exception, errorMetadata, {
-            $fault: ns.getMergedTraits().error,
-            message,
-        }, output), dataObject);
-    }
-}
-
-class AwsJson1_0Protocol extends AwsJsonRpcProtocol {
-    constructor({ defaultNamespace, serviceTarget, awsQueryCompatible, jsonCodec, }) {
-        super({
-            defaultNamespace,
-            serviceTarget,
-            awsQueryCompatible,
-            jsonCodec,
-        });
-    }
-    getShapeId() {
-        return "aws.protocols#awsJson1_0";
-    }
-    getJsonRpcVersion() {
-        return "1.0";
-    }
-    getDefaultContentType() {
-        return "application/x-amz-json-1.0";
-    }
-}
-
-class AwsRestJsonProtocol extends HttpBindingProtocol {
-    serializer;
-    deserializer;
-    codec;
-    mixin = new ProtocolLib();
-    constructor({ defaultNamespace }) {
-        super({
-            defaultNamespace,
-        });
-        const settings = {
-            timestampFormat: {
-                useTrait: true,
-                default: 7,
-            },
-            httpBindings: true,
-            jsonName: true,
-        };
-        this.codec = new JsonCodec(settings);
-        this.serializer = new HttpInterceptingShapeSerializer(this.codec.createSerializer(), settings);
-        this.deserializer = new HttpInterceptingShapeDeserializer(this.codec.createDeserializer(), settings);
-    }
-    getShapeId() {
-        return "aws.protocols#restJson1";
-    }
-    getPayloadCodec() {
-        return this.codec;
-    }
-    setSerdeContext(serdeContext) {
-        this.codec.setSerdeContext(serdeContext);
-        super.setSerdeContext(serdeContext);
-    }
-    async serializeRequest(operationSchema, input, context) {
-        const request = await super.serializeRequest(operationSchema, input, context);
-        const inputSchema = NormalizedSchema.of(operationSchema.input);
-        if (!request.headers["content-type"]) {
-            const contentType = this.mixin.resolveRestContentType(this.getDefaultContentType(), inputSchema);
-            if (contentType) {
-                request.headers["content-type"] = contentType;
-            }
-        }
-        if (request.body == null && request.headers["content-type"] === this.getDefaultContentType()) {
-            request.body = "{}";
-        }
-        return request;
-    }
-    async deserializeResponse(operationSchema, context, response) {
-        const output = await super.deserializeResponse(operationSchema, context, response);
-        const outputSchema = NormalizedSchema.of(operationSchema.output);
-        for (const [name, member] of outputSchema.structIterator()) {
-            if (member.getMemberTraits().httpPayload && !(name in output)) {
-                output[name] = null;
-            }
-        }
-        return output;
-    }
-    async handleError(operationSchema, context, response, dataObject, metadata) {
-        const errorIdentifier = loadRestJsonErrorCode(response, dataObject) ?? "Unknown";
-        const { errorSchema, errorMetadata } = await this.mixin.getErrorSchemaOrThrowBaseException(errorIdentifier, this.options.defaultNamespace, response, dataObject, metadata);
-        const ns = NormalizedSchema.of(errorSchema);
-        const message = dataObject.message ?? dataObject.Message ?? "Unknown";
-        const ErrorCtor = TypeRegistry.for(errorSchema[1]).getErrorCtor(errorSchema) ?? Error;
-        const exception = new ErrorCtor(message);
-        await this.deserializeHttpMessage(errorSchema, context, response, dataObject);
-        const output = {};
-        for (const [name, member] of ns.structIterator()) {
-            const target = member.getMergedTraits().jsonName ?? name;
-            output[name] = this.codec.createDeserializer().readObject(member, dataObject[target]);
-        }
-        throw this.mixin.decorateServiceException(Object.assign(exception, errorMetadata, {
-            $fault: ns.getMergedTraits().error,
-            message,
-        }, output), dataObject);
-    }
-    getDefaultContentType() {
-        return "application/json";
-    }
-}
-
-const nameStartChar = ':A-Za-z_\\u00C0-\\u00D6\\u00D8-\\u00F6\\u00F8-\\u02FF\\u0370-\\u037D\\u037F-\\u1FFF\\u200C-\\u200D\\u2070-\\u218F\\u2C00-\\u2FEF\\u3001-\\uD7FF\\uF900-\\uFDCF\\uFDF0-\\uFFFD';
-const nameChar = nameStartChar + '\\-.\\d\\u00B7\\u0300-\\u036F\\u203F-\\u2040';
-const nameRegexp = '[' + nameStartChar + '][' + nameChar + ']*';
-const regexName = new RegExp('^' + nameRegexp + '$');
-
-function getAllMatches(string, regex) {
-  const matches = [];
-  let match = regex.exec(string);
-  while (match) {
-    const allmatches = [];
-    allmatches.startIndex = regex.lastIndex - match[0].length;
-    const len = match.length;
-    for (let index = 0; index < len; index++) {
-      allmatches.push(match[index]);
-    }
-    matches.push(allmatches);
-    match = regex.exec(string);
-  }
-  return matches;
-}
-
-const isName = function(string) {
-  const match = regexName.exec(string);
-  return !(match === null || typeof match === 'undefined');
-};
-
-function isExist(v) {
-  return typeof v !== 'undefined';
-}
-
-// const fakeCall = function(a) {return a;};
-// const fakeCallNoReturn = function() {};
-
-const defaultOptions$1 = {
-  allowBooleanAttributes: false, //A tag can have attributes without any value
-  unpairedTags: []
-};
-
-//const tagsPattern = new RegExp("<\\/?([\\w:\\-_\.]+)\\s*\/?>","g");
-function validate(xmlData, options) {
-  options = Object.assign({}, defaultOptions$1, options);
-
-  //xmlData = xmlData.replace(/(\r\n|\n|\r)/gm,"");//make it single line
-  //xmlData = xmlData.replace(/(^\s*<\?xml.*?\?>)/g,"");//Remove XML starting tag
-  //xmlData = xmlData.replace(/(<!DOCTYPE[\s\w\"\.\/\-\:]+(\[.*\])*\s*>)/g,"");//Remove DOCTYPE
-  const tags = [];
-  let tagFound = false;
-
-  //indicates that the root tag has been closed (aka. depth 0 has been reached)
-  let reachedRoot = false;
-
-  if (xmlData[0] === '\ufeff') {
-    // check for byte order mark (BOM)
-    xmlData = xmlData.substr(1);
-  }
-  
-  for (let i = 0; i < xmlData.length; i++) {
-
-    if (xmlData[i] === '<' && xmlData[i+1] === '?') {
-      i+=2;
-      i = readPI(xmlData,i);
-      if (i.err) return i;
-    }else if (xmlData[i] === '<') {
-      //starting of tag
-      //read until you reach to '>' avoiding any '>' in attribute value
-      let tagStartPos = i;
-      i++;
-      
-      if (xmlData[i] === '!') {
-        i = readCommentAndCDATA(xmlData, i);
-        continue;
-      } else {
-        let closingTag = false;
-        if (xmlData[i] === '/') {
-          //closing tag
-          closingTag = true;
-          i++;
-        }
-        //read tagname
-        let tagName = '';
-        for (; i < xmlData.length &&
-          xmlData[i] !== '>' &&
-          xmlData[i] !== ' ' &&
-          xmlData[i] !== '\t' &&
-          xmlData[i] !== '\n' &&
-          xmlData[i] !== '\r'; i++
-        ) {
-          tagName += xmlData[i];
-        }
-        tagName = tagName.trim();
-        //console.log(tagName);
-
-        if (tagName[tagName.length - 1] === '/') {
-          //self closing tag without attributes
-          tagName = tagName.substring(0, tagName.length - 1);
-          //continue;
-          i--;
-        }
-        if (!validateTagName(tagName)) {
-          let msg;
-          if (tagName.trim().length === 0) {
-            msg = "Invalid space after '<'.";
-          } else {
-            msg = "Tag '"+tagName+"' is an invalid name.";
-          }
-          return getErrorObject('InvalidTag', msg, getLineNumberForPosition(xmlData, i));
-        }
-
-        const result = readAttributeStr(xmlData, i);
-        if (result === false) {
-          return getErrorObject('InvalidAttr', "Attributes for '"+tagName+"' have open quote.", getLineNumberForPosition(xmlData, i));
-        }
-        let attrStr = result.value;
-        i = result.index;
-
-        if (attrStr[attrStr.length - 1] === '/') {
-          //self closing tag
-          const attrStrStart = i - attrStr.length;
-          attrStr = attrStr.substring(0, attrStr.length - 1);
-          const isValid = validateAttributeString(attrStr, options);
-          if (isValid === true) {
-            tagFound = true;
-            //continue; //text may presents after self closing tag
-          } else {
-            //the result from the nested function returns the position of the error within the attribute
-            //in order to get the 'true' error line, we need to calculate the position where the attribute begins (i - attrStr.length) and then add the position within the attribute
-            //this gives us the absolute index in the entire xml, which we can use to find the line at last
-            return getErrorObject(isValid.err.code, isValid.err.msg, getLineNumberForPosition(xmlData, attrStrStart + isValid.err.line));
-          }
-        } else if (closingTag) {
-          if (!result.tagClosed) {
-            return getErrorObject('InvalidTag', "Closing tag '"+tagName+"' doesn't have proper closing.", getLineNumberForPosition(xmlData, i));
-          } else if (attrStr.trim().length > 0) {
-            return getErrorObject('InvalidTag', "Closing tag '"+tagName+"' can't have attributes or invalid starting.", getLineNumberForPosition(xmlData, tagStartPos));
-          } else if (tags.length === 0) {
-            return getErrorObject('InvalidTag', "Closing tag '"+tagName+"' has not been opened.", getLineNumberForPosition(xmlData, tagStartPos));
-          } else {
-            const otg = tags.pop();
-            if (tagName !== otg.tagName) {
-              let openPos = getLineNumberForPosition(xmlData, otg.tagStartPos);
-              return getErrorObject('InvalidTag',
-                "Expected closing tag '"+otg.tagName+"' (opened in line "+openPos.line+", col "+openPos.col+") instead of closing tag '"+tagName+"'.",
-                getLineNumberForPosition(xmlData, tagStartPos));
-            }
-
-            //when there are no more tags, we reached the root level.
-            if (tags.length == 0) {
-              reachedRoot = true;
-            }
-          }
-        } else {
-          const isValid = validateAttributeString(attrStr, options);
-          if (isValid !== true) {
-            //the result from the nested function returns the position of the error within the attribute
-            //in order to get the 'true' error line, we need to calculate the position where the attribute begins (i - attrStr.length) and then add the position within the attribute
-            //this gives us the absolute index in the entire xml, which we can use to find the line at last
-            return getErrorObject(isValid.err.code, isValid.err.msg, getLineNumberForPosition(xmlData, i - attrStr.length + isValid.err.line));
-          }
-
-          //if the root level has been reached before ...
-          if (reachedRoot === true) {
-            return getErrorObject('InvalidXml', 'Multiple possible root nodes found.', getLineNumberForPosition(xmlData, i));
-          } else if(options.unpairedTags.indexOf(tagName) !== -1); else {
-            tags.push({tagName, tagStartPos});
-          }
-          tagFound = true;
-        }
-
-        //skip tag text value
-        //It may include comments and CDATA value
-        for (i++; i < xmlData.length; i++) {
-          if (xmlData[i] === '<') {
-            if (xmlData[i + 1] === '!') {
-              //comment or CADATA
-              i++;
-              i = readCommentAndCDATA(xmlData, i);
-              continue;
-            } else if (xmlData[i+1] === '?') {
-              i = readPI(xmlData, ++i);
-              if (i.err) return i;
-            } else {
-              break;
-            }
-          } else if (xmlData[i] === '&') {
-            const afterAmp = validateAmpersand(xmlData, i);
-            if (afterAmp == -1)
-              return getErrorObject('InvalidChar', "char '&' is not expected.", getLineNumberForPosition(xmlData, i));
-            i = afterAmp;
-          }else {
-            if (reachedRoot === true && !isWhiteSpace(xmlData[i])) {
-              return getErrorObject('InvalidXml', "Extra text at the end", getLineNumberForPosition(xmlData, i));
-            }
-          }
-        } //end of reading tag text value
-        if (xmlData[i] === '<') {
-          i--;
-        }
-      }
-    } else {
-      if ( isWhiteSpace(xmlData[i])) {
-        continue;
-      }
-      return getErrorObject('InvalidChar', "char '"+xmlData[i]+"' is not expected.", getLineNumberForPosition(xmlData, i));
-    }
-  }
-
-  if (!tagFound) {
-    return getErrorObject('InvalidXml', 'Start tag expected.', 1);
-  }else if (tags.length == 1) {
-      return getErrorObject('InvalidTag', "Unclosed tag '"+tags[0].tagName+"'.", getLineNumberForPosition(xmlData, tags[0].tagStartPos));
-  }else if (tags.length > 0) {
-      return getErrorObject('InvalidXml', "Invalid '"+
-          JSON.stringify(tags.map(t => t.tagName), null, 4).replace(/\r?\n/g, '')+
-          "' found.", {line: 1, col: 1});
-  }
-
-  return true;
-}
-function isWhiteSpace(char){
-  return char === ' ' || char === '\t' || char === '\n'  || char === '\r';
-}
-/**
- * Read Processing insstructions and skip
- * @param {*} xmlData
- * @param {*} i
- */
-function readPI(xmlData, i) {
-  const start = i;
-  for (; i < xmlData.length; i++) {
-    if (xmlData[i] == '?' || xmlData[i] == ' ') {
-      //tagname
-      const tagname = xmlData.substr(start, i - start);
-      if (i > 5 && tagname === 'xml') {
-        return getErrorObject('InvalidXml', 'XML declaration allowed only at the start of the document.', getLineNumberForPosition(xmlData, i));
-      } else if (xmlData[i] == '?' && xmlData[i + 1] == '>') {
-        //check if valid attribut string
-        i++;
-        break;
-      } else {
-        continue;
-      }
-    }
-  }
-  return i;
-}
-
-function readCommentAndCDATA(xmlData, i) {
-  if (xmlData.length > i + 5 && xmlData[i + 1] === '-' && xmlData[i + 2] === '-') {
-    //comment
-    for (i += 3; i < xmlData.length; i++) {
-      if (xmlData[i] === '-' && xmlData[i + 1] === '-' && xmlData[i + 2] === '>') {
-        i += 2;
-        break;
-      }
-    }
-  } else if (
-    xmlData.length > i + 8 &&
-    xmlData[i + 1] === 'D' &&
-    xmlData[i + 2] === 'O' &&
-    xmlData[i + 3] === 'C' &&
-    xmlData[i + 4] === 'T' &&
-    xmlData[i + 5] === 'Y' &&
-    xmlData[i + 6] === 'P' &&
-    xmlData[i + 7] === 'E'
-  ) {
-    let angleBracketsCount = 1;
-    for (i += 8; i < xmlData.length; i++) {
-      if (xmlData[i] === '<') {
-        angleBracketsCount++;
-      } else if (xmlData[i] === '>') {
-        angleBracketsCount--;
-        if (angleBracketsCount === 0) {
-          break;
-        }
-      }
-    }
-  } else if (
-    xmlData.length > i + 9 &&
-    xmlData[i + 1] === '[' &&
-    xmlData[i + 2] === 'C' &&
-    xmlData[i + 3] === 'D' &&
-    xmlData[i + 4] === 'A' &&
-    xmlData[i + 5] === 'T' &&
-    xmlData[i + 6] === 'A' &&
-    xmlData[i + 7] === '['
-  ) {
-    for (i += 8; i < xmlData.length; i++) {
-      if (xmlData[i] === ']' && xmlData[i + 1] === ']' && xmlData[i + 2] === '>') {
-        i += 2;
-        break;
-      }
-    }
-  }
-
-  return i;
-}
-
-const doubleQuote = '"';
-const singleQuote = "'";
-
-/**
- * Keep reading xmlData until '<' is found outside the attribute value.
- * @param {string} xmlData
- * @param {number} i
- */
-function readAttributeStr(xmlData, i) {
-  let attrStr = '';
-  let startChar = '';
-  let tagClosed = false;
-  for (; i < xmlData.length; i++) {
-    if (xmlData[i] === doubleQuote || xmlData[i] === singleQuote) {
-      if (startChar === '') {
-        startChar = xmlData[i];
-      } else if (startChar !== xmlData[i]) ; else {
-        startChar = '';
-      }
-    } else if (xmlData[i] === '>') {
-      if (startChar === '') {
-        tagClosed = true;
-        break;
-      }
-    }
-    attrStr += xmlData[i];
-  }
-  if (startChar !== '') {
-    return false;
-  }
-
-  return {
-    value: attrStr,
-    index: i,
-    tagClosed: tagClosed
-  };
-}
-
-/**
- * Select all the attributes whether valid or invalid.
- */
-const validAttrStrRegxp = new RegExp('(\\s*)([^\\s=]+)(\\s*=)?(\\s*([\'"])(([\\s\\S])*?)\\5)?', 'g');
-
-//attr, ="sd", a="amit's", a="sd"b="saf", ab  cd=""
-
-function validateAttributeString(attrStr, options) {
-  //console.log("start:"+attrStr+":end");
-
-  //if(attrStr.trim().length === 0) return true; //empty string
-
-  const matches = getAllMatches(attrStr, validAttrStrRegxp);
-  const attrNames = {};
-
-  for (let i = 0; i < matches.length; i++) {
-    if (matches[i][1].length === 0) {
-      //nospace before attribute name: a="sd"b="saf"
-      return getErrorObject('InvalidAttr', "Attribute '"+matches[i][2]+"' has no space in starting.", getPositionFromMatch(matches[i]))
-    } else if (matches[i][3] !== undefined && matches[i][4] === undefined) {
-      return getErrorObject('InvalidAttr', "Attribute '"+matches[i][2]+"' is without value.", getPositionFromMatch(matches[i]));
-    } else if (matches[i][3] === undefined && !options.allowBooleanAttributes) {
-      //independent attribute: ab
-      return getErrorObject('InvalidAttr', "boolean attribute '"+matches[i][2]+"' is not allowed.", getPositionFromMatch(matches[i]));
-    }
-    /* else if(matches[i][6] === undefined){//attribute without value: ab=
-                    return { err: { code:"InvalidAttr",msg:"attribute " + matches[i][2] + " has no value assigned."}};
-                } */
-    const attrName = matches[i][2];
-    if (!validateAttrName(attrName)) {
-      return getErrorObject('InvalidAttr', "Attribute '"+attrName+"' is an invalid name.", getPositionFromMatch(matches[i]));
-    }
-    if (!attrNames.hasOwnProperty(attrName)) {
-      //check for duplicate attribute.
-      attrNames[attrName] = 1;
-    } else {
-      return getErrorObject('InvalidAttr', "Attribute '"+attrName+"' is repeated.", getPositionFromMatch(matches[i]));
-    }
-  }
-
-  return true;
-}
-
-function validateNumberAmpersand(xmlData, i) {
-  let re = /\d/;
-  if (xmlData[i] === 'x') {
-    i++;
-    re = /[\da-fA-F]/;
-  }
-  for (; i < xmlData.length; i++) {
-    if (xmlData[i] === ';')
-      return i;
-    if (!xmlData[i].match(re))
-      break;
-  }
-  return -1;
-}
-
-function validateAmpersand(xmlData, i) {
-  // https://www.w3.org/TR/xml/#dt-charref
-  i++;
-  if (xmlData[i] === ';')
-    return -1;
-  if (xmlData[i] === '#') {
-    i++;
-    return validateNumberAmpersand(xmlData, i);
-  }
-  let count = 0;
-  for (; i < xmlData.length; i++, count++) {
-    if (xmlData[i].match(/\w/) && count < 20)
-      continue;
-    if (xmlData[i] === ';')
-      break;
-    return -1;
-  }
-  return i;
-}
-
-function getErrorObject(code, message, lineNumber) {
-  return {
-    err: {
-      code: code,
-      msg: message,
-      line: lineNumber.line || lineNumber,
-      col: lineNumber.col,
-    },
-  };
-}
-
-function validateAttrName(attrName) {
-  return isName(attrName);
-}
-
-// const startsWithXML = /^xml/i;
-
-function validateTagName(tagname) {
-  return isName(tagname) /* && !tagname.match(startsWithXML) */;
-}
-
-//this function returns the line number for the character at the given index
-function getLineNumberForPosition(xmlData, index) {
-  const lines = xmlData.substring(0, index).split(/\r?\n/);
-  return {
-    line: lines.length,
-
-    // column number is last line's length + 1, because column numbering starts at 1:
-    col: lines[lines.length - 1].length + 1
-  };
-}
-
-//this function returns the position of the first character of match within attrStr
-function getPositionFromMatch(match) {
-  return match.startIndex + match[1].length;
-}
-
-const defaultOptions = {
-    preserveOrder: false,
-    attributeNamePrefix: '@_',
-    attributesGroupName: false,
-    textNodeName: '#text',
-    ignoreAttributes: true,
-    removeNSPrefix: false, // remove NS from tag name or attribute name if true
-    allowBooleanAttributes: false, //a tag can have attributes without any value
-    //ignoreRootElement : false,
-    parseTagValue: true,
-    parseAttributeValue: false,
-    trimValues: true, //Trim string values of tag and attributes
-    cdataPropName: false,
-    numberParseOptions: {
-      hex: true,
-      leadingZeros: true,
-      eNotation: true
-    },
-    tagValueProcessor: function(tagName, val) {
-      return val;
-    },
-    attributeValueProcessor: function(attrName, val) {
-      return val;
-    },
-    stopNodes: [], //nested tags will not be parsed even for errors
-    alwaysCreateTextNode: false,
-    isArray: () => false,
-    commentPropName: false,
-    unpairedTags: [],
-    processEntities: true,
-    htmlEntities: false,
-    ignoreDeclaration: false,
-    ignorePiTags: false,
-    transformTagName: false,
-    transformAttributeName: false,
-    updateTag: function(tagName, jPath, attrs){
-      return tagName
-    },
-    // skipEmptyListItem: false
-    captureMetaData: false,
-};
-   
-const buildOptions = function(options) {
-    return Object.assign({}, defaultOptions, options);
-};
-
-let METADATA_SYMBOL$1;
-
-if (typeof Symbol !== "function") {
-  METADATA_SYMBOL$1 = "@@xmlMetadata";
-} else {
-  METADATA_SYMBOL$1 = Symbol("XML Node Metadata");
-}
-
-class XmlNode{
-  constructor(tagname) {
-    this.tagname = tagname;
-    this.child = []; //nested tags, text, cdata, comments in order
-    this[":@"] = {}; //attributes map
-  }
-  add(key,val){
-    // this.child.push( {name : key, val: val, isCdata: isCdata });
-    if(key === "__proto__") key = "#__proto__";
-    this.child.push( {[key]: val });
-  }
-  addChild(node, startIndex) {
-    if(node.tagname === "__proto__") node.tagname = "#__proto__";
-    if(node[":@"] && Object.keys(node[":@"]).length > 0){
-      this.child.push( { [node.tagname]: node.child, [":@"]: node[":@"] });
-    }else {
-      this.child.push( { [node.tagname]: node.child });
-    }
-    // if requested, add the startIndex
-    if (startIndex !== undefined) {
-      // Note: for now we just overwrite the metadata. If we had more complex metadata,
-      // we might need to do an object append here:  metadata = { ...metadata, startIndex }
-      this.child[this.child.length - 1][METADATA_SYMBOL$1] = { startIndex };
-    }
-  }
-  /** symbol used for metadata */
-  static getMetaDataSymbol() {
-    return METADATA_SYMBOL$1;
-  }
-}
-
-//TODO: handle comments
-function readDocType(xmlData, i){
-    
-    const entities = {};
-    if( xmlData[i + 3] === 'O' &&
-         xmlData[i + 4] === 'C' &&
-         xmlData[i + 5] === 'T' &&
-         xmlData[i + 6] === 'Y' &&
-         xmlData[i + 7] === 'P' &&
-         xmlData[i + 8] === 'E')
-    {    
-        i = i+9;
-        let angleBracketsCount = 1;
-        let hasBody = false, comment = false;
-        let exp = "";
-        for(;i<xmlData.length;i++){
-            if (xmlData[i] === '<' && !comment) { //Determine the tag type
-                if( hasBody && hasSeq(xmlData, "!ENTITY",i)){
-                    i += 7; 
-                    let entityName, val;
-                    [entityName, val,i] = readEntityExp(xmlData,i+1);
-                    if(val.indexOf("&") === -1) //Parameter entities are not supported
-                        entities[ entityName ] = {
-                            regx : RegExp( `&${entityName};`,"g"),
-                            val: val
-                        };
-                }
-                else if( hasBody && hasSeq(xmlData, "!ELEMENT",i))  {
-                    i += 8;//Not supported
-                    const {index} = readElementExp(xmlData,i+1);
-                    i = index;
-                }else if( hasBody && hasSeq(xmlData, "!ATTLIST",i)){
-                    i += 8;//Not supported
-                    // const {index} = readAttlistExp(xmlData,i+1);
-                    // i = index;
-                }else if( hasBody && hasSeq(xmlData, "!NOTATION",i)) {
-                    i += 9;//Not supported
-                    const {index} = readNotationExp(xmlData,i+1);
-                    i = index;
-                }else if( hasSeq(xmlData, "!--",i) ) comment = true;
-                else throw new Error(`Invalid DOCTYPE`);
-
-                angleBracketsCount++;
-                exp = "";
-            } else if (xmlData[i] === '>') { //Read tag content
-                if(comment){
-                    if( xmlData[i - 1] === "-" && xmlData[i - 2] === "-"){
-                        comment = false;
-                        angleBracketsCount--;
-                    }
-                }else {
-                    angleBracketsCount--;
-                }
-                if (angleBracketsCount === 0) {
-                  break;
-                }
-            }else if( xmlData[i] === '['){
-                hasBody = true;
-            }else {
-                exp += xmlData[i];
-            }
-        }
-        if(angleBracketsCount !== 0){
-            throw new Error(`Unclosed DOCTYPE`);
-        }
-    }else {
-        throw new Error(`Invalid Tag instead of DOCTYPE`);
-    }
-    return {entities, i};
-}
-
-const skipWhitespace = (data, index) => {
-    while (index < data.length && /\s/.test(data[index])) {
-        index++;
-    }
-    return index;
-};
-
-function readEntityExp(xmlData, i) {    
-    //External entities are not supported
-    //    <!ENTITY ext SYSTEM "http://normal-website.com" >
-
-    //Parameter entities are not supported
-    //    <!ENTITY entityname "&anotherElement;">
-
-    //Internal entities are supported
-    //    <!ENTITY entityname "replacement text">
-
-    // Skip leading whitespace after <!ENTITY
-    i = skipWhitespace(xmlData, i);
-
-    // Read entity name
-    let entityName = "";
-    while (i < xmlData.length && !/\s/.test(xmlData[i]) && xmlData[i] !== '"' && xmlData[i] !== "'") {
-        entityName += xmlData[i];
-        i++;
-    }
-    validateEntityName(entityName);
-
-    // Skip whitespace after entity name
-    i = skipWhitespace(xmlData, i);
-
-    // Check for unsupported constructs (external entities or parameter entities)
-    if (xmlData.substring(i, i + 6).toUpperCase() === "SYSTEM") {
-        throw new Error("External entities are not supported");
-    }else if (xmlData[i] === "%") {
-        throw new Error("Parameter entities are not supported");
-    }
-
-    // Read entity value (internal entity)
-    let entityValue = "";
-    [i, entityValue] = readIdentifierVal(xmlData, i, "entity");
-    i--;
-    return [entityName, entityValue, i ];
-}
-
-function readNotationExp(xmlData, i) {
-    // Skip leading whitespace after <!NOTATION
-    i = skipWhitespace(xmlData, i);
-
-    // Read notation name
-    let notationName = "";
-    while (i < xmlData.length && !/\s/.test(xmlData[i])) {
-        notationName += xmlData[i];
-        i++;
-    }
-    validateEntityName(notationName);
-
-    // Skip whitespace after notation name
-    i = skipWhitespace(xmlData, i);
-
-    // Check identifier type (SYSTEM or PUBLIC)
-    const identifierType = xmlData.substring(i, i + 6).toUpperCase();
-    if (identifierType !== "SYSTEM" && identifierType !== "PUBLIC") {
-        throw new Error(`Expected SYSTEM or PUBLIC, found "${identifierType}"`);
-    }
-    i += identifierType.length;
-
-    // Skip whitespace after identifier type
-    i = skipWhitespace(xmlData, i);
-
-    // Read public identifier (if PUBLIC)
-    let publicIdentifier = null;
-    let systemIdentifier = null;
-
-    if (identifierType === "PUBLIC") {
-        [i, publicIdentifier ] = readIdentifierVal(xmlData, i, "publicIdentifier");
-
-        // Skip whitespace after public identifier
-        i = skipWhitespace(xmlData, i);
-
-        // Optionally read system identifier
-        if (xmlData[i] === '"' || xmlData[i] === "'") {
-            [i, systemIdentifier ] = readIdentifierVal(xmlData, i,"systemIdentifier");
-        }
-    } else if (identifierType === "SYSTEM") {
-        // Read system identifier (mandatory for SYSTEM)
-        [i, systemIdentifier ] = readIdentifierVal(xmlData, i, "systemIdentifier");
-
-        if (!systemIdentifier) {
-            throw new Error("Missing mandatory system identifier for SYSTEM notation");
-        }
-    }
-    
-    return {notationName, publicIdentifier, systemIdentifier, index: --i};
-}
-
-function readIdentifierVal(xmlData, i, type) {
-    let identifierVal = "";
-    const startChar = xmlData[i];
-    if (startChar !== '"' && startChar !== "'") {
-        throw new Error(`Expected quoted string, found "${startChar}"`);
-    }
-    i++;
-
-    while (i < xmlData.length && xmlData[i] !== startChar) {
-        identifierVal += xmlData[i];
-        i++;
-    }
-
-    if (xmlData[i] !== startChar) {
-        throw new Error(`Unterminated ${type} value`);
-    }
-    i++;
-    return [i, identifierVal];
-}
-
-function readElementExp(xmlData, i) {
-    // <!ELEMENT br EMPTY>
-    // <!ELEMENT div ANY>
-    // <!ELEMENT title (#PCDATA)>
-    // <!ELEMENT book (title, author+)>
-    // <!ELEMENT name (content-model)>
-    
-    // Skip leading whitespace after <!ELEMENT
-    i = skipWhitespace(xmlData, i);
-
-    // Read element name
-    let elementName = "";
-    while (i < xmlData.length && !/\s/.test(xmlData[i])) {
-        elementName += xmlData[i];
-        i++;
-    }
-
-    // Validate element name
-    if (!validateEntityName(elementName)) {
-        throw new Error(`Invalid element name: "${elementName}"`);
-    }
-
-    // Skip whitespace after element name
-    i = skipWhitespace(xmlData, i);
-    let contentModel = "";
-    // Expect '(' to start content model
-    if(xmlData[i] === "E" && hasSeq(xmlData, "MPTY",i)) i+=4;
-    else if(xmlData[i] === "A" && hasSeq(xmlData, "NY",i)) i+=2;
-    else if (xmlData[i] === "(") {
-        i++; // Move past '('
-
-        // Read content model
-        while (i < xmlData.length && xmlData[i] !== ")") {
-            contentModel += xmlData[i];
-            i++;
-        }
-        if (xmlData[i] !== ")") {
-            throw new Error("Unterminated content model");
-        }
-
-    }else {
-        throw new Error(`Invalid Element Expression, found "${xmlData[i]}"`);
-    }
-    
-    return {
-        elementName,
-        contentModel: contentModel.trim(),
-        index: i
-    };
-}
-
-function hasSeq(data, seq,i){
-    for(let j=0;j<seq.length;j++){
-        if(seq[j]!==data[i+j+1]) return false;
-    }
-    return true;
-}
-
-function validateEntityName(name){
-    if (isName(name))
-	return name;
-    else
-        throw new Error(`Invalid entity name ${name}`);
-}
-
-const hexRegex = /^[-+]?0x[a-fA-F0-9]+$/;
-const numRegex = /^([\-\+])?(0*)([0-9]*(\.[0-9]*)?)$/;
-// const octRegex = /^0x[a-z0-9]+/;
-// const binRegex = /0x[a-z0-9]+/;
-
- 
-const consider = {
-    hex :  true,
-    // oct: false,
-    leadingZeros: true,
-    decimalPoint: "\.",
-    eNotation: true,
-    //skipLike: /regex/
-};
-
-function toNumber(str, options = {}){
-    options = Object.assign({}, consider, options );
-    if(!str || typeof str !== "string" ) return str;
-    
-    let trimmedStr  = str.trim();
-    
-    if(options.skipLike !== undefined && options.skipLike.test(trimmedStr)) return str;
-    else if(str==="0") return 0;
-    else if (options.hex && hexRegex.test(trimmedStr)) {
-        return parse_int(trimmedStr, 16);
-    // }else if (options.oct && octRegex.test(str)) {
-    //     return Number.parseInt(val, 8);
-    }else if (trimmedStr.includes('e') || trimmedStr.includes('E')) { //eNotation
-        return resolveEnotation(str,trimmedStr,options);
-    // }else if (options.parseBin && binRegex.test(str)) {
-    //     return Number.parseInt(val, 2);
-    }else {
-        //separate negative sign, leading zeros, and rest number
-        const match = numRegex.exec(trimmedStr);
-        // +00.123 => [ , '+', '00', '.123', ..
-        if(match){
-            const sign = match[1] || "";
-            const leadingZeros = match[2];
-            let numTrimmedByZeros = trimZeros(match[3]); //complete num without leading zeros
-            const decimalAdjacentToLeadingZeros = sign ? // 0., -00., 000.
-                str[leadingZeros.length+1] === "." 
-                : str[leadingZeros.length] === ".";
-
-            //trim ending zeros for floating number
-            if(!options.leadingZeros //leading zeros are not allowed
-                && (leadingZeros.length > 1 
-                    || (leadingZeros.length === 1 && !decimalAdjacentToLeadingZeros))){
-                // 00, 00.3, +03.24, 03, 03.24
-                return str;
-            }
-            else {//no leading zeros or leading zeros are allowed
-                const num = Number(trimmedStr);
-                const parsedStr = String(num);
-
-                if( num === 0) return num;
-                if(parsedStr.search(/[eE]/) !== -1){ //given number is long and parsed to eNotation
-                    if(options.eNotation) return num;
-                    else return str;
-                }else if(trimmedStr.indexOf(".") !== -1){ //floating number
-                    if(parsedStr === "0") return num; //0.0
-                    else if(parsedStr === numTrimmedByZeros) return num; //0.456. 0.79000
-                    else if( parsedStr === `${sign}${numTrimmedByZeros}`) return num;
-                    else return str;
-                }
-                
-                let n = leadingZeros? numTrimmedByZeros : trimmedStr;
-                if(leadingZeros){
-                    // -009 => -9
-                    return (n === parsedStr) || (sign+n === parsedStr) ? num : str
-                }else  {
-                    // +9
-                    return (n === parsedStr) || (n === sign+parsedStr) ? num : str
-                }
-            }
-        }else { //non-numeric string
-            return str;
-        }
-    }
-}
-
-const eNotationRegx = /^([-+])?(0*)(\d*(\.\d*)?[eE][-\+]?\d+)$/;
-function resolveEnotation(str,trimmedStr,options){
-    if(!options.eNotation) return str;
-    const notation = trimmedStr.match(eNotationRegx); 
-    if(notation){
-        let sign = notation[1] || "";
-        const eChar = notation[3].indexOf("e") === -1 ? "E" : "e";
-        const leadingZeros = notation[2];
-        const eAdjacentToLeadingZeros = sign ? // 0E.
-            str[leadingZeros.length+1] === eChar 
-            : str[leadingZeros.length] === eChar;
-
-        if(leadingZeros.length > 1 && eAdjacentToLeadingZeros) return str;
-        else if(leadingZeros.length === 1 
-            && (notation[3].startsWith(`.${eChar}`) || notation[3][0] === eChar)){
-                return Number(trimmedStr);
-        }else if(options.leadingZeros && !eAdjacentToLeadingZeros){ //accept with leading zeros
-            //remove leading 0s
-            trimmedStr = (notation[1] || "") + notation[3];
-            return Number(trimmedStr);
-        }else return str;
-    }else {
-        return str;
-    }
-}
-
-/**
- * 
- * @param {string} numStr without leading zeros
- * @returns 
- */
-function trimZeros(numStr){
-    if(numStr && numStr.indexOf(".") !== -1){//float
-        numStr = numStr.replace(/0+$/, ""); //remove ending zeros
-        if(numStr === ".")  numStr = "0";
-        else if(numStr[0] === ".")  numStr = "0"+numStr;
-        else if(numStr[numStr.length-1] === ".")  numStr = numStr.substring(0,numStr.length-1);
-        return numStr;
-    }
-    return numStr;
-}
-
-function parse_int(numStr, base){
-    //polyfill
-    if(parseInt) return parseInt(numStr, base);
-    else if(Number.parseInt) return Number.parseInt(numStr, base);
-    else if(window && window.parseInt) return window.parseInt(numStr, base);
-    else throw new Error("parseInt, Number.parseInt, window.parseInt are not supported")
-}
-
-function getIgnoreAttributesFn(ignoreAttributes) {
-    if (typeof ignoreAttributes === 'function') {
-        return ignoreAttributes
-    }
-    if (Array.isArray(ignoreAttributes)) {
-        return (attrName) => {
-            for (const pattern of ignoreAttributes) {
-                if (typeof pattern === 'string' && attrName === pattern) {
-                    return true
-                }
-                if (pattern instanceof RegExp && pattern.test(attrName)) {
-                    return true
-                }
-            }
-        }
-    }
-    return () => false
-}
-
-// const regx =
-//   '<((!\\[CDATA\\[([\\s\\S]*?)(]]>))|((NAME:)?(NAME))([^>]*)>|((\\/)(NAME)\\s*>))([^<]*)'
-//   .replace(/NAME/g, util.nameRegexp);
-
-//const tagsRegx = new RegExp("<(\\/?[\\w:\\-\._]+)([^>]*)>(\\s*"+cdataRegx+")*([^<]+)?","g");
-//const tagsRegx = new RegExp("<(\\/?)((\\w*:)?([\\w:\\-\._]+))([^>]*)>([^<]*)("+cdataRegx+"([^<]*))*([^<]+)?","g");
-
-class OrderedObjParser{
-  constructor(options){
-    this.options = options;
-    this.currentNode = null;
-    this.tagsNodeStack = [];
-    this.docTypeEntities = {};
-    this.lastEntities = {
-      "apos" : { regex: /&(apos|#39|#x27);/g, val : "'"},
-      "gt" : { regex: /&(gt|#62|#x3E);/g, val : ">"},
-      "lt" : { regex: /&(lt|#60|#x3C);/g, val : "<"},
-      "quot" : { regex: /&(quot|#34|#x22);/g, val : "\""},
-    };
-    this.ampEntity = { regex: /&(amp|#38|#x26);/g, val : "&"};
-    this.htmlEntities = {
-      "space": { regex: /&(nbsp|#160);/g, val: " " },
-      // "lt" : { regex: /&(lt|#60);/g, val: "<" },
-      // "gt" : { regex: /&(gt|#62);/g, val: ">" },
-      // "amp" : { regex: /&(amp|#38);/g, val: "&" },
-      // "quot" : { regex: /&(quot|#34);/g, val: "\"" },
-      // "apos" : { regex: /&(apos|#39);/g, val: "'" },
-      "cent" : { regex: /&(cent|#162);/g, val: "¢" },
-      "pound" : { regex: /&(pound|#163);/g, val: "£" },
-      "yen" : { regex: /&(yen|#165);/g, val: "¥" },
-      "euro" : { regex: /&(euro|#8364);/g, val: "€" },
-      "copyright" : { regex: /&(copy|#169);/g, val: "©" },
-      "reg" : { regex: /&(reg|#174);/g, val: "®" },
-      "inr" : { regex: /&(inr|#8377);/g, val: "₹" },
-      "num_dec": { regex: /&#([0-9]{1,7});/g, val : (_, str) => String.fromCodePoint(Number.parseInt(str, 10)) },
-      "num_hex": { regex: /&#x([0-9a-fA-F]{1,6});/g, val : (_, str) => String.fromCodePoint(Number.parseInt(str, 16)) },
-    };
-    this.addExternalEntities = addExternalEntities;
-    this.parseXml = parseXml;
-    this.parseTextData = parseTextData;
-    this.resolveNameSpace = resolveNameSpace;
-    this.buildAttributesMap = buildAttributesMap;
-    this.isItStopNode = isItStopNode;
-    this.replaceEntitiesValue = replaceEntitiesValue;
-    this.readStopNodeData = readStopNodeData;
-    this.saveTextToParentTag = saveTextToParentTag;
-    this.addChild = addChild;
-    this.ignoreAttributesFn = getIgnoreAttributesFn(this.options.ignoreAttributes);
-  }
-
-}
-
-function addExternalEntities(externalEntities){
-  const entKeys = Object.keys(externalEntities);
-  for (let i = 0; i < entKeys.length; i++) {
-    const ent = entKeys[i];
-    this.lastEntities[ent] = {
-       regex: new RegExp("&"+ent+";","g"),
-       val : externalEntities[ent]
-    };
-  }
-}
-
-/**
- * @param {string} val
- * @param {string} tagName
- * @param {string} jPath
- * @param {boolean} dontTrim
- * @param {boolean} hasAttributes
- * @param {boolean} isLeafNode
- * @param {boolean} escapeEntities
- */
-function parseTextData(val, tagName, jPath, dontTrim, hasAttributes, isLeafNode, escapeEntities) {
-  if (val !== undefined) {
-    if (this.options.trimValues && !dontTrim) {
-      val = val.trim();
-    }
-    if(val.length > 0){
-      if(!escapeEntities) val = this.replaceEntitiesValue(val);
-      
-      const newval = this.options.tagValueProcessor(tagName, val, jPath, hasAttributes, isLeafNode);
-      if(newval === null || newval === undefined){
-        //don't parse
-        return val;
-      }else if(typeof newval !== typeof val || newval !== val){
-        //overwrite
-        return newval;
-      }else if(this.options.trimValues){
-        return parseValue(val, this.options.parseTagValue, this.options.numberParseOptions);
-      }else {
-        const trimmedVal = val.trim();
-        if(trimmedVal === val){
-          return parseValue(val, this.options.parseTagValue, this.options.numberParseOptions);
-        }else {
-          return val;
-        }
-      }
-    }
-  }
-}
-
-function resolveNameSpace(tagname) {
-  if (this.options.removeNSPrefix) {
-    const tags = tagname.split(':');
-    const prefix = tagname.charAt(0) === '/' ? '/' : '';
-    if (tags[0] === 'xmlns') {
-      return '';
-    }
-    if (tags.length === 2) {
-      tagname = prefix + tags[1];
-    }
-  }
-  return tagname;
-}
-
-//TODO: change regex to capture NS
-//const attrsRegx = new RegExp("([\\w\\-\\.\\:]+)\\s*=\\s*(['\"])((.|\n)*?)\\2","gm");
-const attrsRegx = new RegExp('([^\\s=]+)\\s*(=\\s*([\'"])([\\s\\S]*?)\\3)?', 'gm');
-
-function buildAttributesMap(attrStr, jPath, tagName) {
-  if (this.options.ignoreAttributes !== true && typeof attrStr === 'string') {
-    // attrStr = attrStr.replace(/\r?\n/g, ' ');
-    //attrStr = attrStr || attrStr.trim();
-
-    const matches = getAllMatches(attrStr, attrsRegx);
-    const len = matches.length; //don't make it inline
-    const attrs = {};
-    for (let i = 0; i < len; i++) {
-      const attrName = this.resolveNameSpace(matches[i][1]);
-      if (this.ignoreAttributesFn(attrName, jPath)) {
-        continue
-      }
-      let oldVal = matches[i][4];
-      let aName = this.options.attributeNamePrefix + attrName;
-      if (attrName.length) {
-        if (this.options.transformAttributeName) {
-          aName = this.options.transformAttributeName(aName);
-        }
-        if(aName === "__proto__") aName  = "#__proto__";
-        if (oldVal !== undefined) {
-          if (this.options.trimValues) {
-            oldVal = oldVal.trim();
-          }
-          oldVal = this.replaceEntitiesValue(oldVal);
-          const newVal = this.options.attributeValueProcessor(attrName, oldVal, jPath);
-          if(newVal === null || newVal === undefined){
-            //don't parse
-            attrs[aName] = oldVal;
-          }else if(typeof newVal !== typeof oldVal || newVal !== oldVal){
-            //overwrite
-            attrs[aName] = newVal;
-          }else {
-            //parse
-            attrs[aName] = parseValue(
-              oldVal,
-              this.options.parseAttributeValue,
-              this.options.numberParseOptions
-            );
-          }
-        } else if (this.options.allowBooleanAttributes) {
-          attrs[aName] = true;
-        }
-      }
-    }
-    if (!Object.keys(attrs).length) {
-      return;
-    }
-    if (this.options.attributesGroupName) {
-      const attrCollection = {};
-      attrCollection[this.options.attributesGroupName] = attrs;
-      return attrCollection;
-    }
-    return attrs
-  }
-}
-
-const parseXml = function(xmlData) {
-  xmlData = xmlData.replace(/\r\n?/g, "\n"); //TODO: remove this line
-  const xmlObj = new XmlNode('!xml');
-  let currentNode = xmlObj;
-  let textData = "";
-  let jPath = "";
-  for(let i=0; i< xmlData.length; i++){//for each char in XML data
-    const ch = xmlData[i];
-    if(ch === '<'){
-      // const nextIndex = i+1;
-      // const _2ndChar = xmlData[nextIndex];
-      if( xmlData[i+1] === '/') {//Closing Tag
-        const closeIndex = findClosingIndex(xmlData, ">", i, "Closing Tag is not closed.");
-        let tagName = xmlData.substring(i+2,closeIndex).trim();
-
-        if(this.options.removeNSPrefix){
-          const colonIndex = tagName.indexOf(":");
-          if(colonIndex !== -1){
-            tagName = tagName.substr(colonIndex+1);
-          }
-        }
-
-        if(this.options.transformTagName) {
-          tagName = this.options.transformTagName(tagName);
-        }
-
-        if(currentNode){
-          textData = this.saveTextToParentTag(textData, currentNode, jPath);
-        }
-
-        //check if last tag of nested tag was unpaired tag
-        const lastTagName = jPath.substring(jPath.lastIndexOf(".")+1);
-        if(tagName && this.options.unpairedTags.indexOf(tagName) !== -1 ){
-          throw new Error(`Unpaired tag can not be used as closing tag: </${tagName}>`);
-        }
-        let propIndex = 0;
-        if(lastTagName && this.options.unpairedTags.indexOf(lastTagName) !== -1 ){
-          propIndex = jPath.lastIndexOf('.', jPath.lastIndexOf('.')-1);
-          this.tagsNodeStack.pop();
-        }else {
-          propIndex = jPath.lastIndexOf(".");
-        }
-        jPath = jPath.substring(0, propIndex);
-
-        currentNode = this.tagsNodeStack.pop();//avoid recursion, set the parent tag scope
-        textData = "";
-        i = closeIndex;
-      } else if( xmlData[i+1] === '?') {
-
-        let tagData = readTagExp(xmlData,i, false, "?>");
-        if(!tagData) throw new Error("Pi Tag is not closed.");
-
-        textData = this.saveTextToParentTag(textData, currentNode, jPath);
-        if( (this.options.ignoreDeclaration && tagData.tagName === "?xml") || this.options.ignorePiTags);else {
-  
-          const childNode = new XmlNode(tagData.tagName);
-          childNode.add(this.options.textNodeName, "");
-          
-          if(tagData.tagName !== tagData.tagExp && tagData.attrExpPresent){
-            childNode[":@"] = this.buildAttributesMap(tagData.tagExp, jPath, tagData.tagName);
-          }
-          this.addChild(currentNode, childNode, jPath, i);
-        }
-
-
-        i = tagData.closeIndex + 1;
-      } else if(xmlData.substr(i + 1, 3) === '!--') {
-        const endIndex = findClosingIndex(xmlData, "-->", i+4, "Comment is not closed.");
-        if(this.options.commentPropName){
-          const comment = xmlData.substring(i + 4, endIndex - 2);
-
-          textData = this.saveTextToParentTag(textData, currentNode, jPath);
-
-          currentNode.add(this.options.commentPropName, [ { [this.options.textNodeName] : comment } ]);
-        }
-        i = endIndex;
-      } else if( xmlData.substr(i + 1, 2) === '!D') {
-        const result = readDocType(xmlData, i);
-        this.docTypeEntities = result.entities;
-        i = result.i;
-      }else if(xmlData.substr(i + 1, 2) === '![') {
-        const closeIndex = findClosingIndex(xmlData, "]]>", i, "CDATA is not closed.") - 2;
-        const tagExp = xmlData.substring(i + 9,closeIndex);
-
-        textData = this.saveTextToParentTag(textData, currentNode, jPath);
-
-        let val = this.parseTextData(tagExp, currentNode.tagname, jPath, true, false, true, true);
-        if(val == undefined) val = "";
-
-        //cdata should be set even if it is 0 length string
-        if(this.options.cdataPropName){
-          currentNode.add(this.options.cdataPropName, [ { [this.options.textNodeName] : tagExp } ]);
-        }else {
-          currentNode.add(this.options.textNodeName, val);
-        }
-        
-        i = closeIndex + 2;
-      }else {//Opening tag
-        let result = readTagExp(xmlData,i, this.options.removeNSPrefix);
-        let tagName= result.tagName;
-        const rawTagName = result.rawTagName;
-        let tagExp = result.tagExp;
-        let attrExpPresent = result.attrExpPresent;
-        let closeIndex = result.closeIndex;
-
-        if (this.options.transformTagName) {
-          tagName = this.options.transformTagName(tagName);
-        }
-        
-        //save text as child node
-        if (currentNode && textData) {
-          if(currentNode.tagname !== '!xml'){
-            //when nested tag is found
-            textData = this.saveTextToParentTag(textData, currentNode, jPath, false);
-          }
-        }
-
-        //check if last tag was unpaired tag
-        const lastTag = currentNode;
-        if(lastTag && this.options.unpairedTags.indexOf(lastTag.tagname) !== -1 ){
-          currentNode = this.tagsNodeStack.pop();
-          jPath = jPath.substring(0, jPath.lastIndexOf("."));
-        }
-        if(tagName !== xmlObj.tagname){
-          jPath += jPath ? "." + tagName : tagName;
-        }
-        const startIndex = i;
-        if (this.isItStopNode(this.options.stopNodes, jPath, tagName)) {
-          let tagContent = "";
-          //self-closing tag
-          if(tagExp.length > 0 && tagExp.lastIndexOf("/") === tagExp.length - 1){
-            if(tagName[tagName.length - 1] === "/"){ //remove trailing '/'
-              tagName = tagName.substr(0, tagName.length - 1);
-              jPath = jPath.substr(0, jPath.length - 1);
-              tagExp = tagName;
-            }else {
-              tagExp = tagExp.substr(0, tagExp.length - 1);
-            }
-            i = result.closeIndex;
-          }
-          //unpaired tag
-          else if(this.options.unpairedTags.indexOf(tagName) !== -1){
-            
-            i = result.closeIndex;
-          }
-          //normal tag
-          else {
-            //read until closing tag is found
-            const result = this.readStopNodeData(xmlData, rawTagName, closeIndex + 1);
-            if(!result) throw new Error(`Unexpected end of ${rawTagName}`);
-            i = result.i;
-            tagContent = result.tagContent;
-          }
-
-          const childNode = new XmlNode(tagName);
-
-          if(tagName !== tagExp && attrExpPresent){
-            childNode[":@"] = this.buildAttributesMap(tagExp, jPath, tagName);
-          }
-          if(tagContent) {
-            tagContent = this.parseTextData(tagContent, tagName, jPath, true, attrExpPresent, true, true);
-          }
-          
-          jPath = jPath.substr(0, jPath.lastIndexOf("."));
-          childNode.add(this.options.textNodeName, tagContent);
-          
-          this.addChild(currentNode, childNode, jPath, startIndex);
-        }else {
-  //selfClosing tag
-          if(tagExp.length > 0 && tagExp.lastIndexOf("/") === tagExp.length - 1){
-            if(tagName[tagName.length - 1] === "/"){ //remove trailing '/'
-              tagName = tagName.substr(0, tagName.length - 1);
-              jPath = jPath.substr(0, jPath.length - 1);
-              tagExp = tagName;
-            }else {
-              tagExp = tagExp.substr(0, tagExp.length - 1);
-            }
-            
-            if(this.options.transformTagName) {
-              tagName = this.options.transformTagName(tagName);
-            }
-
-            const childNode = new XmlNode(tagName);
-            if(tagName !== tagExp && attrExpPresent){
-              childNode[":@"] = this.buildAttributesMap(tagExp, jPath, tagName);
-            }
-            this.addChild(currentNode, childNode, jPath, startIndex);
-            jPath = jPath.substr(0, jPath.lastIndexOf("."));
-          }
-    //opening tag
-          else {
-            const childNode = new XmlNode( tagName);
-            this.tagsNodeStack.push(currentNode);
-            
-            if(tagName !== tagExp && attrExpPresent){
-              childNode[":@"] = this.buildAttributesMap(tagExp, jPath, tagName);
-            }
-            this.addChild(currentNode, childNode, jPath, startIndex);
-            currentNode = childNode;
-          }
-          textData = "";
-          i = closeIndex;
-        }
-      }
-    }else {
-      textData += xmlData[i];
-    }
-  }
-  return xmlObj.child;
-};
-
-function addChild(currentNode, childNode, jPath, startIndex){
-  // unset startIndex if not requested
-  if (!this.options.captureMetaData) startIndex = undefined;
-  const result = this.options.updateTag(childNode.tagname, jPath, childNode[":@"]);
-  if(result === false); else if(typeof result === "string"){
-    childNode.tagname = result;
-    currentNode.addChild(childNode, startIndex);
-  }else {
-    currentNode.addChild(childNode, startIndex);
-  }
-}
-
-const replaceEntitiesValue = function(val){
-
-  if(this.options.processEntities){
-    for(let entityName in this.docTypeEntities){
-      const entity = this.docTypeEntities[entityName];
-      val = val.replace( entity.regx, entity.val);
-    }
-    for(let entityName in this.lastEntities){
-      const entity = this.lastEntities[entityName];
-      val = val.replace( entity.regex, entity.val);
-    }
-    if(this.options.htmlEntities){
-      for(let entityName in this.htmlEntities){
-        const entity = this.htmlEntities[entityName];
-        val = val.replace( entity.regex, entity.val);
-      }
-    }
-    val = val.replace( this.ampEntity.regex, this.ampEntity.val);
-  }
-  return val;
-};
-function saveTextToParentTag(textData, currentNode, jPath, isLeafNode) {
-  if (textData) { //store previously collected data as textNode
-    if(isLeafNode === undefined) isLeafNode = currentNode.child.length === 0;
-    
-    textData = this.parseTextData(textData,
-      currentNode.tagname,
-      jPath,
-      false,
-      currentNode[":@"] ? Object.keys(currentNode[":@"]).length !== 0 : false,
-      isLeafNode);
-
-    if (textData !== undefined && textData !== "")
-      currentNode.add(this.options.textNodeName, textData);
-    textData = "";
-  }
-  return textData;
-}
-
-//TODO: use jPath to simplify the logic
-/**
- * 
- * @param {string[]} stopNodes 
- * @param {string} jPath
- * @param {string} currentTagName 
- */
-function isItStopNode(stopNodes, jPath, currentTagName){
-  const allNodesExp = "*." + currentTagName;
-  for (const stopNodePath in stopNodes) {
-    const stopNodeExp = stopNodes[stopNodePath];
-    if( allNodesExp === stopNodeExp || jPath === stopNodeExp  ) return true;
-  }
-  return false;
-}
-
-/**
- * Returns the tag Expression and where it is ending handling single-double quotes situation
- * @param {string} xmlData 
- * @param {number} i starting index
- * @returns 
- */
-function tagExpWithClosingIndex(xmlData, i, closingChar = ">"){
-  let attrBoundary;
-  let tagExp = "";
-  for (let index = i; index < xmlData.length; index++) {
-    let ch = xmlData[index];
-    if (attrBoundary) {
-        if (ch === attrBoundary) attrBoundary = "";//reset
-    } else if (ch === '"' || ch === "'") {
-        attrBoundary = ch;
-    } else if (ch === closingChar[0]) {
-      if(closingChar[1]){
-        if(xmlData[index + 1] === closingChar[1]){
-          return {
-            data: tagExp,
-            index: index
-          }
-        }
-      }else {
-        return {
-          data: tagExp,
-          index: index
-        }
-      }
-    } else if (ch === '\t') {
-      ch = " ";
-    }
-    tagExp += ch;
-  }
-}
-
-function findClosingIndex(xmlData, str, i, errMsg){
-  const closingIndex = xmlData.indexOf(str, i);
-  if(closingIndex === -1){
-    throw new Error(errMsg)
-  }else {
-    return closingIndex + str.length - 1;
-  }
-}
-
-function readTagExp(xmlData,i, removeNSPrefix, closingChar = ">"){
-  const result = tagExpWithClosingIndex(xmlData, i+1, closingChar);
-  if(!result) return;
-  let tagExp = result.data;
-  const closeIndex = result.index;
-  const separatorIndex = tagExp.search(/\s/);
-  let tagName = tagExp;
-  let attrExpPresent = true;
-  if(separatorIndex !== -1){//separate tag name and attributes expression
-    tagName = tagExp.substring(0, separatorIndex);
-    tagExp = tagExp.substring(separatorIndex + 1).trimStart();
-  }
-
-  const rawTagName = tagName;
-  if(removeNSPrefix){
-    const colonIndex = tagName.indexOf(":");
-    if(colonIndex !== -1){
-      tagName = tagName.substr(colonIndex+1);
-      attrExpPresent = tagName !== result.data.substr(colonIndex + 1);
-    }
-  }
-
-  return {
-    tagName: tagName,
-    tagExp: tagExp,
-    closeIndex: closeIndex,
-    attrExpPresent: attrExpPresent,
-    rawTagName: rawTagName,
-  }
-}
-/**
- * find paired tag for a stop node
- * @param {string} xmlData 
- * @param {string} tagName 
- * @param {number} i 
- */
-function readStopNodeData(xmlData, tagName, i){
-  const startIndex = i;
-  // Starting at 1 since we already have an open tag
-  let openTagCount = 1;
-
-  for (; i < xmlData.length; i++) {
-    if( xmlData[i] === "<"){ 
-      if (xmlData[i+1] === "/") {//close tag
-          const closeIndex = findClosingIndex(xmlData, ">", i, `${tagName} is not closed`);
-          let closeTagName = xmlData.substring(i+2,closeIndex).trim();
-          if(closeTagName === tagName){
-            openTagCount--;
-            if (openTagCount === 0) {
-              return {
-                tagContent: xmlData.substring(startIndex, i),
-                i : closeIndex
-              }
-            }
-          }
-          i=closeIndex;
-        } else if(xmlData[i+1] === '?') { 
-          const closeIndex = findClosingIndex(xmlData, "?>", i+1, "StopNode is not closed.");
-          i=closeIndex;
-        } else if(xmlData.substr(i + 1, 3) === '!--') { 
-          const closeIndex = findClosingIndex(xmlData, "-->", i+3, "StopNode is not closed.");
-          i=closeIndex;
-        } else if(xmlData.substr(i + 1, 2) === '![') { 
-          const closeIndex = findClosingIndex(xmlData, "]]>", i, "StopNode is not closed.") - 2;
-          i=closeIndex;
-        } else {
-          const tagData = readTagExp(xmlData, i, '>');
-
-          if (tagData) {
-            const openTagName = tagData && tagData.tagName;
-            if (openTagName === tagName && tagData.tagExp[tagData.tagExp.length-1] !== "/") {
-              openTagCount++;
-            }
-            i=tagData.closeIndex;
-          }
-        }
-      }
-  }//end for loop
-}
-
-function parseValue(val, shouldParse, options) {
-  if (shouldParse && typeof val === 'string') {
-    //console.log(options)
-    const newval = val.trim();
-    if(newval === 'true' ) return true;
-    else if(newval === 'false' ) return false;
-    else return toNumber(val, options);
-  } else {
-    if (isExist(val)) {
-      return val;
-    } else {
-      return '';
-    }
-  }
-}
-
-const METADATA_SYMBOL = XmlNode.getMetaDataSymbol();
-
-/**
- * 
- * @param {array} node 
- * @param {any} options 
- * @returns 
- */
-function prettify(node, options){
-  return compress( node, options);
-}
-
-/**
- * 
- * @param {array} arr 
- * @param {object} options 
- * @param {string} jPath 
- * @returns object
- */
-function compress(arr, options, jPath){
-  let text;
-  const compressedObj = {};
-  for (let i = 0; i < arr.length; i++) {
-    const tagObj = arr[i];
-    const property = propName(tagObj);
-    let newJpath = "";
-    if(jPath === undefined) newJpath = property;
-    else newJpath = jPath + "." + property;
-
-    if(property === options.textNodeName){
-      if(text === undefined) text = tagObj[property];
-      else text += "" + tagObj[property];
-    }else if(property === undefined){
-      continue;
-    }else if(tagObj[property]){
-      
-      let val = compress(tagObj[property], options, newJpath);
-      const isLeaf = isLeafTag(val, options);
-      if (tagObj[METADATA_SYMBOL] !== undefined) {
-        val[METADATA_SYMBOL] = tagObj[METADATA_SYMBOL]; // copy over metadata
-      }
-
-      if(tagObj[":@"]){
-        assignAttributes( val, tagObj[":@"], newJpath, options);
-      }else if(Object.keys(val).length === 1 && val[options.textNodeName] !== undefined && !options.alwaysCreateTextNode){
-        val = val[options.textNodeName];
-      }else if(Object.keys(val).length === 0){
-        if(options.alwaysCreateTextNode) val[options.textNodeName] = "";
-        else val = "";
-      }
-
-      if(compressedObj[property] !== undefined && compressedObj.hasOwnProperty(property)) {
-        if(!Array.isArray(compressedObj[property])) {
-            compressedObj[property] = [ compressedObj[property] ];
-        }
-        compressedObj[property].push(val);
-      }else {
-        //TODO: if a node is not an array, then check if it should be an array
-        //also determine if it is a leaf node
-        if (options.isArray(property, newJpath, isLeaf )) {
-          compressedObj[property] = [val];
-        }else {
-          compressedObj[property] = val;
-        }
-      }
-    }
-    
-  }
-  // if(text && text.length > 0) compressedObj[options.textNodeName] = text;
-  if(typeof text === "string"){
-    if(text.length > 0) compressedObj[options.textNodeName] = text;
-  }else if(text !== undefined) compressedObj[options.textNodeName] = text;
-  return compressedObj;
-}
-
-function propName(obj){
-  const keys = Object.keys(obj);
-  for (let i = 0; i < keys.length; i++) {
-    const key = keys[i];
-    if(key !== ":@") return key;
-  }
-}
-
-function assignAttributes(obj, attrMap, jpath, options){
-  if (attrMap) {
-    const keys = Object.keys(attrMap);
-    const len = keys.length; //don't make it inline
-    for (let i = 0; i < len; i++) {
-      const atrrName = keys[i];
-      if (options.isArray(atrrName, jpath + "." + atrrName, true, true)) {
-        obj[atrrName] = [ attrMap[atrrName] ];
-      } else {
-        obj[atrrName] = attrMap[atrrName];
-      }
-    }
-  }
-}
-
-function isLeafTag(obj, options){
-  const { textNodeName } = options;
-  const propCount = Object.keys(obj).length;
-  
-  if (propCount === 0) {
-    return true;
-  }
-
-  if (
-    propCount === 1 &&
-    (obj[textNodeName] || typeof obj[textNodeName] === "boolean" || obj[textNodeName] === 0)
-  ) {
-    return true;
-  }
-
-  return false;
-}
-
-class XMLParser{
-    
-    constructor(options){
-        this.externalEntities = {};
-        this.options = buildOptions(options);
-        
-    }
-    /**
-     * Parse XML dats to JS object 
-     * @param {string|Buffer} xmlData 
-     * @param {boolean|Object} validationOption 
-     */
-    parse(xmlData,validationOption){
-        if(typeof xmlData === "string");else if( xmlData.toString){
-            xmlData = xmlData.toString();
-        }else {
-            throw new Error("XML data is accepted in String or Bytes[] form.")
-        }
-        if( validationOption){
-            if(validationOption === true) validationOption = {}; //validate with default options
-            
-            const result = validate(xmlData, validationOption);
-            if (result !== true) {
-              throw Error( `${result.err.msg}:${result.err.line}:${result.err.col}` )
-            }
-          }
-        const orderedObjParser = new OrderedObjParser(this.options);
-        orderedObjParser.addExternalEntities(this.externalEntities);
-        const orderedResult = orderedObjParser.parseXml(xmlData);
-        if(this.options.preserveOrder || orderedResult === undefined) return orderedResult;
-        else return prettify(orderedResult, this.options);
-    }
-
-    /**
-     * Add Entity which is not by default supported by this library
-     * @param {string} key 
-     * @param {string} value 
-     */
-    addEntity(key, value){
-        if(value.indexOf("&") !== -1){
-            throw new Error("Entity value can't have '&'")
-        }else if(key.indexOf("&") !== -1 || key.indexOf(";") !== -1){
-            throw new Error("An entity must be set without '&' and ';'. Eg. use '#xD' for '&#xD;'")
-        }else if(value === "&"){
-            throw new Error("An entity with value '&' is not permitted");
-        }else {
-            this.externalEntities[key] = value;
-        }
-    }
-
-    /**
-     * Returns a Symbol that can be used to access the metadata
-     * property on a node.
-     * 
-     * If Symbol is not available in the environment, an ordinary property is used
-     * and the name of the property is here returned.
-     * 
-     * The XMLMetaData property is only present when `captureMetaData`
-     * is true in the options.
-     */
-    static getMetaDataSymbol() {
-        return XmlNode.getMetaDataSymbol();
-    }
-}
-
-const parser = new XMLParser({
-    attributeNamePrefix: "",
-    htmlEntities: true,
-    ignoreAttributes: false,
-    ignoreDeclaration: true,
-    parseTagValue: false,
-    trimValues: false,
-    tagValueProcessor: (_, val) => (val.trim() === "" && val.includes("\n") ? "" : undefined),
-});
-parser.addEntity("#xD", "\r");
-parser.addEntity("#10", "\n");
-function parseXML(xmlString) {
-    return parser.parse(xmlString, true);
-}
-
-class XmlShapeDeserializer extends SerdeContextConfig {
-    settings;
-    stringDeserializer;
-    constructor(settings) {
-        super();
-        this.settings = settings;
-        this.stringDeserializer = new FromStringShapeDeserializer(settings);
-    }
-    setSerdeContext(serdeContext) {
-        this.serdeContext = serdeContext;
-        this.stringDeserializer.setSerdeContext(serdeContext);
-    }
-    read(schema, bytes, key) {
-        const ns = NormalizedSchema.of(schema);
-        const memberSchemas = ns.getMemberSchemas();
-        const isEventPayload = ns.isStructSchema() &&
-            ns.isMemberSchema() &&
-            !!Object.values(memberSchemas).find((memberNs) => {
-                return !!memberNs.getMemberTraits().eventPayload;
-            });
-        if (isEventPayload) {
-            const output = {};
-            const memberName = Object.keys(memberSchemas)[0];
-            const eventMemberSchema = memberSchemas[memberName];
-            if (eventMemberSchema.isBlobSchema()) {
-                output[memberName] = bytes;
-            }
-            else {
-                output[memberName] = this.read(memberSchemas[memberName], bytes);
-            }
-            return output;
-        }
-        const xmlString = (this.serdeContext?.utf8Encoder ?? toUtf8)(bytes);
-        const parsedObject = this.parseXml(xmlString);
-        return this.readSchema(schema, key ? parsedObject[key] : parsedObject);
-    }
-    readSchema(_schema, value) {
-        const ns = NormalizedSchema.of(_schema);
-        if (ns.isUnitSchema()) {
-            return;
-        }
-        const traits = ns.getMergedTraits();
-        if (ns.isListSchema() && !Array.isArray(value)) {
-            return this.readSchema(ns, [value]);
-        }
-        if (value == null) {
-            return value;
-        }
-        if (typeof value === "object") {
-            const sparse = !!traits.sparse;
-            const flat = !!traits.xmlFlattened;
-            if (ns.isListSchema()) {
-                const listValue = ns.getValueSchema();
-                const buffer = [];
-                const sourceKey = listValue.getMergedTraits().xmlName ?? "member";
-                const source = flat ? value : (value[0] ?? value)[sourceKey];
-                const sourceArray = Array.isArray(source) ? source : [source];
-                for (const v of sourceArray) {
-                    if (v != null || sparse) {
-                        buffer.push(this.readSchema(listValue, v));
-                    }
-                }
-                return buffer;
-            }
-            const buffer = {};
-            if (ns.isMapSchema()) {
-                const keyNs = ns.getKeySchema();
-                const memberNs = ns.getValueSchema();
-                let entries;
-                if (flat) {
-                    entries = Array.isArray(value) ? value : [value];
-                }
-                else {
-                    entries = Array.isArray(value.entry) ? value.entry : [value.entry];
-                }
-                const keyProperty = keyNs.getMergedTraits().xmlName ?? "key";
-                const valueProperty = memberNs.getMergedTraits().xmlName ?? "value";
-                for (const entry of entries) {
-                    const key = entry[keyProperty];
-                    const value = entry[valueProperty];
-                    if (value != null || sparse) {
-                        buffer[key] = this.readSchema(memberNs, value);
-                    }
-                }
-                return buffer;
-            }
-            if (ns.isStructSchema()) {
-                const union = ns.isUnionSchema();
-                let unionSerde;
-                if (union) {
-                    unionSerde = new UnionSerde(value, buffer);
-                }
-                for (const [memberName, memberSchema] of ns.structIterator()) {
-                    const memberTraits = memberSchema.getMergedTraits();
-                    const xmlObjectKey = !memberTraits.httpPayload
-                        ? memberSchema.getMemberTraits().xmlName ?? memberName
-                        : memberTraits.xmlName ?? memberSchema.getName();
-                    if (union) {
-                        unionSerde.mark(xmlObjectKey);
-                    }
-                    if (value[xmlObjectKey] != null) {
-                        buffer[memberName] = this.readSchema(memberSchema, value[xmlObjectKey]);
-                    }
-                }
-                if (union) {
-                    unionSerde.writeUnknown();
-                }
-                return buffer;
-            }
-            if (ns.isDocumentSchema()) {
-                return value;
-            }
-            throw new Error(`@aws-sdk/core/protocols - xml deserializer unhandled schema type for ${ns.getName(true)}`);
-        }
-        if (ns.isListSchema()) {
-            return [];
-        }
-        if (ns.isMapSchema() || ns.isStructSchema()) {
-            return {};
-        }
-        return this.stringDeserializer.read(ns, value);
-    }
-    parseXml(xml) {
-        if (xml.length) {
-            let parsedObj;
-            try {
-                parsedObj = parseXML(xml);
-            }
-            catch (e) {
-                if (e && typeof e === "object") {
-                    Object.defineProperty(e, "$responseBodyText", {
-                        value: xml,
-                    });
-                }
-                throw e;
-            }
-            const textNodeName = "#text";
-            const key = Object.keys(parsedObj)[0];
-            const parsedObjToReturn = parsedObj[key];
-            if (parsedObjToReturn[textNodeName]) {
-                parsedObjToReturn[key] = parsedObjToReturn[textNodeName];
-                delete parsedObjToReturn[textNodeName];
-            }
-            return getValueFromTextNode(parsedObjToReturn);
-        }
-        return {};
-    }
-}
-
-class QueryShapeSerializer extends SerdeContextConfig {
-    settings;
-    buffer;
-    constructor(settings) {
-        super();
-        this.settings = settings;
-    }
-    write(schema, value, prefix = "") {
-        if (this.buffer === undefined) {
-            this.buffer = "";
-        }
-        const ns = NormalizedSchema.of(schema);
-        if (prefix && !prefix.endsWith(".")) {
-            prefix += ".";
-        }
-        if (ns.isBlobSchema()) {
-            if (typeof value === "string" || value instanceof Uint8Array) {
-                this.writeKey(prefix);
-                this.writeValue((this.serdeContext?.base64Encoder ?? toBase64)(value));
-            }
-        }
-        else if (ns.isBooleanSchema() || ns.isNumericSchema() || ns.isStringSchema()) {
-            if (value != null) {
-                this.writeKey(prefix);
-                this.writeValue(String(value));
-            }
-            else if (ns.isIdempotencyToken()) {
-                this.writeKey(prefix);
-                this.writeValue(v4());
-            }
-        }
-        else if (ns.isBigIntegerSchema()) {
-            if (value != null) {
-                this.writeKey(prefix);
-                this.writeValue(String(value));
-            }
-        }
-        else if (ns.isBigDecimalSchema()) {
-            if (value != null) {
-                this.writeKey(prefix);
-                this.writeValue(value instanceof NumericValue ? value.string : String(value));
-            }
-        }
-        else if (ns.isTimestampSchema()) {
-            if (value instanceof Date) {
-                this.writeKey(prefix);
-                const format = determineTimestampFormat(ns, this.settings);
-                switch (format) {
-                    case 5:
-                        this.writeValue(value.toISOString().replace(".000Z", "Z"));
-                        break;
-                    case 6:
-                        this.writeValue(dateToUtcString(value));
-                        break;
-                    case 7:
-                        this.writeValue(String(value.getTime() / 1000));
-                        break;
-                }
-            }
-        }
-        else if (ns.isDocumentSchema()) {
-            if (Array.isArray(value)) {
-                this.write(64 | 15, value, prefix);
-            }
-            else if (value instanceof Date) {
-                this.write(4, value, prefix);
-            }
-            else if (value instanceof Uint8Array) {
-                this.write(21, value, prefix);
-            }
-            else if (value && typeof value === "object") {
-                this.write(128 | 15, value, prefix);
-            }
-            else {
-                this.writeKey(prefix);
-                this.writeValue(String(value));
-            }
-        }
-        else if (ns.isListSchema()) {
-            if (Array.isArray(value)) {
-                if (value.length === 0) {
-                    if (this.settings.serializeEmptyLists) {
-                        this.writeKey(prefix);
-                        this.writeValue("");
-                    }
-                }
-                else {
-                    const member = ns.getValueSchema();
-                    const flat = this.settings.flattenLists || ns.getMergedTraits().xmlFlattened;
-                    let i = 1;
-                    for (const item of value) {
-                        if (item == null) {
-                            continue;
-                        }
-                        const suffix = this.getKey("member", member.getMergedTraits().xmlName);
-                        const key = flat ? `${prefix}${i}` : `${prefix}${suffix}.${i}`;
-                        this.write(member, item, key);
-                        ++i;
-                    }
-                }
-            }
-        }
-        else if (ns.isMapSchema()) {
-            if (value && typeof value === "object") {
-                const keySchema = ns.getKeySchema();
-                const memberSchema = ns.getValueSchema();
-                const flat = ns.getMergedTraits().xmlFlattened;
-                let i = 1;
-                for (const [k, v] of Object.entries(value)) {
-                    if (v == null) {
-                        continue;
-                    }
-                    const keySuffix = this.getKey("key", keySchema.getMergedTraits().xmlName);
-                    const key = flat ? `${prefix}${i}.${keySuffix}` : `${prefix}entry.${i}.${keySuffix}`;
-                    const valueSuffix = this.getKey("value", memberSchema.getMergedTraits().xmlName);
-                    const valueKey = flat ? `${prefix}${i}.${valueSuffix}` : `${prefix}entry.${i}.${valueSuffix}`;
-                    this.write(keySchema, k, key);
-                    this.write(memberSchema, v, valueKey);
-                    ++i;
-                }
-            }
-        }
-        else if (ns.isStructSchema()) {
-            if (value && typeof value === "object") {
-                let didWriteMember = false;
-                for (const [memberName, member] of ns.structIterator()) {
-                    if (value[memberName] == null && !member.isIdempotencyToken()) {
-                        continue;
-                    }
-                    const suffix = this.getKey(memberName, member.getMergedTraits().xmlName);
-                    const key = `${prefix}${suffix}`;
-                    this.write(member, value[memberName], key);
-                    didWriteMember = true;
-                }
-                if (!didWriteMember && ns.isUnionSchema()) {
-                    const { $unknown } = value;
-                    if (Array.isArray($unknown)) {
-                        const [k, v] = $unknown;
-                        const key = `${prefix}${k}`;
-                        this.write(15, v, key);
-                    }
-                }
-            }
-        }
-        else if (ns.isUnitSchema()) ;
-        else {
-            throw new Error(`@aws-sdk/core/protocols - QuerySerializer unrecognized schema type ${ns.getName(true)}`);
-        }
-    }
-    flush() {
-        if (this.buffer === undefined) {
-            throw new Error("@aws-sdk/core/protocols - QuerySerializer cannot flush with nothing written to buffer.");
-        }
-        const str = this.buffer;
-        delete this.buffer;
-        return str;
-    }
-    getKey(memberName, xmlName) {
-        const key = xmlName ?? memberName;
-        if (this.settings.capitalizeKeys) {
-            return key[0].toUpperCase() + key.slice(1);
-        }
-        return key;
-    }
-    writeKey(key) {
-        if (key.endsWith(".")) {
-            key = key.slice(0, key.length - 1);
-        }
-        this.buffer += `&${extendedEncodeURIComponent(key)}=`;
-    }
-    writeValue(value) {
-        this.buffer += extendedEncodeURIComponent(value);
-    }
-}
-
-class AwsQueryProtocol extends RpcProtocol {
-    options;
-    serializer;
-    deserializer;
-    mixin = new ProtocolLib();
-    constructor(options) {
-        super({
-            defaultNamespace: options.defaultNamespace,
-        });
-        this.options = options;
-        const settings = {
-            timestampFormat: {
-                useTrait: true,
-                default: 5,
-            },
-            httpBindings: false,
-            xmlNamespace: options.xmlNamespace,
-            serviceNamespace: options.defaultNamespace,
-            serializeEmptyLists: true,
-        };
-        this.serializer = new QueryShapeSerializer(settings);
-        this.deserializer = new XmlShapeDeserializer(settings);
-    }
-    getShapeId() {
-        return "aws.protocols#awsQuery";
-    }
-    setSerdeContext(serdeContext) {
-        this.serializer.setSerdeContext(serdeContext);
-        this.deserializer.setSerdeContext(serdeContext);
-    }
-    getPayloadCodec() {
-        throw new Error("AWSQuery protocol has no payload codec.");
-    }
-    async serializeRequest(operationSchema, input, context) {
-        const request = await super.serializeRequest(operationSchema, input, context);
-        if (!request.path.endsWith("/")) {
-            request.path += "/";
-        }
-        Object.assign(request.headers, {
-            "content-type": `application/x-www-form-urlencoded`,
-        });
-        if (deref(operationSchema.input) === "unit" || !request.body) {
-            request.body = "";
-        }
-        const action = operationSchema.name.split("#")[1] ?? operationSchema.name;
-        request.body = `Action=${action}&Version=${this.options.version}` + request.body;
-        if (request.body.endsWith("&")) {
-            request.body = request.body.slice(-1);
-        }
-        return request;
-    }
-    async deserializeResponse(operationSchema, context, response) {
-        const deserializer = this.deserializer;
-        const ns = NormalizedSchema.of(operationSchema.output);
-        const dataObject = {};
-        if (response.statusCode >= 300) {
-            const bytes = await collectBody(response.body, context);
-            if (bytes.byteLength > 0) {
-                Object.assign(dataObject, await deserializer.read(15, bytes));
-            }
-            await this.handleError(operationSchema, context, response, dataObject, this.deserializeMetadata(response));
-        }
-        for (const header in response.headers) {
-            const value = response.headers[header];
-            delete response.headers[header];
-            response.headers[header.toLowerCase()] = value;
-        }
-        const shortName = operationSchema.name.split("#")[1] ?? operationSchema.name;
-        const awsQueryResultKey = ns.isStructSchema() && this.useNestedResult() ? shortName + "Result" : undefined;
-        const bytes = await collectBody(response.body, context);
-        if (bytes.byteLength > 0) {
-            Object.assign(dataObject, await deserializer.read(ns, bytes, awsQueryResultKey));
-        }
-        const output = {
-            $metadata: this.deserializeMetadata(response),
-            ...dataObject,
-        };
-        return output;
-    }
-    useNestedResult() {
-        return true;
-    }
-    async handleError(operationSchema, context, response, dataObject, metadata) {
-        const errorIdentifier = this.loadQueryErrorCode(response, dataObject) ?? "Unknown";
-        const errorData = this.loadQueryError(dataObject);
-        const message = this.loadQueryErrorMessage(dataObject);
-        errorData.message = message;
-        errorData.Error = {
-            Type: errorData.Type,
-            Code: errorData.Code,
-            Message: message,
-        };
-        const { errorSchema, errorMetadata } = await this.mixin.getErrorSchemaOrThrowBaseException(errorIdentifier, this.options.defaultNamespace, response, errorData, metadata, this.mixin.findQueryCompatibleError);
-        const ns = NormalizedSchema.of(errorSchema);
-        const ErrorCtor = TypeRegistry.for(errorSchema[1]).getErrorCtor(errorSchema) ?? Error;
-        const exception = new ErrorCtor(message);
-        const output = {
-            Type: errorData.Error.Type,
-            Code: errorData.Error.Code,
-            Error: errorData.Error,
-        };
-        for (const [name, member] of ns.structIterator()) {
-            const target = member.getMergedTraits().xmlName ?? name;
-            const value = errorData[target] ?? dataObject[target];
-            output[name] = this.deserializer.readSchema(member, value);
-        }
-        throw this.mixin.decorateServiceException(Object.assign(exception, errorMetadata, {
-            $fault: ns.getMergedTraits().error,
-            message,
-        }, output), dataObject);
-    }
-    loadQueryErrorCode(output, data) {
-        const code = (data.Errors?.[0]?.Error ?? data.Errors?.Error ?? data.Error)?.Code;
-        if (code !== undefined) {
-            return code;
-        }
-        if (output.statusCode == 404) {
-            return "NotFound";
-        }
-    }
-    loadQueryError(data) {
-        return data.Errors?.[0]?.Error ?? data.Errors?.Error ?? data.Error;
-    }
-    loadQueryErrorMessage(data) {
-        const errorData = this.loadQueryError(data);
-        return errorData?.message ?? errorData?.Message ?? data.message ?? data.Message ?? "Unknown";
-    }
-    getDefaultContentType() {
-        return "application/x-www-form-urlencoded";
-    }
-}
-
-const ACCOUNT_ID_ENDPOINT_REGEX = /\d{12}\.ddb/;
-async function checkFeatures(context, config, args) {
-    const request = args.request;
-    if (request?.headers?.["smithy-protocol"] === "rpc-v2-cbor") {
-        setFeature(context, "PROTOCOL_RPC_V2_CBOR", "M");
-    }
-    if (typeof config.retryStrategy === "function") {
-        const retryStrategy = await config.retryStrategy();
-        if (typeof retryStrategy.acquireInitialRetryToken === "function") {
-            if (retryStrategy.constructor?.name?.includes("Adaptive")) {
-                setFeature(context, "RETRY_MODE_ADAPTIVE", "F");
-            }
-            else {
-                setFeature(context, "RETRY_MODE_STANDARD", "E");
-            }
-        }
-        else {
-            setFeature(context, "RETRY_MODE_LEGACY", "D");
-        }
-    }
-    if (typeof config.accountIdEndpointMode === "function") {
-        const endpointV2 = context.endpointV2;
-        if (String(endpointV2?.url?.hostname).match(ACCOUNT_ID_ENDPOINT_REGEX)) {
-            setFeature(context, "ACCOUNT_ID_ENDPOINT", "O");
-        }
-        switch (await config.accountIdEndpointMode?.()) {
-            case "disabled":
-                setFeature(context, "ACCOUNT_ID_MODE_DISABLED", "Q");
-                break;
-            case "preferred":
-                setFeature(context, "ACCOUNT_ID_MODE_PREFERRED", "P");
-                break;
-            case "required":
-                setFeature(context, "ACCOUNT_ID_MODE_REQUIRED", "R");
-                break;
-        }
-    }
-    const identity = context.__smithy_context?.selectedHttpAuthScheme?.identity;
-    if (identity?.$source) {
-        const credentials = identity;
-        if (credentials.accountId) {
-            setFeature(context, "RESOLVED_ACCOUNT_ID", "T");
-        }
-        for (const [key, value] of Object.entries(credentials.$source ?? {})) {
-            setFeature(context, key, value);
-        }
-    }
-}
-
-const USER_AGENT = "user-agent";
-const X_AMZ_USER_AGENT = "x-amz-user-agent";
-const SPACE = " ";
-const UA_NAME_SEPARATOR = "/";
-const UA_NAME_ESCAPE_REGEX = /[^!$%&'*+\-.^_`|~\w]/g;
-const UA_VALUE_ESCAPE_REGEX = /[^!$%&'*+\-.^_`|~\w#]/g;
-const UA_ESCAPE_CHAR = "-";
-
-const BYTE_LIMIT = 1024;
-function encodeFeatures(features) {
-    let buffer = "";
-    for (const key in features) {
-        const val = features[key];
-        if (buffer.length + val.length + 1 <= BYTE_LIMIT) {
-            if (buffer.length) {
-                buffer += "," + val;
-            }
-            else {
-                buffer += val;
-            }
-            continue;
-        }
-        break;
-    }
-    return buffer;
-}
-
-const userAgentMiddleware = (options) => (next, context) => async (args) => {
-    const { request } = args;
-    if (!HttpRequest.isInstance(request)) {
-        return next(args);
-    }
-    const { headers } = request;
-    const userAgent = context?.userAgent?.map(escapeUserAgent) || [];
-    const defaultUserAgent = (await options.defaultUserAgentProvider()).map(escapeUserAgent);
-    await checkFeatures(context, options, args);
-    const awsContext = context;
-    defaultUserAgent.push(`m/${encodeFeatures(Object.assign({}, context.__smithy_context?.features, awsContext.__aws_sdk_context?.features))}`);
-    const customUserAgent = options?.customUserAgent?.map(escapeUserAgent) || [];
-    const appId = await options.userAgentAppId();
-    if (appId) {
-        defaultUserAgent.push(escapeUserAgent([`app`, `${appId}`]));
-    }
-    const sdkUserAgentValue = ([])
-        .concat([...defaultUserAgent, ...userAgent, ...customUserAgent])
-        .join(SPACE);
-    const normalUAValue = [
-        ...defaultUserAgent.filter((section) => section.startsWith("aws-sdk-")),
-        ...customUserAgent,
-    ].join(SPACE);
-    if (options.runtime !== "browser") {
-        if (normalUAValue) {
-            headers[X_AMZ_USER_AGENT] = headers[X_AMZ_USER_AGENT]
-                ? `${headers[USER_AGENT]} ${normalUAValue}`
-                : normalUAValue;
-        }
-        headers[USER_AGENT] = sdkUserAgentValue;
-    }
-    else {
-        headers[X_AMZ_USER_AGENT] = sdkUserAgentValue;
-    }
-    return next({
-        ...args,
-        request,
-    });
-};
-const escapeUserAgent = (userAgentPair) => {
-    const name = userAgentPair[0]
-        .split(UA_NAME_SEPARATOR)
-        .map((part) => part.replace(UA_NAME_ESCAPE_REGEX, UA_ESCAPE_CHAR))
-        .join(UA_NAME_SEPARATOR);
-    const version = userAgentPair[1]?.replace(UA_VALUE_ESCAPE_REGEX, UA_ESCAPE_CHAR);
-    const prefixSeparatorIndex = name.indexOf(UA_NAME_SEPARATOR);
-    const prefix = name.substring(0, prefixSeparatorIndex);
-    let uaName = name.substring(prefixSeparatorIndex + 1);
-    if (prefix === "api") {
-        uaName = uaName.toLowerCase();
-    }
-    return [prefix, uaName, version]
-        .filter((item) => item && item.length > 0)
-        .reduce((acc, item, index) => {
-        switch (index) {
-            case 0:
-                return item;
-            case 1:
-                return `${acc}/${item}`;
-            default:
-                return `${acc}#${item}`;
-        }
-    }, "");
-};
-const getUserAgentMiddlewareOptions = {
-    name: "getUserAgentMiddleware",
-    step: "build",
-    priority: "low",
-    tags: ["SET_USER_AGENT", "USER_AGENT"],
-    override: true,
-};
-const getUserAgentPlugin = (config) => ({
-    applyToStack: (clientStack) => {
-        clientStack.add(userAgentMiddleware(config), getUserAgentMiddlewareOptions);
-    },
-});
-
-const booleanSelector = (obj, key, type) => {
-    if (!(key in obj))
-        return undefined;
-    if (obj[key] === "true")
-        return true;
-    if (obj[key] === "false")
-        return false;
-    throw new Error(`Cannot load ${type} "${key}". Expected "true" or "false", got ${obj[key]}.`);
-};
-
-var SelectorType;
-(function (SelectorType) {
-    SelectorType["ENV"] = "env";
-    SelectorType["CONFIG"] = "shared config entry";
-})(SelectorType || (SelectorType = {}));
-
-const ENV_USE_DUALSTACK_ENDPOINT = "AWS_USE_DUALSTACK_ENDPOINT";
-const CONFIG_USE_DUALSTACK_ENDPOINT = "use_dualstack_endpoint";
-const NODE_USE_DUALSTACK_ENDPOINT_CONFIG_OPTIONS = {
-    environmentVariableSelector: (env) => booleanSelector(env, ENV_USE_DUALSTACK_ENDPOINT, SelectorType.ENV),
-    configFileSelector: (profile) => booleanSelector(profile, CONFIG_USE_DUALSTACK_ENDPOINT, SelectorType.CONFIG),
-    default: false,
-};
-
-const ENV_USE_FIPS_ENDPOINT = "AWS_USE_FIPS_ENDPOINT";
-const CONFIG_USE_FIPS_ENDPOINT = "use_fips_endpoint";
-const NODE_USE_FIPS_ENDPOINT_CONFIG_OPTIONS = {
-    environmentVariableSelector: (env) => booleanSelector(env, ENV_USE_FIPS_ENDPOINT, SelectorType.ENV),
-    configFileSelector: (profile) => booleanSelector(profile, CONFIG_USE_FIPS_ENDPOINT, SelectorType.CONFIG),
-    default: false,
-};
-
-const REGION_ENV_NAME = "AWS_REGION";
-const REGION_INI_NAME = "region";
-const NODE_REGION_CONFIG_OPTIONS = {
-    environmentVariableSelector: (env) => env[REGION_ENV_NAME],
-    configFileSelector: (profile) => profile[REGION_INI_NAME],
-    default: () => {
-        throw new Error("Region is missing");
-    },
-};
-const NODE_REGION_CONFIG_FILE_OPTIONS = {
-    preferredFile: "credentials",
-};
-
-const validRegions = new Set();
-const checkRegion = (region, check = isValidHostLabel) => {
-    if (!validRegions.has(region) && !check(region)) {
-        if (region === "*") {
-            console.warn(`@smithy/config-resolver WARN - Please use the caller region instead of "*". See "sigv4a" in https://github.com/aws/aws-sdk-js-v3/blob/main/supplemental-docs/CLIENTS.md.`);
-        }
-        else {
-            throw new Error(`Region not accepted: region="${region}" is not a valid hostname component.`);
-        }
-    }
-    else {
-        validRegions.add(region);
-    }
-};
-
-const isFipsRegion = (region) => typeof region === "string" && (region.startsWith("fips-") || region.endsWith("-fips"));
-
-const getRealRegion = (region) => isFipsRegion(region)
-    ? ["fips-aws-global", "aws-fips"].includes(region)
-        ? "us-east-1"
-        : region.replace(/fips-(dkr-|prod-)?|-fips/, "")
-    : region;
-
-const resolveRegionConfig = (input) => {
-    const { region, useFipsEndpoint } = input;
-    if (!region) {
-        throw new Error("Region is missing");
-    }
-    return Object.assign(input, {
-        region: async () => {
-            const providedRegion = typeof region === "function" ? await region() : region;
-            const realRegion = getRealRegion(providedRegion);
-            checkRegion(realRegion);
-            return realRegion;
-        },
-        useFipsEndpoint: async () => {
-            const providedRegion = typeof region === "string" ? region : await region();
-            if (isFipsRegion(providedRegion)) {
-                return true;
-            }
-            return typeof useFipsEndpoint !== "function" ? Promise.resolve(!!useFipsEndpoint) : useFipsEndpoint();
-        },
-    });
-};
-
-const CONTENT_LENGTH_HEADER = "content-length";
-function contentLengthMiddleware(bodyLengthChecker) {
-    return (next) => async (args) => {
-        const request = args.request;
-        if (HttpRequest.isInstance(request)) {
-            const { body, headers } = request;
-            if (body &&
-                Object.keys(headers)
-                    .map((str) => str.toLowerCase())
-                    .indexOf(CONTENT_LENGTH_HEADER) === -1) {
-                try {
-                    const length = bodyLengthChecker(body);
-                    request.headers = {
-                        ...request.headers,
-                        [CONTENT_LENGTH_HEADER]: String(length),
-                    };
-                }
-                catch (error) {
-                }
-            }
-        }
-        return next({
-            ...args,
-            request,
-        });
-    };
-}
-const contentLengthMiddlewareOptions = {
-    step: "build",
-    tags: ["SET_CONTENT_LENGTH", "CONTENT_LENGTH"],
-    name: "contentLengthMiddleware",
-    override: true,
-};
-const getContentLengthPlugin = (options) => ({
-    applyToStack: (clientStack) => {
-        clientStack.add(contentLengthMiddleware(options.bodyLengthChecker), contentLengthMiddlewareOptions);
-    },
-});
-
-const resolveParamsForS3 = async (endpointParams) => {
-    const bucket = endpointParams?.Bucket || "";
-    if (typeof endpointParams.Bucket === "string") {
-        endpointParams.Bucket = bucket.replace(/#/g, encodeURIComponent("#")).replace(/\?/g, encodeURIComponent("?"));
-    }
-    if (isArnBucketName(bucket)) {
-        if (endpointParams.ForcePathStyle === true) {
-            throw new Error("Path-style addressing cannot be used with ARN buckets");
-        }
-    }
-    else if (!isDnsCompatibleBucketName(bucket) ||
-        (bucket.indexOf(".") !== -1 && !String(endpointParams.Endpoint).startsWith("http:")) ||
-        bucket.toLowerCase() !== bucket ||
-        bucket.length < 3) {
-        endpointParams.ForcePathStyle = true;
-    }
-    if (endpointParams.DisableMultiRegionAccessPoints) {
-        endpointParams.disableMultiRegionAccessPoints = true;
-        endpointParams.DisableMRAP = true;
-    }
-    return endpointParams;
-};
-const DOMAIN_PATTERN = /^[a-z0-9][a-z0-9\.\-]{1,61}[a-z0-9]$/;
-const IP_ADDRESS_PATTERN = /(\d+\.){3}\d+/;
-const DOTS_PATTERN = /\.\./;
-const isDnsCompatibleBucketName = (bucketName) => DOMAIN_PATTERN.test(bucketName) && !IP_ADDRESS_PATTERN.test(bucketName) && !DOTS_PATTERN.test(bucketName);
-const isArnBucketName = (bucketName) => {
-    const [arn, partition, service, , , bucket] = bucketName.split(":");
-    const isArn = arn === "arn" && bucketName.split(":").length >= 6;
-    const isValidArn = Boolean(isArn && partition && service && bucket);
-    if (isArn && !isValidArn) {
-        throw new Error(`Invalid ARN: ${bucketName} was an invalid ARN.`);
-    }
-    return isValidArn;
-};
-
-const createConfigValueProvider = (configKey, canonicalEndpointParamKey, config, isClientContextParam = false) => {
-    const configProvider = async () => {
-        let configValue;
-        if (isClientContextParam) {
-            const clientContextParams = config.clientContextParams;
-            const nestedValue = clientContextParams?.[configKey];
-            configValue = nestedValue ?? config[configKey] ?? config[canonicalEndpointParamKey];
-        }
-        else {
-            configValue = config[configKey] ?? config[canonicalEndpointParamKey];
-        }
-        if (typeof configValue === "function") {
-            return configValue();
-        }
-        return configValue;
-    };
-    if (configKey === "credentialScope" || canonicalEndpointParamKey === "CredentialScope") {
-        return async () => {
-            const credentials = typeof config.credentials === "function" ? await config.credentials() : config.credentials;
-            const configValue = credentials?.credentialScope ?? credentials?.CredentialScope;
-            return configValue;
-        };
-    }
-    if (configKey === "accountId" || canonicalEndpointParamKey === "AccountId") {
-        return async () => {
-            const credentials = typeof config.credentials === "function" ? await config.credentials() : config.credentials;
-            const configValue = credentials?.accountId ?? credentials?.AccountId;
-            return configValue;
-        };
-    }
-    if (configKey === "endpoint" || canonicalEndpointParamKey === "endpoint") {
-        return async () => {
-            if (config.isCustomEndpoint === false) {
-                return undefined;
-            }
-            const endpoint = await configProvider();
-            if (endpoint && typeof endpoint === "object") {
-                if ("url" in endpoint) {
-                    return endpoint.url.href;
-                }
-                if ("hostname" in endpoint) {
-                    const { protocol, hostname, port, path } = endpoint;
-                    return `${protocol}//${hostname}${port ? ":" + port : ""}${path}`;
-                }
-            }
-            return endpoint;
-        };
-    }
-    return configProvider;
-};
-
-function getSelectorName(functionString) {
-    try {
-        const constants = new Set(Array.from(functionString.match(/([A-Z_]){3,}/g) ?? []));
-        constants.delete("CONFIG");
-        constants.delete("CONFIG_PREFIX_SEPARATOR");
-        constants.delete("ENV");
-        return [...constants].join(", ");
-    }
-    catch (e) {
-        return functionString;
-    }
-}
-
-const fromEnv$1 = (envVarSelector, options) => async () => {
-    try {
-        const config = envVarSelector(process.env, options);
-        if (config === undefined) {
-            throw new Error();
-        }
-        return config;
-    }
-    catch (e) {
-        throw new CredentialsProviderError(e.message || `Not found in ENV: ${getSelectorName(envVarSelector.toString())}`, { logger: options?.logger });
-    }
-};
-
-const homeDirCache = {};
-const getHomeDirCacheKey = () => {
-    if (process && process.geteuid) {
-        return `${process.geteuid()}`;
-    }
-    return "DEFAULT";
-};
-const getHomeDir = () => {
-    const { HOME, USERPROFILE, HOMEPATH, HOMEDRIVE = `C:${sep}` } = process.env;
-    if (HOME)
-        return HOME;
-    if (USERPROFILE)
-        return USERPROFILE;
-    if (HOMEPATH)
-        return `${HOMEDRIVE}${HOMEPATH}`;
-    const homeDirCacheKey = getHomeDirCacheKey();
-    if (!homeDirCache[homeDirCacheKey])
-        homeDirCache[homeDirCacheKey] = homedir();
-    return homeDirCache[homeDirCacheKey];
-};
-
-const ENV_PROFILE = "AWS_PROFILE";
-const DEFAULT_PROFILE = "default";
-const getProfileName = (init) => init.profile || process.env[ENV_PROFILE] || DEFAULT_PROFILE;
-
-const getSSOTokenFilepath = (id) => {
-    const hasher = createHash("sha1");
-    const cacheName = hasher.update(id).digest("hex");
-    return join(getHomeDir(), ".aws", "sso", "cache", `${cacheName}.json`);
-};
-
-const tokenIntercept = {};
-const getSSOTokenFromFile = async (id) => {
-    if (tokenIntercept[id]) {
-        return tokenIntercept[id];
-    }
-    const ssoTokenFilepath = getSSOTokenFilepath(id);
-    const ssoTokenText = await readFile$1(ssoTokenFilepath, "utf8");
-    return JSON.parse(ssoTokenText);
-};
-
-const CONFIG_PREFIX_SEPARATOR = ".";
-
-const getConfigData = (data) => Object.entries(data)
-    .filter(([key]) => {
-    const indexOfSeparator = key.indexOf(CONFIG_PREFIX_SEPARATOR);
-    if (indexOfSeparator === -1) {
-        return false;
-    }
-    return Object.values(IniSectionType).includes(key.substring(0, indexOfSeparator));
-})
-    .reduce((acc, [key, value]) => {
-    const indexOfSeparator = key.indexOf(CONFIG_PREFIX_SEPARATOR);
-    const updatedKey = key.substring(0, indexOfSeparator) === IniSectionType.PROFILE ? key.substring(indexOfSeparator + 1) : key;
-    acc[updatedKey] = value;
-    return acc;
-}, {
-    ...(data.default && { default: data.default }),
-});
-
-const ENV_CONFIG_PATH = "AWS_CONFIG_FILE";
-const getConfigFilepath = () => process.env[ENV_CONFIG_PATH] || join(getHomeDir(), ".aws", "config");
-
-const ENV_CREDENTIALS_PATH = "AWS_SHARED_CREDENTIALS_FILE";
-const getCredentialsFilepath = () => process.env[ENV_CREDENTIALS_PATH] || join(getHomeDir(), ".aws", "credentials");
-
-const prefixKeyRegex = /^([\w-]+)\s(["'])?([\w-@\+\.%:/]+)\2$/;
-const profileNameBlockList = ["__proto__", "profile __proto__"];
-const parseIni = (iniData) => {
-    const map = {};
-    let currentSection;
-    let currentSubSection;
-    for (const iniLine of iniData.split(/\r?\n/)) {
-        const trimmedLine = iniLine.split(/(^|\s)[;#]/)[0].trim();
-        const isSection = trimmedLine[0] === "[" && trimmedLine[trimmedLine.length - 1] === "]";
-        if (isSection) {
-            currentSection = undefined;
-            currentSubSection = undefined;
-            const sectionName = trimmedLine.substring(1, trimmedLine.length - 1);
-            const matches = prefixKeyRegex.exec(sectionName);
-            if (matches) {
-                const [, prefix, , name] = matches;
-                if (Object.values(IniSectionType).includes(prefix)) {
-                    currentSection = [prefix, name].join(CONFIG_PREFIX_SEPARATOR);
-                }
-            }
-            else {
-                currentSection = sectionName;
-            }
-            if (profileNameBlockList.includes(sectionName)) {
-                throw new Error(`Found invalid profile name "${sectionName}"`);
-            }
-        }
-        else if (currentSection) {
-            const indexOfEqualsSign = trimmedLine.indexOf("=");
-            if (![0, -1].includes(indexOfEqualsSign)) {
-                const [name, value] = [
-                    trimmedLine.substring(0, indexOfEqualsSign).trim(),
-                    trimmedLine.substring(indexOfEqualsSign + 1).trim(),
-                ];
-                if (value === "") {
-                    currentSubSection = name;
-                }
-                else {
-                    if (currentSubSection && iniLine.trimStart() === iniLine) {
-                        currentSubSection = undefined;
-                    }
-                    map[currentSection] = map[currentSection] || {};
-                    const key = currentSubSection ? [currentSubSection, name].join(CONFIG_PREFIX_SEPARATOR) : name;
-                    map[currentSection][key] = value;
-                }
-            }
-        }
-    }
-    return map;
-};
-
-const filePromises = {};
-const fileIntercept = {};
-const readFile = (path, options) => {
-    if (fileIntercept[path] !== undefined) {
-        return fileIntercept[path];
-    }
-    if (!filePromises[path] || options?.ignoreCache) {
-        filePromises[path] = readFile$2(path, "utf8");
-    }
-    return filePromises[path];
-};
-
-const swallowError$1 = () => ({});
-const loadSharedConfigFiles = async (init = {}) => {
-    const { filepath = getCredentialsFilepath(), configFilepath = getConfigFilepath() } = init;
-    const homeDir = getHomeDir();
-    const relativeHomeDirPrefix = "~/";
-    let resolvedFilepath = filepath;
-    if (filepath.startsWith(relativeHomeDirPrefix)) {
-        resolvedFilepath = join(homeDir, filepath.slice(2));
-    }
-    let resolvedConfigFilepath = configFilepath;
-    if (configFilepath.startsWith(relativeHomeDirPrefix)) {
-        resolvedConfigFilepath = join(homeDir, configFilepath.slice(2));
-    }
-    const parsedFiles = await Promise.all([
-        readFile(resolvedConfigFilepath, {
-            ignoreCache: init.ignoreCache,
-        })
-            .then(parseIni)
-            .then(getConfigData)
-            .catch(swallowError$1),
-        readFile(resolvedFilepath, {
-            ignoreCache: init.ignoreCache,
-        })
-            .then(parseIni)
-            .catch(swallowError$1),
-    ]);
-    return {
-        configFile: parsedFiles[0],
-        credentialsFile: parsedFiles[1],
-    };
-};
-
-const getSsoSessionData = (data) => Object.entries(data)
-    .filter(([key]) => key.startsWith(IniSectionType.SSO_SESSION + CONFIG_PREFIX_SEPARATOR))
-    .reduce((acc, [key, value]) => ({ ...acc, [key.substring(key.indexOf(CONFIG_PREFIX_SEPARATOR) + 1)]: value }), {});
-
-const swallowError = () => ({});
-const loadSsoSessionData = async (init = {}) => readFile(init.configFilepath ?? getConfigFilepath())
-    .then(parseIni)
-    .then(getSsoSessionData)
-    .catch(swallowError);
-
-const mergeConfigFiles = (...files) => {
-    const merged = {};
-    for (const file of files) {
-        for (const [key, values] of Object.entries(file)) {
-            if (merged[key] !== undefined) {
-                Object.assign(merged[key], values);
-            }
-            else {
-                merged[key] = values;
-            }
-        }
-    }
-    return merged;
-};
-
-const parseKnownFiles = async (init) => {
-    const parsedFiles = await loadSharedConfigFiles(init);
-    return mergeConfigFiles(parsedFiles.configFile, parsedFiles.credentialsFile);
-};
-
-const externalDataInterceptor = {
-    getFileRecord() {
-        return fileIntercept;
-    },
-    interceptFile(path, contents) {
-        fileIntercept[path] = Promise.resolve(contents);
-    },
-    getTokenRecord() {
-        return tokenIntercept;
-    },
-    interceptToken(id, contents) {
-        tokenIntercept[id] = contents;
-    },
-};
-
-const fromSharedConfigFiles = (configSelector, { preferredFile = "config", ...init } = {}) => async () => {
-    const profile = getProfileName(init);
-    const { configFile, credentialsFile } = await loadSharedConfigFiles(init);
-    const profileFromCredentials = credentialsFile[profile] || {};
-    const profileFromConfig = configFile[profile] || {};
-    const mergedProfile = preferredFile === "config"
-        ? { ...profileFromCredentials, ...profileFromConfig }
-        : { ...profileFromConfig, ...profileFromCredentials };
-    try {
-        const cfgFile = preferredFile === "config" ? configFile : credentialsFile;
-        const configValue = configSelector(mergedProfile, cfgFile);
-        if (configValue === undefined) {
-            throw new Error();
-        }
-        return configValue;
-    }
-    catch (e) {
-        throw new CredentialsProviderError(e.message || `Not found in config files w/ profile [${profile}]: ${getSelectorName(configSelector.toString())}`, { logger: init.logger });
-    }
-};
-
-const isFunction = (func) => typeof func === "function";
-const fromStatic = (defaultValue) => isFunction(defaultValue) ? async () => await defaultValue() : fromStatic$1(defaultValue);
-
-const loadConfig = ({ environmentVariableSelector, configFileSelector, default: defaultValue }, configuration = {}) => {
-    const { signingName, logger } = configuration;
-    const envOptions = { signingName, logger };
-    return memoize(chain(fromEnv$1(environmentVariableSelector, envOptions), fromSharedConfigFiles(configFileSelector, configuration), fromStatic(defaultValue)));
-};
-
-const ENV_ENDPOINT_URL = "AWS_ENDPOINT_URL";
-const CONFIG_ENDPOINT_URL = "endpoint_url";
-const getEndpointUrlConfig = (serviceId) => ({
-    environmentVariableSelector: (env) => {
-        const serviceSuffixParts = serviceId.split(" ").map((w) => w.toUpperCase());
-        const serviceEndpointUrl = env[[ENV_ENDPOINT_URL, ...serviceSuffixParts].join("_")];
-        if (serviceEndpointUrl)
-            return serviceEndpointUrl;
-        const endpointUrl = env[ENV_ENDPOINT_URL];
-        if (endpointUrl)
-            return endpointUrl;
-        return undefined;
-    },
-    configFileSelector: (profile, config) => {
-        if (config && profile.services) {
-            const servicesSection = config[["services", profile.services].join(CONFIG_PREFIX_SEPARATOR)];
-            if (servicesSection) {
-                const servicePrefixParts = serviceId.split(" ").map((w) => w.toLowerCase());
-                const endpointUrl = servicesSection[[servicePrefixParts.join("_"), CONFIG_ENDPOINT_URL].join(CONFIG_PREFIX_SEPARATOR)];
-                if (endpointUrl)
-                    return endpointUrl;
-            }
-        }
-        const endpointUrl = profile[CONFIG_ENDPOINT_URL];
-        if (endpointUrl)
-            return endpointUrl;
-        return undefined;
-    },
-    default: undefined,
-});
-
-const getEndpointFromConfig = async (serviceId) => loadConfig(getEndpointUrlConfig(serviceId ?? ""))();
-
-const toEndpointV1 = (endpoint) => {
-    if (typeof endpoint === "object") {
-        if ("url" in endpoint) {
-            return parseUrl(endpoint.url);
-        }
-        return endpoint;
-    }
-    return parseUrl(endpoint);
-};
-
-const getEndpointFromInstructions = async (commandInput, instructionsSupplier, clientConfig, context) => {
-    if (!clientConfig.isCustomEndpoint) {
-        let endpointFromConfig;
-        if (clientConfig.serviceConfiguredEndpoint) {
-            endpointFromConfig = await clientConfig.serviceConfiguredEndpoint();
-        }
-        else {
-            endpointFromConfig = await getEndpointFromConfig(clientConfig.serviceId);
-        }
-        if (endpointFromConfig) {
-            clientConfig.endpoint = () => Promise.resolve(toEndpointV1(endpointFromConfig));
-            clientConfig.isCustomEndpoint = true;
-        }
-    }
-    const endpointParams = await resolveParams(commandInput, instructionsSupplier, clientConfig);
-    if (typeof clientConfig.endpointProvider !== "function") {
-        throw new Error("config.endpointProvider is not set.");
-    }
-    const endpoint = clientConfig.endpointProvider(endpointParams, context);
-    return endpoint;
-};
-const resolveParams = async (commandInput, instructionsSupplier, clientConfig) => {
-    const endpointParams = {};
-    const instructions = instructionsSupplier?.getEndpointParameterInstructions?.() || {};
-    for (const [name, instruction] of Object.entries(instructions)) {
-        switch (instruction.type) {
-            case "staticContextParams":
-                endpointParams[name] = instruction.value;
-                break;
-            case "contextParams":
-                endpointParams[name] = commandInput[instruction.name];
-                break;
-            case "clientContextParams":
-            case "builtInParams":
-                endpointParams[name] = await createConfigValueProvider(instruction.name, name, clientConfig, instruction.type !== "builtInParams")();
-                break;
-            case "operationContextParams":
-                endpointParams[name] = instruction.get(commandInput);
-                break;
-            default:
-                throw new Error("Unrecognized endpoint parameter instruction: " + JSON.stringify(instruction));
-        }
-    }
-    if (Object.keys(instructions).length === 0) {
-        Object.assign(endpointParams, clientConfig);
-    }
-    if (String(clientConfig.serviceId).toLowerCase() === "s3") {
-        await resolveParamsForS3(endpointParams);
-    }
-    return endpointParams;
-};
-
-const endpointMiddleware = ({ config, instructions, }) => {
-    return (next, context) => async (args) => {
-        if (config.isCustomEndpoint) {
-            setFeature$1(context, "ENDPOINT_OVERRIDE", "N");
-        }
-        const endpoint = await getEndpointFromInstructions(args.input, {
-            getEndpointParameterInstructions() {
-                return instructions;
-            },
-        }, { ...config }, context);
-        context.endpointV2 = endpoint;
-        context.authSchemes = endpoint.properties?.authSchemes;
-        const authScheme = context.authSchemes?.[0];
-        if (authScheme) {
-            context["signing_region"] = authScheme.signingRegion;
-            context["signing_service"] = authScheme.signingName;
-            const smithyContext = getSmithyContext(context);
-            const httpAuthOption = smithyContext?.selectedHttpAuthScheme?.httpAuthOption;
-            if (httpAuthOption) {
-                httpAuthOption.signingProperties = Object.assign(httpAuthOption.signingProperties || {}, {
-                    signing_region: authScheme.signingRegion,
-                    signingRegion: authScheme.signingRegion,
-                    signing_service: authScheme.signingName,
-                    signingName: authScheme.signingName,
-                    signingRegionSet: authScheme.signingRegionSet,
-                }, authScheme.properties);
-            }
-        }
-        return next({
-            ...args,
-        });
-    };
-};
-
-const endpointMiddlewareOptions = {
-    step: "serialize",
-    tags: ["ENDPOINT_PARAMETERS", "ENDPOINT_V2", "ENDPOINT"],
-    name: "endpointV2Middleware",
-    override: true,
-    relation: "before",
-    toMiddleware: serializerMiddlewareOption$1.name,
-};
-const getEndpointPlugin = (config, instructions) => ({
-    applyToStack: (clientStack) => {
-        clientStack.addRelativeTo(endpointMiddleware({
-            config,
-            instructions,
-        }), endpointMiddlewareOptions);
-    },
-});
-
-const resolveEndpointConfig = (input) => {
-    const tls = input.tls ?? true;
-    const { endpoint, useDualstackEndpoint, useFipsEndpoint } = input;
-    const customEndpointProvider = endpoint != null ? async () => toEndpointV1(await normalizeProvider$1(endpoint)()) : undefined;
-    const isCustomEndpoint = !!endpoint;
-    const resolvedConfig = Object.assign(input, {
-        endpoint: customEndpointProvider,
-        tls,
-        isCustomEndpoint,
-        useDualstackEndpoint: normalizeProvider$1(useDualstackEndpoint ?? false),
-        useFipsEndpoint: normalizeProvider$1(useFipsEndpoint ?? false),
-    });
-    let configuredEndpointPromise = undefined;
-    resolvedConfig.serviceConfiguredEndpoint = async () => {
-        if (input.serviceId && !configuredEndpointPromise) {
-            configuredEndpointPromise = getEndpointFromConfig(input.serviceId);
-        }
-        return configuredEndpointPromise;
-    };
-    return resolvedConfig;
-};
-
-var RETRY_MODES;
-(function (RETRY_MODES) {
-    RETRY_MODES["STANDARD"] = "standard";
-    RETRY_MODES["ADAPTIVE"] = "adaptive";
-})(RETRY_MODES || (RETRY_MODES = {}));
-const DEFAULT_MAX_ATTEMPTS = 3;
-const DEFAULT_RETRY_MODE = RETRY_MODES.STANDARD;
-
-const THROTTLING_ERROR_CODES = [
-    "BandwidthLimitExceeded",
-    "EC2ThrottledException",
-    "LimitExceededException",
-    "PriorRequestNotComplete",
-    "ProvisionedThroughputExceededException",
-    "RequestLimitExceeded",
-    "RequestThrottled",
-    "RequestThrottledException",
-    "SlowDown",
-    "ThrottledException",
-    "Throttling",
-    "ThrottlingException",
-    "TooManyRequestsException",
-    "TransactionInProgressException",
-];
-const TRANSIENT_ERROR_CODES = ["TimeoutError", "RequestTimeout", "RequestTimeoutException"];
-const TRANSIENT_ERROR_STATUS_CODES = [500, 502, 503, 504];
-const NODEJS_TIMEOUT_ERROR_CODES = ["ECONNRESET", "ECONNREFUSED", "EPIPE", "ETIMEDOUT"];
-const NODEJS_NETWORK_ERROR_CODES = ["EHOSTUNREACH", "ENETUNREACH", "ENOTFOUND"];
-
-const isRetryableByTrait = (error) => error?.$retryable !== undefined;
-const isClockSkewCorrectedError = (error) => error.$metadata?.clockSkewCorrected;
-const isBrowserNetworkError = (error) => {
-    const errorMessages = new Set([
-        "Failed to fetch",
-        "NetworkError when attempting to fetch resource",
-        "The Internet connection appears to be offline",
-        "Load failed",
-        "Network request failed",
-    ]);
-    const isValid = error && error instanceof TypeError;
-    if (!isValid) {
-        return false;
-    }
-    return errorMessages.has(error.message);
-};
-const isThrottlingError = (error) => error.$metadata?.httpStatusCode === 429 ||
-    THROTTLING_ERROR_CODES.includes(error.name) ||
-    error.$retryable?.throttling == true;
-const isTransientError = (error, depth = 0) => isRetryableByTrait(error) ||
-    isClockSkewCorrectedError(error) ||
-    TRANSIENT_ERROR_CODES.includes(error.name) ||
-    NODEJS_TIMEOUT_ERROR_CODES.includes(error?.code || "") ||
-    NODEJS_NETWORK_ERROR_CODES.includes(error?.code || "") ||
-    TRANSIENT_ERROR_STATUS_CODES.includes(error.$metadata?.httpStatusCode || 0) ||
-    isBrowserNetworkError(error) ||
-    (error.cause !== undefined && depth <= 10 && isTransientError(error.cause, depth + 1));
-const isServerError = (error) => {
-    if (error.$metadata?.httpStatusCode !== undefined) {
-        const statusCode = error.$metadata.httpStatusCode;
-        if (500 <= statusCode && statusCode <= 599 && !isTransientError(error)) {
-            return true;
-        }
-        return false;
-    }
-    return false;
-};
-
-class DefaultRateLimiter {
-    static setTimeoutFn = setTimeout;
-    beta;
-    minCapacity;
-    minFillRate;
-    scaleConstant;
-    smooth;
-    currentCapacity = 0;
-    enabled = false;
-    lastMaxRate = 0;
-    measuredTxRate = 0;
-    requestCount = 0;
-    fillRate;
-    lastThrottleTime;
-    lastTimestamp = 0;
-    lastTxRateBucket;
-    maxCapacity;
-    timeWindow = 0;
-    constructor(options) {
-        this.beta = options?.beta ?? 0.7;
-        this.minCapacity = options?.minCapacity ?? 1;
-        this.minFillRate = options?.minFillRate ?? 0.5;
-        this.scaleConstant = options?.scaleConstant ?? 0.4;
-        this.smooth = options?.smooth ?? 0.8;
-        const currentTimeInSeconds = this.getCurrentTimeInSeconds();
-        this.lastThrottleTime = currentTimeInSeconds;
-        this.lastTxRateBucket = Math.floor(this.getCurrentTimeInSeconds());
-        this.fillRate = this.minFillRate;
-        this.maxCapacity = this.minCapacity;
-    }
-    getCurrentTimeInSeconds() {
-        return Date.now() / 1000;
-    }
-    async getSendToken() {
-        return this.acquireTokenBucket(1);
-    }
-    async acquireTokenBucket(amount) {
-        if (!this.enabled) {
-            return;
-        }
-        this.refillTokenBucket();
-        if (amount > this.currentCapacity) {
-            const delay = ((amount - this.currentCapacity) / this.fillRate) * 1000;
-            await new Promise((resolve) => DefaultRateLimiter.setTimeoutFn(resolve, delay));
-        }
-        this.currentCapacity = this.currentCapacity - amount;
-    }
-    refillTokenBucket() {
-        const timestamp = this.getCurrentTimeInSeconds();
-        if (!this.lastTimestamp) {
-            this.lastTimestamp = timestamp;
-            return;
-        }
-        const fillAmount = (timestamp - this.lastTimestamp) * this.fillRate;
-        this.currentCapacity = Math.min(this.maxCapacity, this.currentCapacity + fillAmount);
-        this.lastTimestamp = timestamp;
-    }
-    updateClientSendingRate(response) {
-        let calculatedRate;
-        this.updateMeasuredRate();
-        if (isThrottlingError(response)) {
-            const rateToUse = !this.enabled ? this.measuredTxRate : Math.min(this.measuredTxRate, this.fillRate);
-            this.lastMaxRate = rateToUse;
-            this.calculateTimeWindow();
-            this.lastThrottleTime = this.getCurrentTimeInSeconds();
-            calculatedRate = this.cubicThrottle(rateToUse);
-            this.enableTokenBucket();
-        }
-        else {
-            this.calculateTimeWindow();
-            calculatedRate = this.cubicSuccess(this.getCurrentTimeInSeconds());
-        }
-        const newRate = Math.min(calculatedRate, 2 * this.measuredTxRate);
-        this.updateTokenBucketRate(newRate);
-    }
-    calculateTimeWindow() {
-        this.timeWindow = this.getPrecise(Math.pow((this.lastMaxRate * (1 - this.beta)) / this.scaleConstant, 1 / 3));
-    }
-    cubicThrottle(rateToUse) {
-        return this.getPrecise(rateToUse * this.beta);
-    }
-    cubicSuccess(timestamp) {
-        return this.getPrecise(this.scaleConstant * Math.pow(timestamp - this.lastThrottleTime - this.timeWindow, 3) + this.lastMaxRate);
-    }
-    enableTokenBucket() {
-        this.enabled = true;
-    }
-    updateTokenBucketRate(newRate) {
-        this.refillTokenBucket();
-        this.fillRate = Math.max(newRate, this.minFillRate);
-        this.maxCapacity = Math.max(newRate, this.minCapacity);
-        this.currentCapacity = Math.min(this.currentCapacity, this.maxCapacity);
-    }
-    updateMeasuredRate() {
-        const t = this.getCurrentTimeInSeconds();
-        const timeBucket = Math.floor(t * 2) / 2;
-        this.requestCount++;
-        if (timeBucket > this.lastTxRateBucket) {
-            const currentRate = this.requestCount / (timeBucket - this.lastTxRateBucket);
-            this.measuredTxRate = this.getPrecise(currentRate * this.smooth + this.measuredTxRate * (1 - this.smooth));
-            this.requestCount = 0;
-            this.lastTxRateBucket = timeBucket;
-        }
-    }
-    getPrecise(num) {
-        return parseFloat(num.toFixed(8));
-    }
-}
-
-const DEFAULT_RETRY_DELAY_BASE = 100;
-const MAXIMUM_RETRY_DELAY = 20 * 1000;
-const THROTTLING_RETRY_DELAY_BASE = 500;
-const INITIAL_RETRY_TOKENS = 500;
-const RETRY_COST = 5;
-const TIMEOUT_RETRY_COST = 10;
-const NO_RETRY_INCREMENT = 1;
-const INVOCATION_ID_HEADER = "amz-sdk-invocation-id";
-const REQUEST_HEADER = "amz-sdk-request";
-
-const getDefaultRetryBackoffStrategy = () => {
-    let delayBase = DEFAULT_RETRY_DELAY_BASE;
-    const computeNextBackoffDelay = (attempts) => {
-        return Math.floor(Math.min(MAXIMUM_RETRY_DELAY, Math.random() * 2 ** attempts * delayBase));
-    };
-    const setDelayBase = (delay) => {
-        delayBase = delay;
-    };
-    return {
-        computeNextBackoffDelay,
-        setDelayBase,
-    };
-};
-
-const createDefaultRetryToken = ({ retryDelay, retryCount, retryCost, }) => {
-    const getRetryCount = () => retryCount;
-    const getRetryDelay = () => Math.min(MAXIMUM_RETRY_DELAY, retryDelay);
-    const getRetryCost = () => retryCost;
-    return {
-        getRetryCount,
-        getRetryDelay,
-        getRetryCost,
-    };
-};
-
-class StandardRetryStrategy {
-    maxAttempts;
-    mode = RETRY_MODES.STANDARD;
-    capacity = INITIAL_RETRY_TOKENS;
-    retryBackoffStrategy = getDefaultRetryBackoffStrategy();
-    maxAttemptsProvider;
-    constructor(maxAttempts) {
-        this.maxAttempts = maxAttempts;
-        this.maxAttemptsProvider = typeof maxAttempts === "function" ? maxAttempts : async () => maxAttempts;
-    }
-    async acquireInitialRetryToken(retryTokenScope) {
-        return createDefaultRetryToken({
-            retryDelay: DEFAULT_RETRY_DELAY_BASE,
-            retryCount: 0,
-        });
-    }
-    async refreshRetryTokenForRetry(token, errorInfo) {
-        const maxAttempts = await this.getMaxAttempts();
-        if (this.shouldRetry(token, errorInfo, maxAttempts)) {
-            const errorType = errorInfo.errorType;
-            this.retryBackoffStrategy.setDelayBase(errorType === "THROTTLING" ? THROTTLING_RETRY_DELAY_BASE : DEFAULT_RETRY_DELAY_BASE);
-            const delayFromErrorType = this.retryBackoffStrategy.computeNextBackoffDelay(token.getRetryCount());
-            const retryDelay = errorInfo.retryAfterHint
-                ? Math.max(errorInfo.retryAfterHint.getTime() - Date.now() || 0, delayFromErrorType)
-                : delayFromErrorType;
-            const capacityCost = this.getCapacityCost(errorType);
-            this.capacity -= capacityCost;
-            return createDefaultRetryToken({
-                retryDelay,
-                retryCount: token.getRetryCount() + 1,
-                retryCost: capacityCost,
-            });
-        }
-        throw new Error("No retry token available");
-    }
-    recordSuccess(token) {
-        this.capacity = Math.max(INITIAL_RETRY_TOKENS, this.capacity + (token.getRetryCost() ?? NO_RETRY_INCREMENT));
-    }
-    getCapacity() {
-        return this.capacity;
-    }
-    async getMaxAttempts() {
-        try {
-            return await this.maxAttemptsProvider();
-        }
-        catch (error) {
-            console.warn(`Max attempts provider could not resolve. Using default of ${DEFAULT_MAX_ATTEMPTS}`);
-            return DEFAULT_MAX_ATTEMPTS;
-        }
-    }
-    shouldRetry(tokenToRenew, errorInfo, maxAttempts) {
-        const attempts = tokenToRenew.getRetryCount() + 1;
-        return (attempts < maxAttempts &&
-            this.capacity >= this.getCapacityCost(errorInfo.errorType) &&
-            this.isRetryableError(errorInfo.errorType));
-    }
-    getCapacityCost(errorType) {
-        return errorType === "TRANSIENT" ? TIMEOUT_RETRY_COST : RETRY_COST;
-    }
-    isRetryableError(errorType) {
-        return errorType === "THROTTLING" || errorType === "TRANSIENT";
-    }
-}
-
-class AdaptiveRetryStrategy {
-    maxAttemptsProvider;
-    rateLimiter;
-    standardRetryStrategy;
-    mode = RETRY_MODES.ADAPTIVE;
-    constructor(maxAttemptsProvider, options) {
-        this.maxAttemptsProvider = maxAttemptsProvider;
-        const { rateLimiter } = options ?? {};
-        this.rateLimiter = rateLimiter ?? new DefaultRateLimiter();
-        this.standardRetryStrategy = new StandardRetryStrategy(maxAttemptsProvider);
-    }
-    async acquireInitialRetryToken(retryTokenScope) {
-        await this.rateLimiter.getSendToken();
-        return this.standardRetryStrategy.acquireInitialRetryToken(retryTokenScope);
-    }
-    async refreshRetryTokenForRetry(tokenToRenew, errorInfo) {
-        this.rateLimiter.updateClientSendingRate(errorInfo);
-        return this.standardRetryStrategy.refreshRetryTokenForRetry(tokenToRenew, errorInfo);
-    }
-    recordSuccess(token) {
-        this.rateLimiter.updateClientSendingRate({});
-        this.standardRetryStrategy.recordSuccess(token);
-    }
-}
-
-const asSdkError = (error) => {
-    if (error instanceof Error)
-        return error;
-    if (error instanceof Object)
-        return Object.assign(new Error(), error);
-    if (typeof error === "string")
-        return new Error(error);
-    return new Error(`AWS SDK error wrapper for ${error}`);
-};
-
-const ENV_MAX_ATTEMPTS = "AWS_MAX_ATTEMPTS";
-const CONFIG_MAX_ATTEMPTS = "max_attempts";
-const NODE_MAX_ATTEMPT_CONFIG_OPTIONS = {
-    environmentVariableSelector: (env) => {
-        const value = env[ENV_MAX_ATTEMPTS];
-        if (!value)
-            return undefined;
-        const maxAttempt = parseInt(value);
-        if (Number.isNaN(maxAttempt)) {
-            throw new Error(`Environment variable ${ENV_MAX_ATTEMPTS} mast be a number, got "${value}"`);
-        }
-        return maxAttempt;
-    },
-    configFileSelector: (profile) => {
-        const value = profile[CONFIG_MAX_ATTEMPTS];
-        if (!value)
-            return undefined;
-        const maxAttempt = parseInt(value);
-        if (Number.isNaN(maxAttempt)) {
-            throw new Error(`Shared config file entry ${CONFIG_MAX_ATTEMPTS} mast be a number, got "${value}"`);
-        }
-        return maxAttempt;
-    },
-    default: DEFAULT_MAX_ATTEMPTS,
-};
-const resolveRetryConfig = (input) => {
-    const { retryStrategy, retryMode: _retryMode, maxAttempts: _maxAttempts } = input;
-    const maxAttempts = normalizeProvider$1(_maxAttempts ?? DEFAULT_MAX_ATTEMPTS);
-    return Object.assign(input, {
-        maxAttempts,
-        retryStrategy: async () => {
-            if (retryStrategy) {
-                return retryStrategy;
-            }
-            const retryMode = await normalizeProvider$1(_retryMode)();
-            if (retryMode === RETRY_MODES.ADAPTIVE) {
-                return new AdaptiveRetryStrategy(maxAttempts);
-            }
-            return new StandardRetryStrategy(maxAttempts);
-        },
-    });
-};
-const ENV_RETRY_MODE = "AWS_RETRY_MODE";
-const CONFIG_RETRY_MODE = "retry_mode";
-const NODE_RETRY_MODE_CONFIG_OPTIONS = {
-    environmentVariableSelector: (env) => env[ENV_RETRY_MODE],
-    configFileSelector: (profile) => profile[CONFIG_RETRY_MODE],
-    default: DEFAULT_RETRY_MODE,
-};
-
-const isStreamingPayload = (request) => request?.body instanceof Readable ||
-    (typeof ReadableStream !== "undefined" && request?.body instanceof ReadableStream);
-
-const retryMiddleware = (options) => (next, context) => async (args) => {
-    let retryStrategy = await options.retryStrategy();
-    const maxAttempts = await options.maxAttempts();
-    if (isRetryStrategyV2(retryStrategy)) {
-        retryStrategy = retryStrategy;
-        let retryToken = await retryStrategy.acquireInitialRetryToken(context["partition_id"]);
-        let lastError = new Error();
-        let attempts = 0;
-        let totalRetryDelay = 0;
-        const { request } = args;
-        const isRequest = HttpRequest.isInstance(request);
-        if (isRequest) {
-            request.headers[INVOCATION_ID_HEADER] = v4();
-        }
-        while (true) {
-            try {
-                if (isRequest) {
-                    request.headers[REQUEST_HEADER] = `attempt=${attempts + 1}; max=${maxAttempts}`;
-                }
-                const { response, output } = await next(args);
-                retryStrategy.recordSuccess(retryToken);
-                output.$metadata.attempts = attempts + 1;
-                output.$metadata.totalRetryDelay = totalRetryDelay;
-                return { response, output };
-            }
-            catch (e) {
-                const retryErrorInfo = getRetryErrorInfo(e);
-                lastError = asSdkError(e);
-                if (isRequest && isStreamingPayload(request)) {
-                    (context.logger instanceof NoOpLogger ? console : context.logger)?.warn("An error was encountered in a non-retryable streaming request.");
-                    throw lastError;
-                }
-                try {
-                    retryToken = await retryStrategy.refreshRetryTokenForRetry(retryToken, retryErrorInfo);
-                }
-                catch (refreshError) {
-                    if (!lastError.$metadata) {
-                        lastError.$metadata = {};
-                    }
-                    lastError.$metadata.attempts = attempts + 1;
-                    lastError.$metadata.totalRetryDelay = totalRetryDelay;
-                    throw lastError;
-                }
-                attempts = retryToken.getRetryCount();
-                const delay = retryToken.getRetryDelay();
-                totalRetryDelay += delay;
-                await new Promise((resolve) => setTimeout(resolve, delay));
-            }
-        }
-    }
-    else {
-        retryStrategy = retryStrategy;
-        if (retryStrategy?.mode)
-            context.userAgent = [...(context.userAgent || []), ["cfg/retry-mode", retryStrategy.mode]];
-        return retryStrategy.retry(next, args);
-    }
-};
-const isRetryStrategyV2 = (retryStrategy) => typeof retryStrategy.acquireInitialRetryToken !== "undefined" &&
-    typeof retryStrategy.refreshRetryTokenForRetry !== "undefined" &&
-    typeof retryStrategy.recordSuccess !== "undefined";
-const getRetryErrorInfo = (error) => {
-    const errorInfo = {
-        error,
-        errorType: getRetryErrorType(error),
-    };
-    const retryAfterHint = getRetryAfterHint(error.$response);
-    if (retryAfterHint) {
-        errorInfo.retryAfterHint = retryAfterHint;
-    }
-    return errorInfo;
-};
-const getRetryErrorType = (error) => {
-    if (isThrottlingError(error))
-        return "THROTTLING";
-    if (isTransientError(error))
-        return "TRANSIENT";
-    if (isServerError(error))
-        return "SERVER_ERROR";
-    return "CLIENT_ERROR";
-};
-const retryMiddlewareOptions = {
-    name: "retryMiddleware",
-    tags: ["RETRY"],
-    step: "finalizeRequest",
-    priority: "high",
-    override: true,
-};
-const getRetryPlugin = (options) => ({
-    applyToStack: (clientStack) => {
-        clientStack.add(retryMiddleware(options), retryMiddlewareOptions);
-    },
-});
-const getRetryAfterHint = (response) => {
-    if (!HttpResponse.isInstance(response))
-        return;
-    const retryAfterHeaderName = Object.keys(response.headers).find((key) => key.toLowerCase() === "retry-after");
-    if (!retryAfterHeaderName)
-        return;
-    const retryAfter = response.headers[retryAfterHeaderName];
-    const retryAfterSeconds = Number(retryAfter);
-    if (!Number.isNaN(retryAfterSeconds))
-        return new Date(retryAfterSeconds * 1000);
-    const retryAfterDate = new Date(retryAfter);
-    return retryAfterDate;
-};
 
 const defaultDynamoDBHttpAuthSchemeParametersProvider = async (config, context, input) => {
     return {
@@ -44086,9 +41798,9 @@ const _CE = "ConditionExpression";
 const _CO = "ComparisonOperator";
 const _COo = "ConditionalOperator";
 const _CPIM = "CachePeriodInMinutes";
+const _CR = "CancellationReasons";
 const _CRL = "CancellationReasonList";
 const _CRa = "CancellationReason";
-const _CRan = "CancellationReasons";
 const _CU = "CapacityUnits";
 const _Ca = "Capacity";
 const _DE = "DescribeEndpoints";
@@ -44175,22 +41887,228 @@ const _hE$4 = "httpError";
 const _m$3 = "message";
 const _r$1 = "reason";
 const _re = "resource";
-const _s$4 = "server";
-const _sm$2 = "smithy.ts.sdk.synthetic.com.amazonaws.dynamodb";
+const _s$4 = "smithy.ts.sdk.synthetic.com.amazonaws.dynamodb";
+const _se$2 = "server";
 const _tR = "throttlingReasons";
 const n0$4 = "com.amazonaws.dynamodb";
+const _s_registry$4 = TypeRegistry.for(_s$4);
+var DynamoDBServiceException$ = [-3, _s$4, "DynamoDBServiceException", 0, [], []];
+_s_registry$4.registerError(DynamoDBServiceException$, DynamoDBServiceException);
+const n0_registry$4 = TypeRegistry.for(n0$4);
 var BackupInUseException$ = [-3, n0$4, _BIUE,
     { [_e$4]: _c$4 },
     [_m$3],
     [0]
 ];
-TypeRegistry.for(n0$4).registerError(BackupInUseException$, BackupInUseException);
+n0_registry$4.registerError(BackupInUseException$, BackupInUseException);
 var BackupNotFoundException$ = [-3, n0$4, _BNFE,
     { [_e$4]: _c$4 },
     [_m$3],
     [0]
 ];
-TypeRegistry.for(n0$4).registerError(BackupNotFoundException$, BackupNotFoundException);
+n0_registry$4.registerError(BackupNotFoundException$, BackupNotFoundException);
+var ConditionalCheckFailedException$ = [-3, n0$4, _CCFE,
+    { [_e$4]: _c$4 },
+    [_m$3, _I],
+    [0, () => AttributeMap]
+];
+n0_registry$4.registerError(ConditionalCheckFailedException$, ConditionalCheckFailedException);
+var ContinuousBackupsUnavailableException$ = [-3, n0$4, _CBUE,
+    { [_e$4]: _c$4 },
+    [_m$3],
+    [0]
+];
+n0_registry$4.registerError(ContinuousBackupsUnavailableException$, ContinuousBackupsUnavailableException);
+var DuplicateItemException$ = [-3, n0$4, _DIE,
+    { [_e$4]: _c$4 },
+    [_m$3],
+    [0]
+];
+n0_registry$4.registerError(DuplicateItemException$, DuplicateItemException);
+var ExportConflictException$ = [-3, n0$4, _ECE,
+    { [_e$4]: _c$4 },
+    [_m$3],
+    [0]
+];
+n0_registry$4.registerError(ExportConflictException$, ExportConflictException);
+var ExportNotFoundException$ = [-3, n0$4, _ENFE,
+    { [_e$4]: _c$4 },
+    [_m$3],
+    [0]
+];
+n0_registry$4.registerError(ExportNotFoundException$, ExportNotFoundException);
+var GlobalTableAlreadyExistsException$ = [-3, n0$4, _GTAEE,
+    { [_e$4]: _c$4 },
+    [_m$3],
+    [0]
+];
+n0_registry$4.registerError(GlobalTableAlreadyExistsException$, GlobalTableAlreadyExistsException);
+var GlobalTableNotFoundException$ = [-3, n0$4, _GTNFE,
+    { [_e$4]: _c$4 },
+    [_m$3],
+    [0]
+];
+n0_registry$4.registerError(GlobalTableNotFoundException$, GlobalTableNotFoundException);
+var IdempotentParameterMismatchException$ = [-3, n0$4, _IPME,
+    { [_e$4]: _c$4 },
+    [_M],
+    [0]
+];
+n0_registry$4.registerError(IdempotentParameterMismatchException$, IdempotentParameterMismatchException);
+var ImportConflictException$ = [-3, n0$4, _ICE$1,
+    { [_e$4]: _c$4 },
+    [_m$3],
+    [0]
+];
+n0_registry$4.registerError(ImportConflictException$, ImportConflictException);
+var ImportNotFoundException$ = [-3, n0$4, _INFE,
+    { [_e$4]: _c$4 },
+    [_m$3],
+    [0]
+];
+n0_registry$4.registerError(ImportNotFoundException$, ImportNotFoundException);
+var IndexNotFoundException$ = [-3, n0$4, _INFEn,
+    { [_e$4]: _c$4 },
+    [_m$3],
+    [0]
+];
+n0_registry$4.registerError(IndexNotFoundException$, IndexNotFoundException);
+var InternalServerError$ = [-3, n0$4, _ISE$2,
+    { [_e$4]: _se$2 },
+    [_m$3],
+    [0]
+];
+n0_registry$4.registerError(InternalServerError$, InternalServerError);
+var InvalidEndpointException$ = [-3, n0$4, _IEE,
+    { [_e$4]: _c$4, [_hE$4]: 421 },
+    [_M],
+    [0]
+];
+n0_registry$4.registerError(InvalidEndpointException$, InvalidEndpointException);
+var InvalidExportTimeException$ = [-3, n0$4, _IETE,
+    { [_e$4]: _c$4 },
+    [_m$3],
+    [0]
+];
+n0_registry$4.registerError(InvalidExportTimeException$, InvalidExportTimeException);
+var InvalidRestoreTimeException$ = [-3, n0$4, _IRTE,
+    { [_e$4]: _c$4 },
+    [_m$3],
+    [0]
+];
+n0_registry$4.registerError(InvalidRestoreTimeException$, InvalidRestoreTimeException);
+var ItemCollectionSizeLimitExceededException$ = [-3, n0$4, _ICSLEE,
+    { [_e$4]: _c$4 },
+    [_m$3],
+    [0]
+];
+n0_registry$4.registerError(ItemCollectionSizeLimitExceededException$, ItemCollectionSizeLimitExceededException);
+var LimitExceededException$ = [-3, n0$4, _LEE,
+    { [_e$4]: _c$4 },
+    [_m$3],
+    [0]
+];
+n0_registry$4.registerError(LimitExceededException$, LimitExceededException);
+var PointInTimeRecoveryUnavailableException$ = [-3, n0$4, _PITRUE,
+    { [_e$4]: _c$4 },
+    [_m$3],
+    [0]
+];
+n0_registry$4.registerError(PointInTimeRecoveryUnavailableException$, PointInTimeRecoveryUnavailableException);
+var PolicyNotFoundException$ = [-3, n0$4, _PNFE,
+    { [_e$4]: _c$4 },
+    [_m$3],
+    [0]
+];
+n0_registry$4.registerError(PolicyNotFoundException$, PolicyNotFoundException);
+var ProvisionedThroughputExceededException$ = [-3, n0$4, _PTEE,
+    { [_e$4]: _c$4 },
+    [_m$3, _TR],
+    [0, () => ThrottlingReasonList]
+];
+n0_registry$4.registerError(ProvisionedThroughputExceededException$, ProvisionedThroughputExceededException);
+var ReplicaAlreadyExistsException$ = [-3, n0$4, _RAEE,
+    { [_e$4]: _c$4 },
+    [_m$3],
+    [0]
+];
+n0_registry$4.registerError(ReplicaAlreadyExistsException$, ReplicaAlreadyExistsException);
+var ReplicaNotFoundException$ = [-3, n0$4, _RNFE$1,
+    { [_e$4]: _c$4 },
+    [_m$3],
+    [0]
+];
+n0_registry$4.registerError(ReplicaNotFoundException$, ReplicaNotFoundException);
+var ReplicatedWriteConflictException$ = [-3, n0$4, _RWCE,
+    { [_e$4]: _c$4 },
+    [_m$3],
+    [0]
+];
+n0_registry$4.registerError(ReplicatedWriteConflictException$, ReplicatedWriteConflictException);
+var RequestLimitExceeded$ = [-3, n0$4, _RLE,
+    { [_e$4]: _c$4 },
+    [_m$3, _TR],
+    [0, () => ThrottlingReasonList]
+];
+n0_registry$4.registerError(RequestLimitExceeded$, RequestLimitExceeded);
+var ResourceInUseException$ = [-3, n0$4, _RIUE,
+    { [_e$4]: _c$4 },
+    [_m$3],
+    [0]
+];
+n0_registry$4.registerError(ResourceInUseException$, ResourceInUseException);
+var ResourceNotFoundException$$1 = [-3, n0$4, _RNFEe,
+    { [_e$4]: _c$4 },
+    [_m$3],
+    [0]
+];
+n0_registry$4.registerError(ResourceNotFoundException$$1, ResourceNotFoundException$1);
+var TableAlreadyExistsException$ = [-3, n0$4, _TAEE,
+    { [_e$4]: _c$4 },
+    [_m$3],
+    [0]
+];
+n0_registry$4.registerError(TableAlreadyExistsException$, TableAlreadyExistsException);
+var TableInUseException$ = [-3, n0$4, _TIUE,
+    { [_e$4]: _c$4 },
+    [_m$3],
+    [0]
+];
+n0_registry$4.registerError(TableInUseException$, TableInUseException);
+var TableNotFoundException$ = [-3, n0$4, _TNFE,
+    { [_e$4]: _c$4 },
+    [_m$3],
+    [0]
+];
+n0_registry$4.registerError(TableNotFoundException$, TableNotFoundException);
+var ThrottlingException$ = [-3, n0$4, _TE,
+    { [_aQE$1]: [`Throttling`, 400], [_e$4]: _c$4, [_hE$4]: 400 },
+    [_m$3, _tR],
+    [0, () => ThrottlingReasonList]
+];
+n0_registry$4.registerError(ThrottlingException$, ThrottlingException);
+var TransactionCanceledException$ = [-3, n0$4, _TCE,
+    { [_e$4]: _c$4 },
+    [_M, _CR],
+    [0, () => CancellationReasonList]
+];
+n0_registry$4.registerError(TransactionCanceledException$, TransactionCanceledException);
+var TransactionConflictException$ = [-3, n0$4, _TCEr,
+    { [_e$4]: _c$4 },
+    [_m$3],
+    [0]
+];
+n0_registry$4.registerError(TransactionConflictException$, TransactionConflictException);
+var TransactionInProgressException$ = [-3, n0$4, _TIPE,
+    { [_e$4]: _c$4 },
+    [_M],
+    [0]
+];
+n0_registry$4.registerError(TransactionInProgressException$, TransactionInProgressException);
+const errorTypeRegistries$4 = [
+    _s_registry$4,
+    n0_registry$4,
+];
 var CancellationReason$ = [3, n0$4, _CRa,
     0,
     [_I, _C$1, _M],
@@ -44201,23 +42119,11 @@ var Capacity$ = [3, n0$4, _Ca,
     [_RCU, _WCU, _CU],
     [1, 1, 1]
 ];
-var ConditionalCheckFailedException$ = [-3, n0$4, _CCFE,
-    { [_e$4]: _c$4 },
-    [_m$3, _I],
-    [0, () => AttributeMap]
-];
-TypeRegistry.for(n0$4).registerError(ConditionalCheckFailedException$, ConditionalCheckFailedException);
 var ConsumedCapacity$ = [3, n0$4, _CC,
     0,
     [_TN, _CU, _RCU, _WCU, _T$1, _LSI, _GSI],
     [0, 1, 1, 1, () => Capacity$, () => SecondaryIndexesCapacityMap, () => SecondaryIndexesCapacityMap]
 ];
-var ContinuousBackupsUnavailableException$ = [-3, n0$4, _CBUE,
-    { [_e$4]: _c$4 },
-    [_m$3],
-    [0]
-];
-TypeRegistry.for(n0$4).registerError(ContinuousBackupsUnavailableException$, ContinuousBackupsUnavailableException);
 var DescribeEndpointsRequest$ = [3, n0$4, _DER,
     0,
     [],
@@ -44228,12 +42134,6 @@ var DescribeEndpointsResponse$ = [3, n0$4, _DERe,
     [_En],
     [() => Endpoints], 1
 ];
-var DuplicateItemException$ = [-3, n0$4, _DIE,
-    { [_e$4]: _c$4 },
-    [_m$3],
-    [0]
-];
-TypeRegistry.for(n0$4).registerError(DuplicateItemException$, DuplicateItemException);
 var Endpoint$ = [3, n0$4, _End,
     0,
     [_Ad, _CPIM],
@@ -44244,113 +42144,11 @@ var ExpectedAttributeValue$ = [3, n0$4, _EAVx,
     [_V$1, _Exi, _CO, _AVL],
     [() => AttributeValue$, 2, 0, () => AttributeValueList]
 ];
-var ExportConflictException$ = [-3, n0$4, _ECE,
-    { [_e$4]: _c$4 },
-    [_m$3],
-    [0]
-];
-TypeRegistry.for(n0$4).registerError(ExportConflictException$, ExportConflictException);
-var ExportNotFoundException$ = [-3, n0$4, _ENFE,
-    { [_e$4]: _c$4 },
-    [_m$3],
-    [0]
-];
-TypeRegistry.for(n0$4).registerError(ExportNotFoundException$, ExportNotFoundException);
-var GlobalTableAlreadyExistsException$ = [-3, n0$4, _GTAEE,
-    { [_e$4]: _c$4 },
-    [_m$3],
-    [0]
-];
-TypeRegistry.for(n0$4).registerError(GlobalTableAlreadyExistsException$, GlobalTableAlreadyExistsException);
-var GlobalTableNotFoundException$ = [-3, n0$4, _GTNFE,
-    { [_e$4]: _c$4 },
-    [_m$3],
-    [0]
-];
-TypeRegistry.for(n0$4).registerError(GlobalTableNotFoundException$, GlobalTableNotFoundException);
-var IdempotentParameterMismatchException$ = [-3, n0$4, _IPME,
-    { [_e$4]: _c$4 },
-    [_M],
-    [0]
-];
-TypeRegistry.for(n0$4).registerError(IdempotentParameterMismatchException$, IdempotentParameterMismatchException);
-var ImportConflictException$ = [-3, n0$4, _ICE$1,
-    { [_e$4]: _c$4 },
-    [_m$3],
-    [0]
-];
-TypeRegistry.for(n0$4).registerError(ImportConflictException$, ImportConflictException);
-var ImportNotFoundException$ = [-3, n0$4, _INFE,
-    { [_e$4]: _c$4 },
-    [_m$3],
-    [0]
-];
-TypeRegistry.for(n0$4).registerError(ImportNotFoundException$, ImportNotFoundException);
-var IndexNotFoundException$ = [-3, n0$4, _INFEn,
-    { [_e$4]: _c$4 },
-    [_m$3],
-    [0]
-];
-TypeRegistry.for(n0$4).registerError(IndexNotFoundException$, IndexNotFoundException);
-var InternalServerError$ = [-3, n0$4, _ISE$2,
-    { [_e$4]: _s$4 },
-    [_m$3],
-    [0]
-];
-TypeRegistry.for(n0$4).registerError(InternalServerError$, InternalServerError);
-var InvalidEndpointException$ = [-3, n0$4, _IEE,
-    { [_e$4]: _c$4, [_hE$4]: 421 },
-    [_M],
-    [0]
-];
-TypeRegistry.for(n0$4).registerError(InvalidEndpointException$, InvalidEndpointException);
-var InvalidExportTimeException$ = [-3, n0$4, _IETE,
-    { [_e$4]: _c$4 },
-    [_m$3],
-    [0]
-];
-TypeRegistry.for(n0$4).registerError(InvalidExportTimeException$, InvalidExportTimeException);
-var InvalidRestoreTimeException$ = [-3, n0$4, _IRTE,
-    { [_e$4]: _c$4 },
-    [_m$3],
-    [0]
-];
-TypeRegistry.for(n0$4).registerError(InvalidRestoreTimeException$, InvalidRestoreTimeException);
 var ItemCollectionMetrics$ = [3, n0$4, _ICM,
     0,
     [_ICK, _SERGB],
     [() => ItemCollectionKeyAttributeMap, 64 | 1]
 ];
-var ItemCollectionSizeLimitExceededException$ = [-3, n0$4, _ICSLEE,
-    { [_e$4]: _c$4 },
-    [_m$3],
-    [0]
-];
-TypeRegistry.for(n0$4).registerError(ItemCollectionSizeLimitExceededException$, ItemCollectionSizeLimitExceededException);
-var LimitExceededException$ = [-3, n0$4, _LEE,
-    { [_e$4]: _c$4 },
-    [_m$3],
-    [0]
-];
-TypeRegistry.for(n0$4).registerError(LimitExceededException$, LimitExceededException);
-var PointInTimeRecoveryUnavailableException$ = [-3, n0$4, _PITRUE,
-    { [_e$4]: _c$4 },
-    [_m$3],
-    [0]
-];
-TypeRegistry.for(n0$4).registerError(PointInTimeRecoveryUnavailableException$, PointInTimeRecoveryUnavailableException);
-var PolicyNotFoundException$ = [-3, n0$4, _PNFE,
-    { [_e$4]: _c$4 },
-    [_m$3],
-    [0]
-];
-TypeRegistry.for(n0$4).registerError(PolicyNotFoundException$, PolicyNotFoundException);
-var ProvisionedThroughputExceededException$ = [-3, n0$4, _PTEE,
-    { [_e$4]: _c$4 },
-    [_m$3, _TR],
-    [0, () => ThrottlingReasonList]
-];
-TypeRegistry.for(n0$4).registerError(ProvisionedThroughputExceededException$, ProvisionedThroughputExceededException);
 var PutItemInput$ = [3, n0$4, _PII,
     0,
     [_TN, _I, _Ex, _RV, _RCC, _RICM, _COo, _CE, _EAN, _EAV, _RVOCCF],
@@ -44361,91 +42159,11 @@ var PutItemOutput$ = [3, n0$4, _PIO,
     [_At, _CC, _ICM],
     [() => AttributeMap, () => ConsumedCapacity$, () => ItemCollectionMetrics$]
 ];
-var ReplicaAlreadyExistsException$ = [-3, n0$4, _RAEE,
-    { [_e$4]: _c$4 },
-    [_m$3],
-    [0]
-];
-TypeRegistry.for(n0$4).registerError(ReplicaAlreadyExistsException$, ReplicaAlreadyExistsException);
-var ReplicaNotFoundException$ = [-3, n0$4, _RNFE$1,
-    { [_e$4]: _c$4 },
-    [_m$3],
-    [0]
-];
-TypeRegistry.for(n0$4).registerError(ReplicaNotFoundException$, ReplicaNotFoundException);
-var ReplicatedWriteConflictException$ = [-3, n0$4, _RWCE,
-    { [_e$4]: _c$4 },
-    [_m$3],
-    [0]
-];
-TypeRegistry.for(n0$4).registerError(ReplicatedWriteConflictException$, ReplicatedWriteConflictException);
-var RequestLimitExceeded$ = [-3, n0$4, _RLE,
-    { [_e$4]: _c$4 },
-    [_m$3, _TR],
-    [0, () => ThrottlingReasonList]
-];
-TypeRegistry.for(n0$4).registerError(RequestLimitExceeded$, RequestLimitExceeded);
-var ResourceInUseException$ = [-3, n0$4, _RIUE,
-    { [_e$4]: _c$4 },
-    [_m$3],
-    [0]
-];
-TypeRegistry.for(n0$4).registerError(ResourceInUseException$, ResourceInUseException);
-var ResourceNotFoundException$$1 = [-3, n0$4, _RNFEe,
-    { [_e$4]: _c$4 },
-    [_m$3],
-    [0]
-];
-TypeRegistry.for(n0$4).registerError(ResourceNotFoundException$$1, ResourceNotFoundException$1);
-var TableAlreadyExistsException$ = [-3, n0$4, _TAEE,
-    { [_e$4]: _c$4 },
-    [_m$3],
-    [0]
-];
-TypeRegistry.for(n0$4).registerError(TableAlreadyExistsException$, TableAlreadyExistsException);
-var TableInUseException$ = [-3, n0$4, _TIUE,
-    { [_e$4]: _c$4 },
-    [_m$3],
-    [0]
-];
-TypeRegistry.for(n0$4).registerError(TableInUseException$, TableInUseException);
-var TableNotFoundException$ = [-3, n0$4, _TNFE,
-    { [_e$4]: _c$4 },
-    [_m$3],
-    [0]
-];
-TypeRegistry.for(n0$4).registerError(TableNotFoundException$, TableNotFoundException);
-var ThrottlingException$ = [-3, n0$4, _TE,
-    { [_aQE$1]: [`Throttling`, 400], [_e$4]: _c$4, [_hE$4]: 400 },
-    [_m$3, _tR],
-    [0, () => ThrottlingReasonList]
-];
-TypeRegistry.for(n0$4).registerError(ThrottlingException$, ThrottlingException);
 var ThrottlingReason$ = [3, n0$4, _TRh,
     0,
     [_r$1, _re],
     [0, 0]
 ];
-var TransactionCanceledException$ = [-3, n0$4, _TCE,
-    { [_e$4]: _c$4 },
-    [_M, _CRan],
-    [0, () => CancellationReasonList]
-];
-TypeRegistry.for(n0$4).registerError(TransactionCanceledException$, TransactionCanceledException);
-var TransactionConflictException$ = [-3, n0$4, _TCEr,
-    { [_e$4]: _c$4 },
-    [_m$3],
-    [0]
-];
-TypeRegistry.for(n0$4).registerError(TransactionConflictException$, TransactionConflictException);
-var TransactionInProgressException$ = [-3, n0$4, _TIPE,
-    { [_e$4]: _c$4 },
-    [_M],
-    [0]
-];
-TypeRegistry.for(n0$4).registerError(TransactionInProgressException$, TransactionInProgressException);
-var DynamoDBServiceException$ = [-3, _sm$2, "DynamoDBServiceException", 0, [], []];
-TypeRegistry.for(_sm$2).registerError(DynamoDBServiceException$, DynamoDBServiceException);
 var AttributeValueList = [1, n0$4, _AVL,
     0, () => AttributeValue$
 ];
@@ -44506,9 +42224,9 @@ class DescribeEndpointsCommand extends Command
     .build() {
 }
 
-var version$2 = "3.980.0";
-var packageInfo$2 = {
-	version: version$2};
+var version$1 = "3.1075.0";
+var packageInfo$1 = {
+	version: version$1};
 
 const ENV_KEY = "AWS_ACCESS_KEY_ID";
 const ENV_SECRET = "AWS_SECRET_ACCESS_KEY";
@@ -44550,7 +42268,7 @@ var index$a = /*#__PURE__*/Object.freeze({
     fromEnv: fromEnv
 });
 
-const ENV_IMDS_DISABLED$1 = "AWS_EC2_METADATA_DISABLED";
+const ENV_IMDS_DISABLED = "AWS_EC2_METADATA_DISABLED";
 const remoteProvider = async (init) => {
     const { ENV_CMDS_FULL_URI, ENV_CMDS_RELATIVE_URI, fromContainerMetadata, fromInstanceMetadata } = await Promise.resolve().then(function () { return index$8; });
     if (process.env[ENV_CMDS_RELATIVE_URI] || process.env[ENV_CMDS_FULL_URI]) {
@@ -44558,7 +42276,7 @@ const remoteProvider = async (init) => {
         const { fromHttp } = await Promise.resolve().then(function () { return index$7; });
         return chain(fromHttp(init), fromContainerMetadata(init));
     }
-    if (process.env[ENV_IMDS_DISABLED$1] && process.env[ENV_IMDS_DISABLED$1] !== "false") {
+    if (process.env[ENV_IMDS_DISABLED] && process.env[ENV_IMDS_DISABLED] !== "false") {
         return async () => {
             throw new CredentialsProviderError("EC2 Instance Metadata Service access disabled", { logger: init.logger });
         };
@@ -44572,9 +42290,20 @@ function memoizeChain(providers, treatAsExpired) {
     let activeLock;
     let passiveLock;
     let credentials;
+    let forceRefreshLock;
     const provider = async (options) => {
         if (options?.forceRefresh) {
-            return await chain(options);
+            if (!forceRefreshLock) {
+                forceRefreshLock = chain(options)
+                    .then((c) => {
+                    credentials = c;
+                })
+                    .finally(() => {
+                    forceRefreshLock = undefined;
+                });
+            }
+            await forceRefreshLock;
+            return credentials;
         }
         if (credentials?.expiration) {
             if (credentials?.expiration?.getTime() < Date.now()) {
@@ -44696,171 +42425,1997 @@ const defaultProvider = (init = {}) => memoizeChain([
 ], credentialsTreatedAsExpired);
 const credentialsTreatedAsExpired = (credentials) => credentials?.expiration !== undefined && credentials.expiration.getTime() - Date.now() < 300000;
 
-const isCrtAvailable = () => {
-    return null;
-};
-
-const createDefaultUserAgentProvider = ({ serviceId, clientVersion }) => {
-    return async (config) => {
-        const sections = [
-            ["aws-sdk-js", clientVersion],
-            ["ua", "2.1"],
-            [`os/${platform()}`, release()],
-            ["lang/js"],
-            ["md/nodejs", `${versions.node}`],
-        ];
-        const crtAvailable = isCrtAvailable();
-        if (crtAvailable) {
-            sections.push(crtAvailable);
+function buildAbortError(abortSignal) {
+    const reason = abortSignal && typeof abortSignal === "object" && "reason" in abortSignal
+        ? abortSignal.reason
+        : undefined;
+    if (reason) {
+        if (reason instanceof Error) {
+            const abortError = new Error("Request aborted");
+            abortError.name = "AbortError";
+            abortError.cause = reason;
+            return abortError;
         }
-        if (serviceId) {
-            sections.push([`api/${serviceId}`, clientVersion]);
-        }
-        if (env.AWS_EXECUTION_ENV) {
-            sections.push([`exec-env/${env.AWS_EXECUTION_ENV}`]);
-        }
-        const appId = await config?.userAgentAppId?.();
-        const resolvedUserAgent = appId ? [...sections, [`app/${appId}`]] : [...sections];
-        return resolvedUserAgent;
-    };
-};
-
-const UA_APP_ID_ENV_NAME = "AWS_SDK_UA_APP_ID";
-const UA_APP_ID_INI_NAME = "sdk_ua_app_id";
-const UA_APP_ID_INI_NAME_DEPRECATED = "sdk-ua-app-id";
-const NODE_APP_ID_CONFIG_OPTIONS = {
-    environmentVariableSelector: (env) => env[UA_APP_ID_ENV_NAME],
-    configFileSelector: (profile) => profile[UA_APP_ID_INI_NAME] ?? profile[UA_APP_ID_INI_NAME_DEPRECATED],
-    default: DEFAULT_UA_APP_ID,
-};
-
-class Hash {
-    algorithmIdentifier;
-    secret;
-    hash;
-    constructor(algorithmIdentifier, secret) {
-        this.algorithmIdentifier = algorithmIdentifier;
-        this.secret = secret;
-        this.reset();
+        const abortError = new Error(String(reason));
+        abortError.name = "AbortError";
+        return abortError;
     }
-    update(toHash, encoding) {
-        this.hash.update(toUint8Array(castSourceData(toHash, encoding)));
-    }
-    digest() {
-        return Promise.resolve(this.hash.digest());
-    }
-    reset() {
-        this.hash = this.secret
-            ? createHmac(this.algorithmIdentifier, castSourceData(this.secret))
-            : createHash(this.algorithmIdentifier);
-    }
-}
-function castSourceData(toCast, encoding) {
-    if (Buffer$1.isBuffer(toCast)) {
-        return toCast;
-    }
-    if (typeof toCast === "string") {
-        return fromString(toCast, encoding);
-    }
-    if (ArrayBuffer.isView(toCast)) {
-        return fromArrayBuffer(toCast.buffer, toCast.byteOffset, toCast.byteLength);
-    }
-    return fromArrayBuffer(toCast);
+    const abortError = new Error("Request aborted");
+    abortError.name = "AbortError";
+    return abortError;
 }
 
-const calculateBodyLength = (body) => {
-    if (!body) {
-        return 0;
+const NODEJS_TIMEOUT_ERROR_CODES = ["ECONNRESET", "EPIPE", "ETIMEDOUT"];
+
+const getTransformedHeaders = (headers) => {
+    const transformedHeaders = {};
+    for (const name in headers) {
+        const headerValues = headers[name];
+        transformedHeaders[name] = Array.isArray(headerValues) ? headerValues.join(",") : headerValues;
     }
-    if (typeof body === "string") {
-        return Buffer.byteLength(body);
-    }
-    else if (typeof body.byteLength === "number") {
-        return body.byteLength;
-    }
-    else if (typeof body.size === "number") {
-        return body.size;
-    }
-    else if (typeof body.start === "number" && typeof body.end === "number") {
-        return body.end + 1 - body.start;
-    }
-    else if (body instanceof ReadStream) {
-        if (body.path != null) {
-            return lstatSync(body.path).size;
-        }
-        else if (typeof body.fd === "number") {
-            return fstatSync(body.fd).size;
-        }
-    }
-    throw new Error(`Body Length computation failed for ${body}`);
+    return transformedHeaders;
 };
 
-const AWS_EXECUTION_ENV = "AWS_EXECUTION_ENV";
-const AWS_REGION_ENV = "AWS_REGION";
-const AWS_DEFAULT_REGION_ENV = "AWS_DEFAULT_REGION";
-const ENV_IMDS_DISABLED = "AWS_EC2_METADATA_DISABLED";
-const DEFAULTS_MODE_OPTIONS = ["in-region", "cross-region", "mobile", "standard", "legacy"];
-const IMDS_REGION_PATH = "/latest/meta-data/placement/region";
-
-const AWS_DEFAULTS_MODE_ENV = "AWS_DEFAULTS_MODE";
-const AWS_DEFAULTS_MODE_CONFIG = "defaults_mode";
-const NODE_DEFAULTS_MODE_CONFIG_OPTIONS = {
-    environmentVariableSelector: (env) => {
-        return env[AWS_DEFAULTS_MODE_ENV];
-    },
-    configFileSelector: (profile) => {
-        return profile[AWS_DEFAULTS_MODE_CONFIG];
-    },
-    default: "legacy",
+const timing = {
+    setTimeout: (cb, ms) => setTimeout(cb, ms),
+    clearTimeout: (timeoutId) => clearTimeout(timeoutId),
 };
 
-const resolveDefaultsModeConfig = ({ region = loadConfig(NODE_REGION_CONFIG_OPTIONS), defaultsMode = loadConfig(NODE_DEFAULTS_MODE_CONFIG_OPTIONS), } = {}) => memoize(async () => {
-    const mode = typeof defaultsMode === "function" ? await defaultsMode() : defaultsMode;
-    switch (mode?.toLowerCase()) {
-        case "auto":
-            return resolveNodeDefaultsModeAuto(region);
-        case "in-region":
-        case "cross-region":
-        case "mobile":
-        case "standard":
-        case "legacy":
-            return Promise.resolve(mode?.toLocaleLowerCase());
-        case undefined:
-            return Promise.resolve("legacy");
-        default:
-            throw new Error(`Invalid parameter for "defaultsMode", expect ${DEFAULTS_MODE_OPTIONS.join(", ")}, got ${mode}`);
+const DEFER_EVENT_LISTENER_TIME$2 = 1000;
+const setConnectionTimeout = (request, reject, timeoutInMs = 0) => {
+    if (!timeoutInMs) {
+        return -1;
     }
-});
-const resolveNodeDefaultsModeAuto = async (clientRegion) => {
-    if (clientRegion) {
-        const resolvedRegion = typeof clientRegion === "function" ? await clientRegion() : clientRegion;
-        const inferredRegion = await inferPhysicalRegion();
-        if (!inferredRegion) {
-            return "standard";
-        }
-        if (resolvedRegion === inferredRegion) {
-            return "in-region";
+    const registerTimeout = (offset) => {
+        const timeoutId = timing.setTimeout(() => {
+            request.destroy();
+            reject(Object.assign(new Error(`@smithy/node-http-handler - the request socket did not establish a connection with the server within the configured timeout of ${timeoutInMs} ms.`), {
+                name: "TimeoutError",
+            }));
+        }, timeoutInMs - offset);
+        const doWithSocket = (socket) => {
+            if (socket?.connecting) {
+                socket.on("connect", () => {
+                    timing.clearTimeout(timeoutId);
+                });
+            }
+            else {
+                timing.clearTimeout(timeoutId);
+            }
+        };
+        if (request.socket) {
+            doWithSocket(request.socket);
         }
         else {
-            return "cross-region";
+            request.on("socket", doWithSocket);
+        }
+    };
+    if (timeoutInMs < 2000) {
+        registerTimeout(0);
+        return 0;
+    }
+    return timing.setTimeout(registerTimeout.bind(null, DEFER_EVENT_LISTENER_TIME$2), DEFER_EVENT_LISTENER_TIME$2);
+};
+
+const setRequestTimeout = (req, reject, timeoutInMs = 0, throwOnRequestTimeout, logger) => {
+    if (timeoutInMs) {
+        return timing.setTimeout(() => {
+            let msg = `@smithy/node-http-handler - [${throwOnRequestTimeout ? "ERROR" : "WARN"}] a request has exceeded the configured ${timeoutInMs} ms requestTimeout.`;
+            if (throwOnRequestTimeout) {
+                const error = Object.assign(new Error(msg), {
+                    name: "TimeoutError",
+                    code: "ETIMEDOUT",
+                });
+                req.destroy(error);
+                reject(error);
+            }
+            else {
+                msg += ` Init client requestHandler with throwOnRequestTimeout=true to turn this into an error.`;
+                logger?.warn?.(msg);
+            }
+        }, timeoutInMs);
+    }
+    return -1;
+};
+
+const DEFER_EVENT_LISTENER_TIME$1 = 3000;
+const setSocketKeepAlive = (request, { keepAlive, keepAliveMsecs }, deferTimeMs = DEFER_EVENT_LISTENER_TIME$1) => {
+    if (keepAlive !== true) {
+        return -1;
+    }
+    const registerListener = () => {
+        if (request.socket) {
+            request.socket.setKeepAlive(keepAlive, keepAliveMsecs || 0);
+        }
+        else {
+            request.on("socket", (socket) => {
+                socket.setKeepAlive(keepAlive, keepAliveMsecs || 0);
+            });
+        }
+    };
+    if (deferTimeMs === 0) {
+        registerListener();
+        return 0;
+    }
+    return timing.setTimeout(registerListener, deferTimeMs);
+};
+
+const DEFER_EVENT_LISTENER_TIME = 3000;
+const setSocketTimeout = (request, reject, timeoutInMs = 0) => {
+    const registerTimeout = (offset) => {
+        const timeout = timeoutInMs - offset;
+        const onTimeout = () => {
+            request.destroy();
+            reject(Object.assign(new Error(`@smithy/node-http-handler - the request socket timed out after ${timeoutInMs} ms of inactivity (configured by client requestHandler).`), { name: "TimeoutError" }));
+        };
+        if (request.socket) {
+            request.socket.setTimeout(timeout, onTimeout);
+            request.on("close", () => request.socket?.removeListener("timeout", onTimeout));
+        }
+        else {
+            request.setTimeout(timeout, onTimeout);
+        }
+    };
+    if (0 < timeoutInMs && timeoutInMs < 6000) {
+        registerTimeout(0);
+        return 0;
+    }
+    return timing.setTimeout(registerTimeout.bind(null, timeoutInMs === 0 ? 0 : DEFER_EVENT_LISTENER_TIME), DEFER_EVENT_LISTENER_TIME);
+};
+
+const MIN_WAIT_TIME = 6_000;
+async function writeRequestBody(httpRequest, request, maxContinueTimeoutMs = MIN_WAIT_TIME, externalAgent = false) {
+    const headers = request.headers;
+    const expect = headers ? headers.Expect || headers.expect : undefined;
+    let timeoutId = -1;
+    let sendBody = true;
+    if (!externalAgent && expect === "100-continue") {
+        sendBody = await Promise.race([
+            new Promise((resolve) => {
+                timeoutId = Number(timing.setTimeout(() => resolve(true), Math.max(MIN_WAIT_TIME, maxContinueTimeoutMs)));
+            }),
+            new Promise((resolve) => {
+                httpRequest.on("continue", () => {
+                    timing.clearTimeout(timeoutId);
+                    resolve(true);
+                });
+                httpRequest.on("response", () => {
+                    timing.clearTimeout(timeoutId);
+                    resolve(false);
+                });
+                httpRequest.on("error", () => {
+                    timing.clearTimeout(timeoutId);
+                    resolve(false);
+                });
+            }),
+        ]);
+    }
+    if (sendBody) {
+        writeBody(httpRequest, request.body);
+    }
+}
+function writeBody(httpRequest, body) {
+    if (body instanceof Readable) {
+        body.pipe(httpRequest);
+        return;
+    }
+    if (body) {
+        const isBuffer = Buffer.isBuffer(body);
+        const isString = typeof body === "string";
+        if (isBuffer || isString) {
+            if (isBuffer && body.byteLength === 0) {
+                httpRequest.end();
+            }
+            else {
+                httpRequest.end(body);
+            }
+            return;
+        }
+        const uint8 = body;
+        if (typeof uint8 === "object" &&
+            uint8.buffer &&
+            typeof uint8.byteOffset === "number" &&
+            typeof uint8.byteLength === "number") {
+            httpRequest.end(Buffer.from(uint8.buffer, uint8.byteOffset, uint8.byteLength));
+            return;
+        }
+        httpRequest.end(Buffer.from(body));
+        return;
+    }
+    httpRequest.end();
+}
+
+let hAgent = undefined;
+let hRequest = undefined;
+class NodeHttpHandler {
+    config;
+    configProvider;
+    socketWarningTimestamp = 0;
+    externalAgent = false;
+    metadata = { handlerProtocol: "http/1.1" };
+    static create(instanceOrOptions) {
+        if (typeof instanceOrOptions?.handle === "function") {
+            return instanceOrOptions;
+        }
+        return new NodeHttpHandler(instanceOrOptions);
+    }
+    static checkSocketUsage(agent, socketWarningTimestamp, logger = console) {
+        const { sockets, requests, maxSockets } = agent;
+        if (typeof maxSockets !== "number" || maxSockets === Infinity) {
+            return socketWarningTimestamp;
+        }
+        const interval = 15_000;
+        if (Date.now() - interval < socketWarningTimestamp) {
+            return socketWarningTimestamp;
+        }
+        if (sockets && requests) {
+            for (const origin in sockets) {
+                const socketsInUse = sockets[origin]?.length ?? 0;
+                const requestsEnqueued = requests[origin]?.length ?? 0;
+                if (socketsInUse >= maxSockets && requestsEnqueued >= 2 * maxSockets) {
+                    logger?.warn?.(`@smithy/node-http-handler:WARN - socket usage at capacity=${socketsInUse} and ${requestsEnqueued} additional requests are enqueued.
+See https://docs.aws.amazon.com/sdk-for-javascript/v3/developer-guide/node-configuring-maxsockets.html
+or increase socketAcquisitionWarningTimeout=(millis) in the NodeHttpHandler config.`);
+                    return Date.now();
+                }
+            }
+        }
+        return socketWarningTimestamp;
+    }
+    constructor(options) {
+        this.configProvider = new Promise((resolve, reject) => {
+            if (typeof options === "function") {
+                options()
+                    .then((_options) => {
+                    resolve(this.resolveDefaultConfig(_options));
+                })
+                    .catch(reject);
+            }
+            else {
+                resolve(this.resolveDefaultConfig(options));
+            }
+        });
+    }
+    destroy() {
+        this.config?.httpAgent?.destroy();
+        this.config?.httpsAgent?.destroy();
+    }
+    async handle(request, { abortSignal, requestTimeout } = {}) {
+        if (!this.config) {
+            this.config = await this.configProvider;
+        }
+        const config = this.config;
+        const isSSL = request.protocol === "https:";
+        if (!isSSL && !this.config.httpAgent) {
+            this.config.httpAgent = await this.config.httpAgentProvider();
+        }
+        return new Promise((_resolve, _reject) => {
+            let writeRequestBodyPromise = undefined;
+            let socketWarningTimeoutId = -1;
+            let connectionTimeoutId = -1;
+            let requestTimeoutId = -1;
+            let socketTimeoutId = -1;
+            let keepAliveTimeoutId = -1;
+            const clearTimeouts = () => {
+                timing.clearTimeout(socketWarningTimeoutId);
+                timing.clearTimeout(connectionTimeoutId);
+                timing.clearTimeout(requestTimeoutId);
+                timing.clearTimeout(socketTimeoutId);
+                timing.clearTimeout(keepAliveTimeoutId);
+            };
+            const resolve = async (arg) => {
+                await writeRequestBodyPromise;
+                clearTimeouts();
+                _resolve(arg);
+            };
+            const reject = async (arg) => {
+                await writeRequestBodyPromise;
+                clearTimeouts();
+                _reject(arg);
+            };
+            if (abortSignal?.aborted) {
+                const abortError = buildAbortError(abortSignal);
+                reject(abortError);
+                return;
+            }
+            const headers = request.headers;
+            const expectContinue = headers ? (headers.Expect ?? headers.expect) === "100-continue" : false;
+            let agent = isSSL ? config.httpsAgent : config.httpAgent;
+            if (expectContinue && !this.externalAgent) {
+                agent = new (isSSL ? node_https.Agent : hAgent)({
+                    keepAlive: false,
+                    maxSockets: Infinity,
+                });
+            }
+            socketWarningTimeoutId = timing.setTimeout(() => {
+                this.socketWarningTimestamp = NodeHttpHandler.checkSocketUsage(agent, this.socketWarningTimestamp, config.logger);
+            }, config.socketAcquisitionWarningTimeout ?? (config.requestTimeout ?? 2000) + (config.connectionTimeout ?? 1000));
+            const queryString = request.query ? buildQueryString(request.query) : "";
+            let auth = undefined;
+            if (request.username != null || request.password != null) {
+                const username = request.username ?? "";
+                const password = request.password ?? "";
+                auth = `${username}:${password}`;
+            }
+            let path = request.path;
+            if (queryString) {
+                path += `?${queryString}`;
+            }
+            if (request.fragment) {
+                path += `#${request.fragment}`;
+            }
+            let hostname = request.hostname ?? "";
+            if (hostname[0] === "[" && hostname.endsWith("]")) {
+                hostname = request.hostname.slice(1, -1);
+            }
+            else {
+                hostname = request.hostname;
+            }
+            const nodeHttpsOptions = {
+                headers: request.headers,
+                host: hostname,
+                method: request.method,
+                path,
+                port: request.port,
+                agent,
+                auth,
+            };
+            const requestFunc = isSSL ? node_https.request : hRequest;
+            const req = requestFunc(nodeHttpsOptions, (res) => {
+                const httpResponse = new HttpResponse({
+                    statusCode: res.statusCode || -1,
+                    reason: res.statusMessage,
+                    headers: getTransformedHeaders(res.headers),
+                    body: res,
+                });
+                resolve({ response: httpResponse });
+            });
+            req.on("error", (err) => {
+                if (NODEJS_TIMEOUT_ERROR_CODES.includes(err.code)) {
+                    reject(Object.assign(err, { name: "TimeoutError" }));
+                }
+                else {
+                    reject(err);
+                }
+            });
+            if (abortSignal) {
+                const onAbort = () => {
+                    req.destroy();
+                    const abortError = buildAbortError(abortSignal);
+                    reject(abortError);
+                };
+                if (typeof abortSignal.addEventListener === "function") {
+                    const signal = abortSignal;
+                    signal.addEventListener("abort", onAbort, { once: true });
+                    req.once("close", () => signal.removeEventListener("abort", onAbort));
+                }
+                else {
+                    abortSignal.onabort = onAbort;
+                }
+            }
+            const effectiveRequestTimeout = requestTimeout ?? config.requestTimeout;
+            connectionTimeoutId = setConnectionTimeout(req, reject, config.connectionTimeout);
+            requestTimeoutId = setRequestTimeout(req, reject, effectiveRequestTimeout, config.throwOnRequestTimeout, config.logger ?? console);
+            socketTimeoutId = setSocketTimeout(req, reject, config.socketTimeout);
+            const httpAgent = nodeHttpsOptions.agent;
+            if (typeof httpAgent === "object" && "keepAlive" in httpAgent) {
+                keepAliveTimeoutId = setSocketKeepAlive(req, {
+                    keepAlive: httpAgent.keepAlive,
+                    keepAliveMsecs: httpAgent.keepAliveMsecs,
+                });
+            }
+            writeRequestBodyPromise = writeRequestBody(req, request, effectiveRequestTimeout, this.externalAgent).catch((e) => {
+                clearTimeouts();
+                return _reject(e);
+            });
+        });
+    }
+    updateHttpClientConfig(key, value) {
+        this.config = undefined;
+        this.configProvider = this.configProvider.then((config) => {
+            return {
+                ...config,
+                [key]: value,
+            };
+        });
+    }
+    httpHandlerConfigs() {
+        return this.config ?? {};
+    }
+    resolveDefaultConfig(options) {
+        const { requestTimeout, connectionTimeout, socketTimeout, socketAcquisitionWarningTimeout, httpAgent, httpsAgent, throwOnRequestTimeout, logger, } = options || {};
+        const keepAlive = true;
+        const maxSockets = 50;
+        return {
+            connectionTimeout,
+            requestTimeout,
+            socketTimeout,
+            socketAcquisitionWarningTimeout,
+            throwOnRequestTimeout,
+            httpAgentProvider: async () => {
+                const node_http = await import('node:http');
+                const { Agent, request } = node_http.default ?? node_http;
+                hRequest = request;
+                hAgent = Agent;
+                if (httpAgent instanceof hAgent || typeof httpAgent?.destroy === "function") {
+                    this.externalAgent = true;
+                    return httpAgent;
+                }
+                return new hAgent({ keepAlive, maxSockets, ...httpAgent });
+            },
+            httpsAgent: (() => {
+                if (httpsAgent instanceof node_https.Agent || typeof httpsAgent?.destroy === "function") {
+                    this.externalAgent = true;
+                    return httpsAgent;
+                }
+                return new node_https.Agent({ keepAlive, maxSockets, ...httpsAgent });
+            })(),
+            logger,
+        };
+    }
+}
+
+class Collector extends Writable {
+    bufferedBytes = [];
+    _write(chunk, encoding, callback) {
+        this.bufferedBytes.push(chunk);
+        callback();
+    }
+}
+
+const streamCollector = (stream) => {
+    if (isReadableStreamInstance(stream)) {
+        return collectReadableStream(stream);
+    }
+    return new Promise((resolve, reject) => {
+        const collector = new Collector();
+        stream.pipe(collector);
+        stream.on("error", (err) => {
+            collector.end();
+            reject(err);
+        });
+        collector.on("error", reject);
+        collector.on("finish", function () {
+            const bytes = new Uint8Array(Buffer.concat(this.bufferedBytes));
+            resolve(bytes);
+        });
+    });
+};
+const isReadableStreamInstance = (stream) => typeof ReadableStream === "function" && stream instanceof ReadableStream;
+async function collectReadableStream(stream) {
+    const chunks = [];
+    const reader = stream.getReader();
+    let isDone = false;
+    let length = 0;
+    while (!isDone) {
+        const { done, value } = await reader.read();
+        if (value) {
+            chunks.push(value);
+            length += value.length;
+        }
+        isDone = done;
+    }
+    const collected = new Uint8Array(length);
+    let offset = 0;
+    for (const chunk of chunks) {
+        collected.set(chunk, offset);
+        offset += chunk.length;
+    }
+    return collected;
+}
+
+class ProtocolLib {
+    queryCompat;
+    errorRegistry;
+    constructor(queryCompat = false) {
+        this.queryCompat = queryCompat;
+    }
+    resolveRestContentType(defaultContentType, inputSchema) {
+        const members = inputSchema.getMemberSchemas();
+        const httpPayloadMember = Object.values(members).find((m) => {
+            return !!m.getMergedTraits().httpPayload;
+        });
+        if (httpPayloadMember) {
+            const mediaType = httpPayloadMember.getMergedTraits().mediaType;
+            if (mediaType) {
+                return mediaType;
+            }
+            else if (httpPayloadMember.isStringSchema()) {
+                return "text/plain";
+            }
+            else if (httpPayloadMember.isBlobSchema()) {
+                return "application/octet-stream";
+            }
+            else {
+                return defaultContentType;
+            }
+        }
+        else if (!inputSchema.isUnitSchema()) {
+            const hasBody = Object.values(members).find((m) => {
+                const { httpQuery, httpQueryParams, httpHeader, httpLabel, httpPrefixHeaders } = m.getMergedTraits();
+                const noPrefixHeaders = httpPrefixHeaders === void 0;
+                return !httpQuery && !httpQueryParams && !httpHeader && !httpLabel && noPrefixHeaders;
+            });
+            if (hasBody) {
+                return defaultContentType;
+            }
         }
     }
-    return "standard";
-};
-const inferPhysicalRegion = async () => {
-    if (process.env[AWS_EXECUTION_ENV] && (process.env[AWS_REGION_ENV] || process.env[AWS_DEFAULT_REGION_ENV])) {
-        return process.env[AWS_REGION_ENV] ?? process.env[AWS_DEFAULT_REGION_ENV];
-    }
-    if (!process.env[ENV_IMDS_DISABLED]) {
+    async getErrorSchemaOrThrowBaseException(errorIdentifier, defaultNamespace, response, dataObject, metadata, getErrorSchema) {
+        let errorName = errorIdentifier;
+        if (errorIdentifier.includes("#")) {
+            [, errorName] = errorIdentifier.split("#");
+        }
+        const errorMetadata = {
+            $metadata: metadata,
+            $fault: response.statusCode < 500 ? "client" : "server",
+        };
+        if (!this.errorRegistry) {
+            throw new Error("@aws-sdk/core/protocols - error handler not initialized.");
+        }
         try {
-            const { getInstanceMetadataEndpoint, httpRequest } = await Promise.resolve().then(function () { return index$8; });
-            const endpoint = await getInstanceMetadataEndpoint();
-            return (await httpRequest({ ...endpoint, path: IMDS_REGION_PATH })).toString();
+            const errorSchema = getErrorSchema?.(this.errorRegistry, errorName) ??
+                this.errorRegistry.getSchema(errorIdentifier);
+            return { errorSchema, errorMetadata };
         }
         catch (e) {
+            dataObject.message = dataObject.message ?? dataObject.Message ?? "UnknownError";
+            const synthetic = this.errorRegistry;
+            const baseExceptionSchema = synthetic.getBaseException();
+            if (baseExceptionSchema) {
+                const ErrorCtor = synthetic.getErrorCtor(baseExceptionSchema) ?? Error;
+                throw this.decorateServiceException(Object.assign(new ErrorCtor({ name: errorName }), errorMetadata), dataObject);
+            }
+            const d = dataObject;
+            const message = d?.message ?? d?.Message ?? d?.Error?.Message ?? d?.Error?.message;
+            throw this.decorateServiceException(Object.assign(new Error(message), {
+                name: errorName,
+            }, errorMetadata), dataObject);
+        }
+    }
+    compose(composite, errorIdentifier, defaultNamespace) {
+        let namespace = defaultNamespace;
+        if (errorIdentifier.includes("#")) {
+            [namespace] = errorIdentifier.split("#");
+        }
+        const staticRegistry = TypeRegistry.for(namespace);
+        const defaultSyntheticRegistry = TypeRegistry.for("smithy.ts.sdk.synthetic." + defaultNamespace);
+        composite.copyFrom(staticRegistry);
+        composite.copyFrom(defaultSyntheticRegistry);
+        this.errorRegistry = composite;
+    }
+    decorateServiceException(exception, additions = {}) {
+        if (this.queryCompat) {
+            const msg = exception.Message ?? additions.Message;
+            const error = decorateServiceException(exception, additions);
+            if (msg) {
+                error.message = msg;
+            }
+            const errorObj = error.Error ?? {};
+            errorObj.Type = error.Error?.Type;
+            errorObj.Code = error.Error?.Code;
+            errorObj.Message = error.Error?.message ?? error.Error?.Message ?? msg;
+            error.Error = errorObj;
+            const reqId = error.$metadata.requestId;
+            if (reqId) {
+                error.RequestId = reqId;
+            }
+            return error;
+        }
+        return decorateServiceException(exception, additions);
+    }
+    setQueryCompatError(output, response) {
+        const queryErrorHeader = response.headers?.["x-amzn-query-error"];
+        if (output !== undefined && queryErrorHeader != null) {
+            const [Code, Type] = queryErrorHeader.split(";");
+            const keys = Object.keys(output);
+            const Error = {
+                Code,
+                Type,
+            };
+            output.Code = Code;
+            output.Type = Type;
+            for (let i = 0; i < keys.length; i++) {
+                const k = keys[i];
+                Error[k === "message" ? "Message" : k] = output[k];
+            }
+            delete Error.__type;
+            output.Error = Error;
+        }
+    }
+    queryCompatOutput(queryCompatErrorData, errorData) {
+        if (queryCompatErrorData.Error) {
+            errorData.Error = queryCompatErrorData.Error;
+        }
+        if (queryCompatErrorData.Type) {
+            errorData.Type = queryCompatErrorData.Type;
+        }
+        if (queryCompatErrorData.Code) {
+            errorData.Code = queryCompatErrorData.Code;
+        }
+    }
+    findQueryCompatibleError(registry, errorName) {
+        try {
+            return registry.getSchema(errorName);
+        }
+        catch (e) {
+            return registry.find((schema) => NormalizedSchema.of(schema).getMergedTraits().awsQueryError?.[0] === errorName);
+        }
+    }
+}
+
+class SerdeContextConfig {
+    serdeContext;
+    setSerdeContext(serdeContext) {
+        this.serdeContext = serdeContext;
+    }
+}
+
+class UnionSerde {
+    from;
+    to;
+    keys;
+    constructor(from, to) {
+        this.from = from;
+        this.to = to;
+        const keys = Object.keys(this.from);
+        const set = new Set(keys);
+        set.delete("__type");
+        this.keys = set;
+    }
+    mark(key) {
+        this.keys.delete(key);
+    }
+    hasUnknown() {
+        return this.keys.size === 1 && Object.keys(this.to).length === 0;
+    }
+    writeUnknown() {
+        if (this.hasUnknown()) {
+            const k = this.keys.values().next().value;
+            const v = this.from[k];
+            this.to.$unknown = [k, v];
+        }
+    }
+}
+
+function jsonReviver(key, value, context) {
+    if (context?.source) {
+        const numericString = context.source;
+        if (typeof value === "number") {
+            if (value > Number.MAX_SAFE_INTEGER || value < Number.MIN_SAFE_INTEGER || numericString !== String(value)) {
+                const isFractional = numericString.includes(".");
+                if (isFractional) {
+                    return new NumericValue(numericString, "bigDecimal");
+                }
+                else {
+                    return BigInt(numericString);
+                }
+            }
+        }
+    }
+    return value;
+}
+
+const collectBodyString = (streamBody, context) => collectBody(streamBody, context).then((body) => (context?.utf8Encoder ?? toUtf8$1)(body));
+
+const parseJsonBody = (streamBody, context) => collectBodyString(streamBody, context).then((encoded) => {
+    if (encoded.length) {
+        try {
+            return JSON.parse(encoded);
+        }
+        catch (e) {
+            if (e?.name === "SyntaxError") {
+                Object.defineProperty(e, "$responseBodyText", {
+                    value: encoded,
+                });
+            }
+            throw e;
+        }
+    }
+    return {};
+});
+const findKey = (object, key) => Object.keys(object).find((k) => k.toLowerCase() === key.toLowerCase());
+const sanitizeErrorCode = (rawValue) => {
+    let cleanValue = rawValue;
+    if (typeof cleanValue === "number") {
+        cleanValue = cleanValue.toString();
+    }
+    if (cleanValue.indexOf(",") >= 0) {
+        cleanValue = cleanValue.split(",")[0];
+    }
+    if (cleanValue.indexOf(":") >= 0) {
+        cleanValue = cleanValue.split(":")[0];
+    }
+    if (cleanValue.indexOf("#") >= 0) {
+        cleanValue = cleanValue.split("#")[1];
+    }
+    return cleanValue;
+};
+const loadRestJsonErrorCode = (output, data) => {
+    return loadErrorCode(output, data, ["header", "code", "type"]);
+};
+const loadJsonRpcErrorCode = (output, data, queryCompat = false) => {
+    return loadErrorCode(output, data, queryCompat ? ["code", "header", "type"] : ["type", "code", "header"]);
+};
+const loadErrorCode = ({ headers }, data, order) => {
+    while (order.length > 0) {
+        const location = order.shift();
+        switch (location) {
+            case "header":
+                const headerKey = findKey(headers ?? {}, "x-amzn-errortype");
+                if (headerKey !== undefined) {
+                    return sanitizeErrorCode(headers[headerKey]);
+                }
+                break;
+            case "code":
+                const codeKey = findKey(data ?? {}, "code");
+                if (codeKey && data[codeKey] !== undefined) {
+                    return sanitizeErrorCode(data[codeKey]);
+                }
+                break;
+            case "type":
+                if (data?.__type !== undefined) {
+                    return sanitizeErrorCode(data.__type);
+                }
+                break;
         }
     }
 };
+
+class JsonShapeDeserializer extends SerdeContextConfig {
+    settings;
+    constructor(settings) {
+        super();
+        this.settings = settings;
+    }
+    async read(schema, data) {
+        return this._read(schema, typeof data === "string" ? JSON.parse(data, jsonReviver) : await parseJsonBody(data, this.serdeContext));
+    }
+    readObject(schema, data) {
+        return this._read(schema, data);
+    }
+    _read(schema, value) {
+        const isObject = value !== null && typeof value === "object";
+        const ns = NormalizedSchema.of(schema);
+        if (isObject) {
+            if (ns.isStructSchema()) {
+                const record = value;
+                const union = ns.isUnionSchema();
+                const out = {};
+                let nameMap = void 0;
+                const { jsonName } = this.settings;
+                if (jsonName) {
+                    nameMap = {};
+                }
+                let unionSerde;
+                if (union) {
+                    unionSerde = new UnionSerde(record, out);
+                }
+                for (const [memberName, memberSchema] of ns.structIterator()) {
+                    let fromKey = memberName;
+                    if (jsonName) {
+                        fromKey = memberSchema.getMergedTraits().jsonName ?? fromKey;
+                        nameMap[fromKey] = memberName;
+                    }
+                    if (union) {
+                        unionSerde.mark(fromKey);
+                    }
+                    if (record[fromKey] != null) {
+                        out[memberName] = this._read(memberSchema, record[fromKey]);
+                    }
+                }
+                if (union) {
+                    unionSerde.writeUnknown();
+                }
+                else if (typeof record.__type === "string") {
+                    for (const k in record) {
+                        const v = record[k];
+                        const t = jsonName ? nameMap[k] ?? k : k;
+                        if (!(t in out)) {
+                            out[t] = v;
+                        }
+                    }
+                }
+                return out;
+            }
+            if (Array.isArray(value) && ns.isListSchema()) {
+                const listMember = ns.getValueSchema();
+                const out = [];
+                for (const item of value) {
+                    out.push(this._read(listMember, item));
+                }
+                return out;
+            }
+            if (ns.isMapSchema()) {
+                const mapMember = ns.getValueSchema();
+                const out = {};
+                for (const _k in value) {
+                    out[_k] = this._read(mapMember, value[_k]);
+                }
+                return out;
+            }
+        }
+        if (ns.isBlobSchema() && typeof value === "string") {
+            return fromBase64$1(value);
+        }
+        const mediaType = ns.getMergedTraits().mediaType;
+        if (ns.isStringSchema() && typeof value === "string" && mediaType) {
+            const isJson = mediaType === "application/json" || mediaType.endsWith("+json");
+            if (isJson) {
+                return LazyJsonString.from(value);
+            }
+            return value;
+        }
+        if (ns.isTimestampSchema() && value != null) {
+            const format = determineTimestampFormat(ns, this.settings);
+            switch (format) {
+                case 5:
+                    return parseRfc3339DateTimeWithOffset(value);
+                case 6:
+                    return parseRfc7231DateTime(value);
+                case 7:
+                    return parseEpochTimestamp(value);
+                default:
+                    console.warn("Missing timestamp format, parsing value with Date constructor:", value);
+                    return new Date(value);
+            }
+        }
+        if (ns.isBigIntegerSchema() && (typeof value === "number" || typeof value === "string")) {
+            return BigInt(value);
+        }
+        if (ns.isBigDecimalSchema() && value != undefined) {
+            if (value instanceof NumericValue) {
+                return value;
+            }
+            const untyped = value;
+            if (untyped.type === "bigDecimal" && "string" in untyped) {
+                return new NumericValue(untyped.string, untyped.type);
+            }
+            return new NumericValue(String(value), "bigDecimal");
+        }
+        if (ns.isNumericSchema() && typeof value === "string") {
+            switch (value) {
+                case "Infinity":
+                    return Infinity;
+                case "-Infinity":
+                    return -Infinity;
+                case "NaN":
+                    return NaN;
+            }
+            return value;
+        }
+        if (ns.isDocumentSchema()) {
+            if (isObject) {
+                const out = Array.isArray(value) ? [] : {};
+                for (const k in value) {
+                    const v = value[k];
+                    if (v instanceof NumericValue) {
+                        out[k] = v;
+                    }
+                    else {
+                        out[k] = this._read(ns, v);
+                    }
+                }
+                return out;
+            }
+            else {
+                return structuredClone(value);
+            }
+        }
+        return value;
+    }
+}
+
+const NUMERIC_CONTROL_CHAR = String.fromCharCode(925);
+class JsonReplacer {
+    values = new Map();
+    counter = 0;
+    stage = 0;
+    createReplacer() {
+        if (this.stage === 1) {
+            throw new Error("@aws-sdk/core/protocols - JsonReplacer already created.");
+        }
+        if (this.stage === 2) {
+            throw new Error("@aws-sdk/core/protocols - JsonReplacer exhausted.");
+        }
+        this.stage = 1;
+        return (key, value) => {
+            if (value instanceof NumericValue) {
+                const v = `${NUMERIC_CONTROL_CHAR + "nv" + this.counter++}_` + value.string;
+                this.values.set(`"${v}"`, value.string);
+                return v;
+            }
+            if (typeof value === "bigint") {
+                const s = value.toString();
+                const v = `${NUMERIC_CONTROL_CHAR + "b" + this.counter++}_` + s;
+                this.values.set(`"${v}"`, s);
+                return v;
+            }
+            return value;
+        };
+    }
+    replaceInJson(json) {
+        if (this.stage === 0) {
+            throw new Error("@aws-sdk/core/protocols - JsonReplacer not created yet.");
+        }
+        if (this.stage === 2) {
+            throw new Error("@aws-sdk/core/protocols - JsonReplacer exhausted.");
+        }
+        this.stage = 2;
+        if (this.counter === 0) {
+            return json;
+        }
+        for (const [key, value] of this.values) {
+            json = json.replace(key, value);
+        }
+        return json;
+    }
+}
+
+class JsonShapeSerializer extends SerdeContextConfig {
+    settings;
+    buffer;
+    useReplacer = false;
+    rootSchema;
+    constructor(settings) {
+        super();
+        this.settings = settings;
+    }
+    write(schema, value) {
+        this.rootSchema = NormalizedSchema.of(schema);
+        this.buffer = this._write(this.rootSchema, value);
+    }
+    flush() {
+        const { rootSchema, useReplacer } = this;
+        this.rootSchema = undefined;
+        this.useReplacer = false;
+        if (rootSchema?.isStructSchema() || rootSchema?.isDocumentSchema()) {
+            if (!useReplacer) {
+                return JSON.stringify(this.buffer);
+            }
+            const replacer = new JsonReplacer();
+            return replacer.replaceInJson(JSON.stringify(this.buffer, replacer.createReplacer(), 0));
+        }
+        return this.buffer;
+    }
+    writeDiscriminatedDocument(schema, value) {
+        this.write(schema, value);
+        if (typeof this.buffer === "object") {
+            this.buffer.__type = NormalizedSchema.of(schema).getName(true);
+        }
+    }
+    _write(schema, value, container) {
+        const isObject = value !== null && typeof value === "object";
+        const ns = NormalizedSchema.of(schema);
+        if (isObject) {
+            if (ns.isStructSchema()) {
+                const record = value;
+                const out = {};
+                const { jsonName } = this.settings;
+                let nameMap = void 0;
+                if (jsonName) {
+                    nameMap = {};
+                }
+                let outCount = 0;
+                for (const [memberName, memberSchema] of ns.structIterator()) {
+                    const serializableValue = this._write(memberSchema, record[memberName], ns);
+                    if (serializableValue !== undefined) {
+                        let targetKey = memberName;
+                        if (jsonName) {
+                            targetKey = memberSchema.getMergedTraits().jsonName ?? memberName;
+                            nameMap[memberName] = targetKey;
+                        }
+                        out[targetKey] = serializableValue;
+                        outCount++;
+                    }
+                }
+                if (ns.isUnionSchema() && outCount === 0) {
+                    const { $unknown } = record;
+                    if (Array.isArray($unknown)) {
+                        const [k, v] = $unknown;
+                        out[k] = this._write(15, v);
+                    }
+                }
+                else if (typeof record.__type === "string") {
+                    for (const k in record) {
+                        const v = record[k];
+                        const targetKey = jsonName ? nameMap[k] ?? k : k;
+                        if (!(targetKey in out)) {
+                            out[targetKey] = this._write(15, v);
+                        }
+                    }
+                }
+                return out;
+            }
+            if (Array.isArray(value) && ns.isListSchema()) {
+                const listMember = ns.getValueSchema();
+                const out = [];
+                const sparse = !!ns.getMergedTraits().sparse;
+                for (const item of value) {
+                    if (sparse || item != null) {
+                        out.push(this._write(listMember, item));
+                    }
+                }
+                return out;
+            }
+            if (ns.isMapSchema()) {
+                const mapMember = ns.getValueSchema();
+                const out = {};
+                const sparse = !!ns.getMergedTraits().sparse;
+                for (const _k in value) {
+                    const _v = value[_k];
+                    if (sparse || _v != null) {
+                        out[_k] = this._write(mapMember, _v);
+                    }
+                }
+                return out;
+            }
+            if (value instanceof Uint8Array && (ns.isBlobSchema() || ns.isDocumentSchema())) {
+                if (ns === this.rootSchema) {
+                    return value;
+                }
+                return (this.serdeContext?.base64Encoder ?? toBase64$1)(value);
+            }
+            if (value instanceof Date && (ns.isTimestampSchema() || ns.isDocumentSchema())) {
+                const format = determineTimestampFormat(ns, this.settings);
+                switch (format) {
+                    case 5:
+                        return value.toISOString().replace(".000Z", "Z");
+                    case 6:
+                        return dateToUtcString(value);
+                    case 7:
+                        return value.getTime() / 1000;
+                    default:
+                        console.warn("Missing timestamp format, using epoch seconds", value);
+                        return value.getTime() / 1000;
+                }
+            }
+            if (value instanceof NumericValue) {
+                this.useReplacer = true;
+            }
+        }
+        if (value === null && container?.isStructSchema()) {
+            return void 0;
+        }
+        if (ns.isStringSchema()) {
+            if (typeof value === "undefined" && ns.isIdempotencyToken()) {
+                return generateIdempotencyToken();
+            }
+            const mediaType = ns.getMergedTraits().mediaType;
+            if (value != null && mediaType) {
+                const isJson = mediaType === "application/json" || mediaType.endsWith("+json");
+                if (isJson) {
+                    return LazyJsonString.from(value);
+                }
+            }
+            return value;
+        }
+        if (typeof value === "number" && ns.isNumericSchema()) {
+            if (Math.abs(value) === Infinity || isNaN(value)) {
+                return String(value);
+            }
+            return value;
+        }
+        if (typeof value === "string" && ns.isBlobSchema()) {
+            if (ns === this.rootSchema) {
+                return value;
+            }
+            return (this.serdeContext?.base64Encoder ?? toBase64$1)(value);
+        }
+        if (typeof value === "bigint") {
+            this.useReplacer = true;
+        }
+        if (ns.isDocumentSchema()) {
+            if (isObject) {
+                const out = Array.isArray(value) ? [] : {};
+                for (const k in value) {
+                    const v = value[k];
+                    if (v instanceof NumericValue) {
+                        this.useReplacer = true;
+                        out[k] = v;
+                    }
+                    else {
+                        out[k] = this._write(ns, v);
+                    }
+                }
+                return out;
+            }
+            else {
+                return structuredClone(value);
+            }
+        }
+        return value;
+    }
+}
+
+class JsonCodec extends SerdeContextConfig {
+    settings;
+    constructor(settings) {
+        super();
+        this.settings = settings;
+    }
+    createSerializer() {
+        const serializer = new JsonShapeSerializer(this.settings);
+        serializer.setSerdeContext(this.serdeContext);
+        return serializer;
+    }
+    createDeserializer() {
+        const deserializer = new JsonShapeDeserializer(this.settings);
+        deserializer.setSerdeContext(this.serdeContext);
+        return deserializer;
+    }
+}
+
+class AwsJsonRpcProtocol extends RpcProtocol {
+    serializer;
+    deserializer;
+    serviceTarget;
+    codec;
+    mixin;
+    awsQueryCompatible;
+    constructor({ defaultNamespace, errorTypeRegistries, serviceTarget, awsQueryCompatible, jsonCodec, }) {
+        super({
+            defaultNamespace,
+            errorTypeRegistries,
+        });
+        this.serviceTarget = serviceTarget;
+        this.codec =
+            jsonCodec ??
+                new JsonCodec({
+                    timestampFormat: {
+                        useTrait: true,
+                        default: 7,
+                    },
+                    jsonName: false,
+                });
+        this.serializer = this.codec.createSerializer();
+        this.deserializer = this.codec.createDeserializer();
+        this.awsQueryCompatible = !!awsQueryCompatible;
+        this.mixin = new ProtocolLib(this.awsQueryCompatible);
+    }
+    async serializeRequest(operationSchema, input, context) {
+        const request = await super.serializeRequest(operationSchema, input, context);
+        if (!request.path.endsWith("/")) {
+            request.path += "/";
+        }
+        request.headers["content-type"] = `application/x-amz-json-${this.getJsonRpcVersion()}`;
+        request.headers["x-amz-target"] = `${this.serviceTarget}.${operationSchema.name}`;
+        if (this.awsQueryCompatible) {
+            request.headers["x-amzn-query-mode"] = "true";
+        }
+        if (deref(operationSchema.input) === "unit" || !request.body) {
+            request.body = "{}";
+        }
+        return request;
+    }
+    getPayloadCodec() {
+        return this.codec;
+    }
+    async handleError(operationSchema, context, response, dataObject, metadata) {
+        const { awsQueryCompatible } = this;
+        if (awsQueryCompatible) {
+            this.mixin.setQueryCompatError(dataObject, response);
+        }
+        const errorIdentifier = loadJsonRpcErrorCode(response, dataObject, awsQueryCompatible) ?? "Unknown";
+        this.mixin.compose(this.compositeErrorRegistry, errorIdentifier, this.options.defaultNamespace);
+        const { errorSchema, errorMetadata } = await this.mixin.getErrorSchemaOrThrowBaseException(errorIdentifier, this.options.defaultNamespace, response, dataObject, metadata, awsQueryCompatible ? this.mixin.findQueryCompatibleError : undefined);
+        const ns = NormalizedSchema.of(errorSchema);
+        const message = dataObject.message ?? dataObject.Message ?? "UnknownError";
+        const ErrorCtor = this.compositeErrorRegistry.getErrorCtor(errorSchema) ?? Error;
+        const exception = new ErrorCtor({});
+        const output = {};
+        const errorDeserializer = this.codec.createDeserializer();
+        for (const [name, member] of ns.structIterator()) {
+            if (dataObject[name] != null) {
+                output[name] = errorDeserializer.readObject(member, dataObject[name]);
+            }
+        }
+        if (awsQueryCompatible) {
+            this.mixin.queryCompatOutput(dataObject, output);
+        }
+        throw this.mixin.decorateServiceException(Object.assign(exception, errorMetadata, {
+            $fault: ns.getMergedTraits().error,
+            message,
+        }, output), dataObject);
+    }
+}
+
+class AwsJson1_0Protocol extends AwsJsonRpcProtocol {
+    constructor({ defaultNamespace, errorTypeRegistries, serviceTarget, awsQueryCompatible, jsonCodec, }) {
+        super({
+            defaultNamespace,
+            errorTypeRegistries,
+            serviceTarget,
+            awsQueryCompatible,
+            jsonCodec,
+        });
+    }
+    getShapeId() {
+        return "aws.protocols#awsJson1_0";
+    }
+    getJsonRpcVersion() {
+        return "1.0";
+    }
+    getDefaultContentType() {
+        return "application/x-amz-json-1.0";
+    }
+}
+
+class AwsRestJsonProtocol extends HttpBindingProtocol {
+    serializer;
+    deserializer;
+    codec;
+    mixin = new ProtocolLib();
+    constructor({ defaultNamespace, errorTypeRegistries, }) {
+        super({
+            defaultNamespace,
+            errorTypeRegistries,
+        });
+        const settings = {
+            timestampFormat: {
+                useTrait: true,
+                default: 7,
+            },
+            httpBindings: true,
+            jsonName: true,
+        };
+        this.codec = new JsonCodec(settings);
+        this.serializer = new HttpInterceptingShapeSerializer(this.codec.createSerializer(), settings);
+        this.deserializer = new HttpInterceptingShapeDeserializer(this.codec.createDeserializer(), settings);
+    }
+    getShapeId() {
+        return "aws.protocols#restJson1";
+    }
+    getPayloadCodec() {
+        return this.codec;
+    }
+    setSerdeContext(serdeContext) {
+        this.codec.setSerdeContext(serdeContext);
+        super.setSerdeContext(serdeContext);
+    }
+    async serializeRequest(operationSchema, input, context) {
+        const request = await super.serializeRequest(operationSchema, input, context);
+        const inputSchema = NormalizedSchema.of(operationSchema.input);
+        if (!request.headers["content-type"]) {
+            const contentType = this.mixin.resolveRestContentType(this.getDefaultContentType(), inputSchema);
+            if (contentType) {
+                request.headers["content-type"] = contentType;
+            }
+        }
+        if (request.body == null && request.headers["content-type"] === this.getDefaultContentType()) {
+            request.body = "{}";
+        }
+        return request;
+    }
+    async deserializeResponse(operationSchema, context, response) {
+        const output = await super.deserializeResponse(operationSchema, context, response);
+        const outputSchema = NormalizedSchema.of(operationSchema.output);
+        for (const [name, member] of outputSchema.structIterator()) {
+            if (member.getMemberTraits().httpPayload && !(name in output)) {
+                output[name] = null;
+            }
+        }
+        return output;
+    }
+    async handleError(operationSchema, context, response, dataObject, metadata) {
+        const errorIdentifier = loadRestJsonErrorCode(response, dataObject) ?? "Unknown";
+        this.mixin.compose(this.compositeErrorRegistry, errorIdentifier, this.options.defaultNamespace);
+        const { errorSchema, errorMetadata } = await this.mixin.getErrorSchemaOrThrowBaseException(errorIdentifier, this.options.defaultNamespace, response, dataObject, metadata);
+        const ns = NormalizedSchema.of(errorSchema);
+        const message = dataObject.message ?? dataObject.Message ?? "UnknownError";
+        const ErrorCtor = this.compositeErrorRegistry.getErrorCtor(errorSchema) ?? Error;
+        const exception = new ErrorCtor({});
+        await this.deserializeHttpMessage(errorSchema, context, response, dataObject);
+        const output = {};
+        const errorDeserializer = this.codec.createDeserializer();
+        for (const [name, member] of ns.structIterator()) {
+            const target = member.getMergedTraits().jsonName ?? name;
+            output[name] = errorDeserializer.readObject(member, dataObject[target]);
+        }
+        throw this.mixin.decorateServiceException(Object.assign(exception, errorMetadata, {
+            $fault: ns.getMergedTraits().error,
+            message,
+        }, output), dataObject);
+    }
+    getDefaultContentType() {
+        return "application/json";
+    }
+}
+
+function parseXML(xml) {
+    const state = new AwsXmlParser(xml);
+    return state.parse();
+}
+class AwsXmlParser {
+    x;
+    i = 0;
+    z;
+    constructor(x) {
+        this.x = x;
+        this.x = x.replace(/\r\n?/g, "\n");
+        this.z = this.x.length;
+    }
+    parse() {
+        const p = this;
+        const { z } = p;
+        while (p.i < z) {
+            p.trim();
+            if (p.i >= z) {
+                break;
+            }
+            if (p.isNext("<?")) {
+                p.readTo("?>");
+                p.trim();
+            }
+            else if (p.isNext("<!--")) {
+                p.readTo("-->");
+                p.trim();
+            }
+            else if (p.isNext("<!DOCTYPE", false)) {
+                p.skipDoctype();
+                p.trim();
+            }
+            else if (p.x[p.i] === "<") {
+                const root = p.parseTag();
+                return { [root.tag]: root.value };
+            }
+            else {
+                throw new Error("@aws-sdk XML parse error: unexpected content.");
+            }
+        }
+        throw new Error("@aws-sdk XML parse error: no root element.");
+    }
+    isNext(s, caseSensitive = true) {
+        const p = this;
+        if (caseSensitive) {
+            return p.x.startsWith(s, p.i);
+        }
+        return p.x.toLowerCase().startsWith(s.toLowerCase(), p.i);
+    }
+    readTo(stop) {
+        const p = this;
+        const _i = p.x.indexOf(stop, p.i);
+        if (_i === -1) {
+            throw new Error(`@aws-sdk XML parse error: expected "${stop}" not found.`);
+        }
+        const result = p.x.slice(p.i, _i);
+        p.i = _i + stop.length;
+        return result;
+    }
+    trim() {
+        const p = this;
+        while (p.i < p.z && " \t\r\n".includes(p.x[p.i])) {
+            ++p.i;
+        }
+    }
+    readAttrValue() {
+        const p = this;
+        const quote = p.x[p.i];
+        ++p.i;
+        let value = "";
+        while (p.i < p.z && p.x[p.i] !== quote) {
+            value += p.x[p.i++];
+        }
+        ++p.i;
+        return p.decodeEntities(value);
+    }
+    parseTag() {
+        const p = this;
+        ++p.i;
+        let tag = "";
+        while (p.i < p.z && !" \t\r\n>/".includes(p.x[p.i])) {
+            tag += p.x[p.i++];
+        }
+        let hasAttrs = false;
+        const attrs = Object.create(null);
+        while (p.i < p.z) {
+            p.trim();
+            if (">/".includes(p.x[p.i])) {
+                break;
+            }
+            let name = "";
+            while (p.i < p.z && !"= \t\r\n>/?".includes(p.x[p.i])) {
+                name += p.x[p.i++];
+            }
+            p.trim();
+            if (p.x[p.i] !== "=") {
+                break;
+            }
+            ++p.i;
+            p.trim();
+            attrs[name] = p.readAttrValue();
+            hasAttrs = true;
+        }
+        if (p.i >= p.z) {
+            throw new Error("@aws-sdk XML parse error: unexpected end of input.");
+        }
+        if (p.x[p.i] === "/") {
+            ++p.i;
+            if (p.i >= p.z || p.x[p.i] !== ">") {
+                throw new Error("@aws-sdk XML parse error: expected > at the end of self-closing tag.");
+            }
+            ++p.i;
+            Object.setPrototypeOf(attrs, Object.prototype);
+            return { tag, value: hasAttrs ? attrs : "" };
+        }
+        if (p.x[p.i] !== ">") {
+            throw new Error("@aws-sdk XML parse error: expected > at the end of opening tag.");
+        }
+        ++p.i;
+        const textParts = [];
+        const childTags = [];
+        let hasElementChild = false;
+        while (p.i < p.z) {
+            if (p.isNext("</")) {
+                break;
+            }
+            if (p.x[p.i] === "<") {
+                if (p.isNext("<!--")) {
+                    p.readTo("-->");
+                }
+                else if (p.isNext("<![CDATA[")) {
+                    p.i += 9;
+                    textParts.push(p.readTo("]]>"));
+                }
+                else if (p.isNext("<?")) {
+                    p.readTo("?>");
+                }
+                else {
+                    hasElementChild = true;
+                    childTags.push(p.parseTag());
+                }
+            }
+            else {
+                let text = "";
+                while (p.i < p.z && p.x[p.i] !== "<") {
+                    text += p.x[p.i++];
+                }
+                textParts.push(p.decodeEntities(text));
+            }
+        }
+        if (!p.isNext("</")) {
+            throw new Error(`@aws-sdk XML parse error: missing closing tag </${tag}>.`);
+        }
+        p.i += 2;
+        const closeTag = p.readTo(">").trim();
+        if (closeTag !== tag) {
+            throw new Error(`@aws-sdk XML parse error: mismatched tags <${tag}> and </${closeTag}>.`);
+        }
+        if (!hasAttrs && textParts.length === 0 && !hasElementChild) {
+            return { tag, value: "" };
+        }
+        if (!hasAttrs && !hasElementChild) {
+            const text = textParts.length === 1 ? textParts[0] : textParts.join("");
+            if (text.trim() === "" && text.includes("\n")) {
+                return { tag, value: "" };
+            }
+            return { tag, value: text };
+        }
+        const obj = Object.create(null);
+        for (const text of textParts) {
+            if (text.trim() === "" && text.includes("\n")) {
+                continue;
+            }
+            obj["#text"] = "#text" in obj ? obj["#text"] + text : text;
+        }
+        for (const child of childTags) {
+            if (child.tag in obj) {
+                if (Array.isArray(obj[child.tag])) {
+                    obj[child.tag].push(child.value);
+                }
+                else {
+                    obj[child.tag] = [obj[child.tag], child.value];
+                }
+            }
+            else {
+                obj[child.tag] = child.value;
+            }
+        }
+        for (const [k, v] of Object.entries(attrs)) {
+            obj[k] = v;
+        }
+        Object.setPrototypeOf(obj, Object.prototype);
+        return { tag, value: obj };
+    }
+    static ENTITIES = {
+        amp: "&",
+        lt: "<",
+        gt: ">",
+        quot: '"',
+        apos: "'",
+    };
+    skipDoctype() {
+        const p = this;
+        p.i += 9;
+        let depth = 0;
+        while (p.i < p.z) {
+            const c = p.x[p.i];
+            if (c === "[") {
+                ++depth;
+            }
+            else if (c === "]") {
+                --depth;
+            }
+            else if (c === ">" && depth === 0) {
+                ++p.i;
+                return;
+            }
+            ++p.i;
+        }
+        throw new Error("@aws-sdk XML parse error: unclosed DOCTYPE.");
+    }
+    decodeEntities(s) {
+        return s.replace(/&(?:#x([0-9a-fA-F]{1,6})|#(\d{1,7})|([a-zA-Z][a-zA-Z0-9]{0,30}));/g, (_, hex, dec, named) => {
+            if (hex) {
+                return String.fromCharCode(parseInt(hex, 16));
+            }
+            if (dec) {
+                return String.fromCharCode(parseInt(dec, 10));
+            }
+            return AwsXmlParser.ENTITIES[named] ?? "";
+        });
+    }
+}
+
+class XmlShapeDeserializer extends SerdeContextConfig {
+    settings;
+    stringDeserializer;
+    constructor(settings) {
+        super();
+        this.settings = settings;
+        this.stringDeserializer = new FromStringShapeDeserializer(settings);
+    }
+    setSerdeContext(serdeContext) {
+        this.serdeContext = serdeContext;
+        this.stringDeserializer.setSerdeContext(serdeContext);
+    }
+    read(schema, bytes, key) {
+        const ns = NormalizedSchema.of(schema);
+        const memberSchemas = ns.getMemberSchemas();
+        const isEventPayload = ns.isStructSchema() &&
+            ns.isMemberSchema() &&
+            !!Object.values(memberSchemas).find((memberNs) => {
+                return !!memberNs.getMemberTraits().eventPayload;
+            });
+        if (isEventPayload) {
+            const output = {};
+            const memberName = Object.keys(memberSchemas)[0];
+            const eventMemberSchema = memberSchemas[memberName];
+            if (eventMemberSchema.isBlobSchema()) {
+                output[memberName] = bytes;
+            }
+            else {
+                output[memberName] = this.read(memberSchemas[memberName], bytes);
+            }
+            return output;
+        }
+        const xmlString = (this.serdeContext?.utf8Encoder ?? toUtf8$1)(bytes);
+        const parsedObject = this.parseXml(xmlString);
+        return this.readSchema(schema, key ? parsedObject[key] : parsedObject);
+    }
+    readSchema(_schema, value) {
+        const ns = NormalizedSchema.of(_schema);
+        if (ns.isUnitSchema()) {
+            return;
+        }
+        const traits = ns.getMergedTraits();
+        if (ns.isListSchema() && !Array.isArray(value)) {
+            return this.readSchema(ns, [value]);
+        }
+        if (value == null) {
+            return value;
+        }
+        if (typeof value === "object") {
+            const flat = !!traits.xmlFlattened;
+            if (ns.isListSchema()) {
+                const listValue = ns.getValueSchema();
+                const buffer = [];
+                const sourceKey = listValue.getMergedTraits().xmlName ?? "member";
+                const source = flat ? value : (value[0] ?? value)[sourceKey];
+                if (source == null) {
+                    return buffer;
+                }
+                const sourceArray = Array.isArray(source) ? source : [source];
+                for (const v of sourceArray) {
+                    buffer.push(this.readSchema(listValue, v));
+                }
+                return buffer;
+            }
+            const buffer = {};
+            if (ns.isMapSchema()) {
+                const keyNs = ns.getKeySchema();
+                const memberNs = ns.getValueSchema();
+                let entries;
+                if (flat) {
+                    entries = Array.isArray(value) ? value : [value];
+                }
+                else {
+                    entries = Array.isArray(value.entry) ? value.entry : [value.entry];
+                }
+                const keyProperty = keyNs.getMergedTraits().xmlName ?? "key";
+                const valueProperty = memberNs.getMergedTraits().xmlName ?? "value";
+                for (const entry of entries) {
+                    const key = entry[keyProperty];
+                    const value = entry[valueProperty];
+                    buffer[key] = this.readSchema(memberNs, value);
+                }
+                return buffer;
+            }
+            if (ns.isStructSchema()) {
+                const union = ns.isUnionSchema();
+                let unionSerde;
+                if (union) {
+                    unionSerde = new UnionSerde(value, buffer);
+                }
+                for (const [memberName, memberSchema] of ns.structIterator()) {
+                    const memberTraits = memberSchema.getMergedTraits();
+                    const xmlObjectKey = !memberTraits.httpPayload
+                        ? memberSchema.getMemberTraits().xmlName ?? memberName
+                        : memberTraits.xmlName ?? memberSchema.getName();
+                    if (union) {
+                        unionSerde.mark(xmlObjectKey);
+                    }
+                    if (value[xmlObjectKey] != null) {
+                        buffer[memberName] = this.readSchema(memberSchema, value[xmlObjectKey]);
+                    }
+                }
+                if (union) {
+                    unionSerde.writeUnknown();
+                }
+                return buffer;
+            }
+            if (ns.isDocumentSchema()) {
+                return value;
+            }
+            throw new Error(`@aws-sdk/core/protocols - xml deserializer unhandled schema type for ${ns.getName(true)}`);
+        }
+        if (ns.isListSchema()) {
+            return [];
+        }
+        if (ns.isMapSchema() || ns.isStructSchema()) {
+            return {};
+        }
+        return this.stringDeserializer.read(ns, value);
+    }
+    parseXml(xml) {
+        if (xml.length) {
+            let parsedObj;
+            try {
+                parsedObj = parseXML(xml);
+            }
+            catch (e) {
+                if (e && typeof e === "object") {
+                    Object.defineProperty(e, "$responseBodyText", {
+                        value: xml,
+                    });
+                }
+                throw e;
+            }
+            const textNodeName = "#text";
+            const key = Object.keys(parsedObj)[0];
+            const parsedObjToReturn = parsedObj[key];
+            if (parsedObjToReturn[textNodeName]) {
+                parsedObjToReturn[key] = parsedObjToReturn[textNodeName];
+                delete parsedObjToReturn[textNodeName];
+            }
+            return getValueFromTextNode(parsedObjToReturn);
+        }
+        return {};
+    }
+}
+
+class QueryShapeSerializer extends SerdeContextConfig {
+    settings;
+    buffer;
+    constructor(settings) {
+        super();
+        this.settings = settings;
+    }
+    write(schema, value, prefix = "") {
+        if (this.buffer === undefined) {
+            this.buffer = "";
+        }
+        const ns = NormalizedSchema.of(schema);
+        if (prefix && !prefix.endsWith(".")) {
+            prefix += ".";
+        }
+        if (ns.isBlobSchema()) {
+            if (typeof value === "string" || value instanceof Uint8Array) {
+                this.writeKey(prefix);
+                this.writeValue((this.serdeContext?.base64Encoder ?? toBase64$1)(value));
+            }
+        }
+        else if (ns.isBooleanSchema() || ns.isNumericSchema() || ns.isStringSchema()) {
+            if (value != null) {
+                this.writeKey(prefix);
+                this.writeValue(String(value));
+            }
+            else if (ns.isIdempotencyToken()) {
+                this.writeKey(prefix);
+                this.writeValue(generateIdempotencyToken());
+            }
+        }
+        else if (ns.isBigIntegerSchema()) {
+            if (value != null) {
+                this.writeKey(prefix);
+                this.writeValue(String(value));
+            }
+        }
+        else if (ns.isBigDecimalSchema()) {
+            if (value != null) {
+                this.writeKey(prefix);
+                this.writeValue(value instanceof NumericValue ? value.string : String(value));
+            }
+        }
+        else if (ns.isTimestampSchema()) {
+            if (value instanceof Date) {
+                this.writeKey(prefix);
+                const format = determineTimestampFormat(ns, this.settings);
+                switch (format) {
+                    case 5:
+                        this.writeValue(value.toISOString().replace(".000Z", "Z"));
+                        break;
+                    case 6:
+                        this.writeValue(dateToUtcString(value));
+                        break;
+                    case 7:
+                        this.writeValue(String(value.getTime() / 1000));
+                        break;
+                }
+            }
+        }
+        else if (ns.isDocumentSchema()) {
+            if (Array.isArray(value)) {
+                this.write(64 | 15, value, prefix);
+            }
+            else if (value instanceof Date) {
+                this.write(4, value, prefix);
+            }
+            else if (value instanceof Uint8Array) {
+                this.write(21, value, prefix);
+            }
+            else if (value && typeof value === "object") {
+                this.write(128 | 15, value, prefix);
+            }
+            else {
+                this.writeKey(prefix);
+                this.writeValue(String(value));
+            }
+        }
+        else if (ns.isListSchema()) {
+            if (Array.isArray(value)) {
+                if (value.length === 0) {
+                    if (this.settings.serializeEmptyLists) {
+                        this.writeKey(prefix);
+                        this.writeValue("");
+                    }
+                }
+                else {
+                    const member = ns.getValueSchema();
+                    const flat = this.settings.flattenLists || ns.getMergedTraits().xmlFlattened;
+                    let i = 1;
+                    for (const item of value) {
+                        if (item == null) {
+                            continue;
+                        }
+                        const traits = member.getMergedTraits();
+                        const suffix = this.getKey("member", traits.xmlName, traits.ec2QueryName);
+                        const key = flat ? `${prefix}${i}` : `${prefix}${suffix}.${i}`;
+                        this.write(member, item, key);
+                        ++i;
+                    }
+                }
+            }
+        }
+        else if (ns.isMapSchema()) {
+            if (value && typeof value === "object") {
+                const keySchema = ns.getKeySchema();
+                const memberSchema = ns.getValueSchema();
+                const flat = ns.getMergedTraits().xmlFlattened;
+                let i = 1;
+                for (const k in value) {
+                    const v = value[k];
+                    if (v == null) {
+                        continue;
+                    }
+                    const keyTraits = keySchema.getMergedTraits();
+                    const keySuffix = this.getKey("key", keyTraits.xmlName, keyTraits.ec2QueryName);
+                    const key = flat ? `${prefix}${i}.${keySuffix}` : `${prefix}entry.${i}.${keySuffix}`;
+                    const valTraits = memberSchema.getMergedTraits();
+                    const valueSuffix = this.getKey("value", valTraits.xmlName, valTraits.ec2QueryName);
+                    const valueKey = flat ? `${prefix}${i}.${valueSuffix}` : `${prefix}entry.${i}.${valueSuffix}`;
+                    this.write(keySchema, k, key);
+                    this.write(memberSchema, v, valueKey);
+                    ++i;
+                }
+            }
+        }
+        else if (ns.isStructSchema()) {
+            if (value && typeof value === "object") {
+                let didWriteMember = false;
+                for (const [memberName, member] of ns.structIterator()) {
+                    if (value[memberName] == null && !member.isIdempotencyToken()) {
+                        continue;
+                    }
+                    const traits = member.getMergedTraits();
+                    const suffix = this.getKey(memberName, traits.xmlName, traits.ec2QueryName, "struct");
+                    const key = `${prefix}${suffix}`;
+                    this.write(member, value[memberName], key);
+                    didWriteMember = true;
+                }
+                if (!didWriteMember && ns.isUnionSchema()) {
+                    const { $unknown } = value;
+                    if (Array.isArray($unknown)) {
+                        const [k, v] = $unknown;
+                        const key = `${prefix}${k}`;
+                        this.write(15, v, key);
+                    }
+                }
+            }
+        }
+        else if (ns.isUnitSchema()) ;
+        else {
+            throw new Error(`@aws-sdk/core/protocols - QuerySerializer unrecognized schema type ${ns.getName(true)}`);
+        }
+    }
+    flush() {
+        if (this.buffer === undefined) {
+            throw new Error("@aws-sdk/core/protocols - QuerySerializer cannot flush with nothing written to buffer.");
+        }
+        const str = this.buffer;
+        delete this.buffer;
+        return str;
+    }
+    getKey(memberName, xmlName, ec2QueryName, keySource) {
+        const { ec2, capitalizeKeys } = this.settings;
+        if (ec2 && ec2QueryName) {
+            return ec2QueryName;
+        }
+        const key = xmlName ?? memberName;
+        if (capitalizeKeys && keySource === "struct") {
+            return key[0].toUpperCase() + key.slice(1);
+        }
+        return key;
+    }
+    writeKey(key) {
+        if (key.endsWith(".")) {
+            key = key.slice(0, key.length - 1);
+        }
+        this.buffer += `&${extendedEncodeURIComponent(key)}=`;
+    }
+    writeValue(value) {
+        this.buffer += extendedEncodeURIComponent(value);
+    }
+}
+
+class AwsQueryProtocol extends RpcProtocol {
+    options;
+    serializer;
+    deserializer;
+    mixin = new ProtocolLib();
+    constructor(options) {
+        super({
+            defaultNamespace: options.defaultNamespace,
+            errorTypeRegistries: options.errorTypeRegistries,
+        });
+        this.options = options;
+        const settings = {
+            timestampFormat: {
+                useTrait: true,
+                default: 5,
+            },
+            httpBindings: false,
+            xmlNamespace: options.xmlNamespace,
+            serviceNamespace: options.defaultNamespace,
+            serializeEmptyLists: true,
+        };
+        this.serializer = new QueryShapeSerializer(settings);
+        this.deserializer = new XmlShapeDeserializer(settings);
+    }
+    getShapeId() {
+        return "aws.protocols#awsQuery";
+    }
+    setSerdeContext(serdeContext) {
+        this.serializer.setSerdeContext(serdeContext);
+        this.deserializer.setSerdeContext(serdeContext);
+    }
+    getPayloadCodec() {
+        throw new Error("AWSQuery protocol has no payload codec.");
+    }
+    async serializeRequest(operationSchema, input, context) {
+        const request = await super.serializeRequest(operationSchema, input, context);
+        if (!request.path.endsWith("/")) {
+            request.path += "/";
+        }
+        request.headers["content-type"] = "application/x-www-form-urlencoded";
+        if (deref(operationSchema.input) === "unit" || !request.body) {
+            request.body = "";
+        }
+        const action = operationSchema.name.split("#")[1] ?? operationSchema.name;
+        request.body = `Action=${action}&Version=${this.options.version}` + request.body;
+        if (request.body.endsWith("&")) {
+            request.body = request.body.slice(-1);
+        }
+        return request;
+    }
+    async deserializeResponse(operationSchema, context, response) {
+        const deserializer = this.deserializer;
+        const ns = NormalizedSchema.of(operationSchema.output);
+        const dataObject = {};
+        if (response.statusCode >= 300) {
+            const bytes = await collectBody(response.body, context);
+            if (bytes.byteLength > 0) {
+                Object.assign(dataObject, await deserializer.read(15, bytes));
+            }
+            await this.handleError(operationSchema, context, response, dataObject, this.deserializeMetadata(response));
+        }
+        for (const header in response.headers) {
+            const value = response.headers[header];
+            delete response.headers[header];
+            response.headers[header.toLowerCase()] = value;
+        }
+        const shortName = operationSchema.name.split("#")[1] ?? operationSchema.name;
+        const awsQueryResultKey = ns.isStructSchema() && this.useNestedResult() ? shortName + "Result" : undefined;
+        const bytes = await collectBody(response.body, context);
+        if (bytes.byteLength > 0) {
+            Object.assign(dataObject, await deserializer.read(ns, bytes, awsQueryResultKey));
+        }
+        dataObject.$metadata = this.deserializeMetadata(response);
+        return dataObject;
+    }
+    useNestedResult() {
+        return true;
+    }
+    async handleError(operationSchema, context, response, dataObject, metadata) {
+        const errorIdentifier = this.loadQueryErrorCode(response, dataObject) ?? "Unknown";
+        this.mixin.compose(this.compositeErrorRegistry, errorIdentifier, this.options.defaultNamespace);
+        const errorData = this.loadQueryError(dataObject) ?? {};
+        const message = this.loadQueryErrorMessage(dataObject);
+        errorData.message = message;
+        errorData.Error = {
+            Type: errorData.Type,
+            Code: errorData.Code,
+            Message: message,
+        };
+        const { errorSchema, errorMetadata } = await this.mixin.getErrorSchemaOrThrowBaseException(errorIdentifier, this.options.defaultNamespace, response, errorData, metadata, this.mixin.findQueryCompatibleError);
+        const ns = NormalizedSchema.of(errorSchema);
+        const ErrorCtor = this.compositeErrorRegistry.getErrorCtor(errorSchema) ?? Error;
+        const exception = new ErrorCtor({});
+        const output = {
+            Type: errorData.Error.Type,
+            Code: errorData.Error.Code,
+            Error: errorData.Error,
+        };
+        for (const [name, member] of ns.structIterator()) {
+            const target = member.getMergedTraits().xmlName ?? name;
+            const value = errorData[target] ?? dataObject[target];
+            output[name] = this.deserializer.readSchema(member, value);
+        }
+        throw this.mixin.decorateServiceException(Object.assign(exception, errorMetadata, {
+            $fault: ns.getMergedTraits().error,
+            message,
+        }, output), dataObject);
+    }
+    loadQueryErrorCode(output, data) {
+        const code = (data.Errors?.[0]?.Error ?? data.Errors?.Error ?? data.Error)?.Code;
+        if (code !== undefined) {
+            return code;
+        }
+        if (output.statusCode == 404) {
+            return "NotFound";
+        }
+    }
+    loadQueryError(data) {
+        return data.Errors?.[0]?.Error ?? data.Errors?.Error ?? data.Error;
+    }
+    loadQueryErrorMessage(data) {
+        const errorData = this.loadQueryError(data);
+        return errorData?.message ?? errorData?.Message ?? data.message ?? data.Message ?? "Unknown";
+    }
+    getDefaultContentType() {
+        return "application/x-www-form-urlencoded";
+    }
+}
 
 class DynamoDBJsonCodec extends JsonCodec {
     constructor() {
@@ -44890,8 +44445,8 @@ class DynamoDBJsonShapeSerializer extends JsonShapeSerializer {
         if (ns.isStructSchema() && ns.getName(true) === ATTRIBUTE_VALUE) {
             if (value && typeof value === "object") {
                 const av = value;
-                const out = _json(av);
-                const base64Encode = this.serdeContext?.base64Encoder ?? toBase64;
+                const out = this.copyRemoveNulls(av);
+                const base64Encode = this.serdeContext?.base64Encoder ?? toBase64$1;
                 if (av.B instanceof Uint8Array) {
                     out.B = base64Encode(av.B);
                 }
@@ -44899,7 +44454,13 @@ class DynamoDBJsonShapeSerializer extends JsonShapeSerializer {
                     out.BS = av.BS.map(base64Encode);
                 }
                 if (Array.isArray(av.L)) {
-                    out.L = av.L.filter((v) => v != null).map((v) => this._write(ns, v, container));
+                    const list = [];
+                    for (const v of av.L) {
+                        if (v != null) {
+                            list.push(this._write(ns, v, container));
+                        }
+                    }
+                    out.L = list;
                 }
                 if (av.M && typeof av.M === "object") {
                     out.M = {};
@@ -44914,6 +44475,33 @@ class DynamoDBJsonShapeSerializer extends JsonShapeSerializer {
         }
         return super._write(ns, value, container);
     }
+    copyRemoveNulls(v) {
+        if (typeof v !== "object") {
+            return v;
+        }
+        if (v === null) {
+            return {};
+        }
+        if (Array.isArray(v)) {
+            const out = [];
+            for (const item of v) {
+                if (item != null) {
+                    out.push(this.copyRemoveNulls(item));
+                }
+            }
+            return out;
+        }
+        const out = {};
+        for (const [k, _v] of Object.entries(v)) {
+            if (_v != null) {
+                if (["B", "BS", "L", "M"].includes(k)) {
+                    continue;
+                }
+                out[k] = this.copyRemoveNulls(_v);
+            }
+        }
+        return out;
+    }
 }
 class DynamoDBJsonShapeDeserializer extends JsonShapeDeserializer {
     _read(schema, value) {
@@ -44921,8 +44509,8 @@ class DynamoDBJsonShapeDeserializer extends JsonShapeDeserializer {
         if (ns.isStructSchema() && ns.getName(true) === ATTRIBUTE_VALUE) {
             if (value && typeof value === "object") {
                 const av = value;
-                const out = _json(av);
-                const base64Decoder = this.serdeContext?.base64Decoder ?? fromBase64;
+                const out = av;
+                const base64Decoder = this.serdeContext?.base64Decoder ?? fromBase64$1;
                 if (typeof av.B === "string") {
                     out.B = base64Decoder(av.B);
                 }
@@ -44933,7 +44521,6 @@ class DynamoDBJsonShapeDeserializer extends JsonShapeDeserializer {
                     out.L = av.L.map((v) => this._read(ns, v));
                 }
                 if (av.M && typeof av.M === "object") {
-                    out.M = {};
                     for (const [k, v] of Object.entries(av.M)) {
                         out.M[k] = this._read(ns, v);
                     }
@@ -44945,12 +44532,143 @@ class DynamoDBJsonShapeDeserializer extends JsonShapeDeserializer {
     }
 }
 
-const K = "required", L = "type", M = "rules", N = "conditions", O = "fn", P = "argv", Q = "ref", R = "assign", S = "url", T = "properties", U = "headers", V = "metricValues";
-const a$4 = false, b$4 = "error", c$4 = "stringEquals", d$4 = "https://dynamodb.{Region}.{PartitionResult#dualStackDnsSuffix}", e$4 = "endpoint", f$4 = "tree", g$4 = "dynamodb", h$4 = { [K]: false, [L]: "string" }, i$4 = { [K]: true, "default": false, [L]: "boolean" }, j$4 = { [O]: "isSet", [P]: [{ [Q]: "Endpoint" }] }, k$4 = { [Q]: "Endpoint" }, l$4 = { [O]: "isSet", [P]: [{ [Q]: "Region" }] }, m$4 = { [Q]: "Region" }, n$4 = { [O]: "aws.partition", [P]: [m$4], [R]: "PartitionResult" }, o$4 = { [N]: [{ [O]: "booleanEquals", [P]: [{ [Q]: "UseFIPS" }, true] }], [b$4]: "Invalid Configuration: FIPS and custom endpoint are not supported", [L]: b$4 }, p$4 = { [O]: "booleanEquals", [P]: [{ [Q]: "UseFIPS" }, true] }, q$4 = { [N]: [{ [O]: "booleanEquals", [P]: [{ [Q]: "UseDualStack" }, true] }], [b$4]: "Invalid Configuration: Dualstack and custom endpoint are not supported", [L]: b$4 }, r$4 = { [O]: "booleanEquals", [P]: [{ [Q]: "UseDualStack" }, true] }, s$4 = { [e$4]: { [S]: "{Endpoint}", [T]: {}, [U]: {} }, [L]: e$4 }, t$4 = {}, u$4 = { [O]: "booleanEquals", [P]: [{ [O]: "getAttr", [P]: [{ [Q]: "PartitionResult" }, "supportsFIPS"] }, true] }, v$4 = { [O]: "booleanEquals", [P]: [{ [O]: "getAttr", [P]: [{ [Q]: "PartitionResult" }, "supportsDualStack"] }, true] }, w$4 = { [N]: [{ [O]: "isSet", [P]: [{ [Q]: "AccountIdEndpointMode" }] }, { [O]: c$4, [P]: [{ [Q]: "AccountIdEndpointMode" }, "required"] }], [M]: [{ [b$4]: "Invalid Configuration: AccountIdEndpointMode is required and FIPS is enabled, but FIPS account endpoints are not supported", [L]: b$4 }], [L]: f$4 }, x$4 = { [O]: "getAttr", [P]: [{ [Q]: "PartitionResult" }, "name"] }, y$1 = { [e$4]: { [S]: "https://dynamodb.{Region}.{PartitionResult#dnsSuffix}", [T]: {}, [U]: {} }, [L]: e$4 }, z$1 = { [S]: "https://{ParsedArn#accountId}.ddb.{Region}.{PartitionResult#dualStackDnsSuffix}", [T]: { [V]: ["O"] }, [U]: {} }, A$1 = { [V]: ["O"] }, B$1 = { [b$4]: "Credentials-sourced account ID parameter is invalid", [L]: b$4 }, C$1 = { [N]: [{ [O]: "isSet", [P]: [{ [Q]: "AccountIdEndpointMode" }] }, { [O]: c$4, [P]: [{ [Q]: "AccountIdEndpointMode" }, "required"] }], [M]: [{ [N]: [{ [O]: "not", [P]: [p$4] }], [M]: [{ [N]: [{ [O]: c$4, [P]: [x$4, "aws"] }], [M]: [{ [b$4]: "AccountIdEndpointMode is required but no AccountID was provided or able to be loaded", [L]: b$4 }], [L]: f$4 }, { [b$4]: "Invalid Configuration: AccountIdEndpointMode is required but account endpoints are not supported in this partition", [L]: b$4 }], [L]: f$4 }, { [b$4]: "Invalid Configuration: AccountIdEndpointMode is required and FIPS is enabled, but FIPS account endpoints are not supported", [L]: b$4 }], [L]: f$4 }, D$1 = { [S]: "https://{ParsedArn#accountId}.ddb.{Region}.{PartitionResult#dnsSuffix}", [T]: A$1, [U]: {} }, E$1 = [p$4], F$1 = [r$4], G$1 = [{ [O]: "isSet", [P]: [{ [Q]: "AccountIdEndpointMode" }] }, { [O]: "not", [P]: [{ [O]: c$4, [P]: [{ [Q]: "AccountIdEndpointMode" }, "disabled"] }] }, { [O]: c$4, [P]: [x$4, "aws"] }, { [O]: "not", [P]: [p$4] }, { [O]: "isSet", [P]: [{ [Q]: "ResourceArn" }] }, { [O]: "aws.parseArn", [P]: [{ [Q]: "ResourceArn" }], [R]: "ParsedArn" }, { [O]: c$4, [P]: [{ [O]: "getAttr", [P]: [{ [Q]: "ParsedArn" }, "service"] }, g$4] }, { [O]: "isValidHostLabel", [P]: [{ [O]: "getAttr", [P]: [{ [Q]: "ParsedArn" }, "region"] }, false] }, { [O]: c$4, [P]: [{ [O]: "getAttr", [P]: [{ [Q]: "ParsedArn" }, "region"] }, "{Region}"] }, { [O]: "isValidHostLabel", [P]: [{ [O]: "getAttr", [P]: [{ [Q]: "ParsedArn" }, "accountId"] }, false] }], H$1 = [{ [O]: "isSet", [P]: [{ [Q]: "AccountIdEndpointMode" }] }, { [O]: "not", [P]: [{ [O]: c$4, [P]: [{ [Q]: "AccountIdEndpointMode" }, "disabled"] }] }, { [O]: c$4, [P]: [x$4, "aws"] }, { [O]: "not", [P]: [p$4] }, { [O]: "isSet", [P]: [{ [Q]: "ResourceArnList" }] }, { [O]: "getAttr", [P]: [{ [Q]: "ResourceArnList" }, "[0]"], [R]: "FirstArn" }, { [O]: "aws.parseArn", [P]: [{ [Q]: "FirstArn" }], [R]: "ParsedArn" }, { [O]: c$4, [P]: [{ [O]: "getAttr", [P]: [{ [Q]: "ParsedArn" }, "service"] }, g$4] }, { [O]: "isValidHostLabel", [P]: [{ [O]: "getAttr", [P]: [{ [Q]: "ParsedArn" }, "region"] }, false] }, { [O]: c$4, [P]: [{ [O]: "getAttr", [P]: [{ [Q]: "ParsedArn" }, "region"] }, "{Region}"] }, { [O]: "isValidHostLabel", [P]: [{ [O]: "getAttr", [P]: [{ [Q]: "ParsedArn" }, "accountId"] }, false] }], I$1 = [{ [O]: "isSet", [P]: [{ [Q]: "AccountIdEndpointMode" }] }, { [O]: "not", [P]: [{ [O]: c$4, [P]: [{ [Q]: "AccountIdEndpointMode" }, "disabled"] }] }, { [O]: c$4, [P]: [x$4, "aws"] }, { [O]: "not", [P]: [p$4] }, { [O]: "isSet", [P]: [{ [Q]: "AccountId" }] }], J$1 = [{ [O]: "isValidHostLabel", [P]: [{ [Q]: "AccountId" }, false] }];
-const _data$4 = { parameters: { Region: h$4, UseDualStack: i$4, UseFIPS: i$4, Endpoint: h$4, AccountId: h$4, AccountIdEndpointMode: h$4, ResourceArn: h$4, ResourceArnList: { [K]: a$4, [L]: "stringArray" } }, [M]: [{ [N]: [j$4, l$4, n$4], [M]: [o$4, q$4, { [N]: [{ [O]: c$4, [P]: [k$4, d$4] }], error: "Endpoint override is not supported for dual-stack endpoints. Please enable dual-stack functionality by enabling the configuration. For more details, see: https://docs.aws.amazon.com/sdkref/latest/guide/feature-endpoints.html", [L]: b$4 }, s$4], [L]: f$4 }, { [N]: [j$4], [M]: [o$4, q$4, s$4], [L]: f$4 }, { [N]: [l$4], [M]: [{ [N]: [n$4], [M]: [{ [N]: [{ [O]: c$4, [P]: [m$4, "local"] }], [M]: [{ [N]: E$1, error: "Invalid Configuration: FIPS and local endpoint are not supported", [L]: b$4 }, { [N]: F$1, error: "Invalid Configuration: Dualstack and local endpoint are not supported", [L]: b$4 }, { endpoint: { [S]: "http://localhost:8000", [T]: { authSchemes: [{ name: "sigv4", signingRegion: "us-east-1", signingName: g$4 }] }, [U]: t$4 }, [L]: e$4 }], [L]: f$4 }, { [N]: [p$4, r$4], [M]: [{ [N]: [u$4, v$4], [M]: [w$4, { endpoint: { [S]: "https://dynamodb-fips.{Region}.{PartitionResult#dualStackDnsSuffix}", [T]: t$4, [U]: t$4 }, [L]: e$4 }], [L]: f$4 }, { error: "FIPS and DualStack are enabled, but this partition does not support one or both", [L]: b$4 }], [L]: f$4 }, { [N]: E$1, [M]: [{ [N]: [u$4], [M]: [{ [N]: [{ [O]: c$4, [P]: [x$4, "aws-us-gov"] }], [M]: [w$4, y$1], [L]: f$4 }, w$4, { endpoint: { [S]: "https://dynamodb-fips.{Region}.{PartitionResult#dnsSuffix}", [T]: t$4, [U]: t$4 }, [L]: e$4 }], [L]: f$4 }, { error: "FIPS is enabled but this partition does not support FIPS", [L]: b$4 }], [L]: f$4 }, { [N]: F$1, [M]: [{ [N]: [v$4], [M]: [{ [N]: G$1, endpoint: z$1, [L]: e$4 }, { [N]: H$1, endpoint: z$1, [L]: e$4 }, { [N]: I$1, [M]: [{ [N]: J$1, [M]: [{ endpoint: { [S]: "https://{AccountId}.ddb.{Region}.{PartitionResult#dualStackDnsSuffix}", [T]: A$1, [U]: t$4 }, [L]: e$4 }], [L]: f$4 }, B$1], [L]: f$4 }, C$1, { endpoint: { [S]: d$4, [T]: t$4, [U]: t$4 }, [L]: e$4 }], [L]: f$4 }, { error: "DualStack is enabled but this partition does not support DualStack", [L]: b$4 }], [L]: f$4 }, { [N]: G$1, endpoint: D$1, [L]: e$4 }, { [N]: H$1, endpoint: D$1, [L]: e$4 }, { [N]: I$1, [M]: [{ [N]: J$1, [M]: [{ endpoint: { [S]: "https://{AccountId}.ddb.{Region}.{PartitionResult#dnsSuffix}", [T]: A$1, [U]: t$4 }, [L]: e$4 }], [L]: f$4 }, B$1], [L]: f$4 }, C$1, y$1], [L]: f$4 }], [L]: f$4 }, { error: "Invalid Configuration: Missing Region", [L]: b$4 }] };
-const ruleSet$4 = _data$4;
+const I = "ref", J = "argv";
+const a$4 = -1, b$4 = true, c$4 = false, d$4 = "isSet", e$4 = "booleanEquals", f$4 = "PartitionResult", g$4 = "stringEquals", h$4 = "getAttr", i$4 = "https://dynamodb.{Region}.{PartitionResult#dualStackDnsSuffix}", j$4 = "aws.parseArn", k$4 = (n) => "ParsedArn_ssa_" + n + "", l$2 = "service", m$2 = "dynamodb", n$2 = "isValidHostLabel", o$2 = "accountId", p$2 = "FirstArn", q$1 = (n) => "https://{ParsedArn_ssa_" + n + "#accountId}.ddb.{Region}.{PartitionResult#dualStackDnsSuffix}", s = (n) => "https://{ParsedArn_ssa_" + n + "#accountId}.ddb.{Region}.{PartitionResult#dnsSuffix}", t = { [I]: "Endpoint" }, u = { [I]: "Region" }, v = { [I]: f$4 }, w = { [I]: "AccountIdEndpointMode" }, x = { "fn": h$4, [J]: [v, "name"] }, y = { "fn": h$4, [J]: [{ [I]: "ParsedArn_ssa_2" }, "region"] }, z = { [I]: "ParsedArn_ssa_2" }, A = { [I]: "ResourceArnList" }, B = { "fn": h$4, [J]: [{ [I]: "ParsedArn_ssa_1" }, "region"] }, C = { [I]: "ParsedArn_ssa_1" }, D = { [I]: "AccountId" }, E = {}, F = { "metricValues": ["O"] }, G = [u], H = [{ [I]: "ResourceArn" }];
+const _data$4 = {
+    conditions: [
+        [d$4, G],
+        [d$4, [t]],
+        [e$4, [{ [I]: "UseFIPS" }, b$4]],
+        ["aws.partition", G, f$4],
+        [g$4, [u, "local"]],
+        [e$4, [{ fn: h$4, [J]: [v, "supportsFIPS"] }, b$4]],
+        [e$4, [{ [I]: "UseDualStack" }, b$4]],
+        [e$4, [{ fn: h$4, [J]: [v, "supportsDualStack"] }, b$4]],
+        [g$4, [i$4, t]],
+        [d$4, [w]],
+        [g$4, [x, "aws"]],
+        [g$4, [w, "disabled"]],
+        [d$4, H],
+        [j$4, H, k$4(2)],
+        [g$4, [y, u]],
+        [g$4, [{ fn: h$4, [J]: [z, l$2] }, m$2]],
+        [n$2, [{ fn: h$4, [J]: [z, o$2] }, c$4]],
+        [n$2, [y, c$4]],
+        [d$4, [A]],
+        [h$4, [A, "[0]"], p$2],
+        [j$4, [{ [I]: p$2 }], k$4(1)],
+        [g$4, [B, u]],
+        [g$4, [{ fn: h$4, [J]: [C, l$2] }, m$2]],
+        [n$2, [{ fn: h$4, [J]: [C, o$2] }, c$4]],
+        [n$2, [B, c$4]],
+        [d$4, [D]],
+        [g$4, [w, "required"]],
+        [n$2, [D, c$4]],
+        [g$4, [x, "aws-us-gov"]]
+    ],
+    results: [
+        [a$4],
+        [a$4, "Invalid Configuration: FIPS and custom endpoint are not supported"],
+        [a$4, "Invalid Configuration: Dualstack and custom endpoint are not supported"],
+        [a$4, "Endpoint override is not supported for dual-stack endpoints. Please enable dual-stack functionality by enabling the configuration. For more details, see: https://docs.aws.amazon.com/sdkref/latest/guide/feature-endpoints.html"],
+        ["{Endpoint}", E],
+        [a$4, "Invalid Configuration: FIPS and local endpoint are not supported"],
+        [a$4, "Invalid Configuration: Dualstack and local endpoint are not supported"],
+        ["http://localhost:8000", { authSchemes: [{ name: "sigv4", signingName: m$2, signingRegion: "us-east-1" }] }],
+        [a$4, "Invalid Configuration: AccountIdEndpointMode is required and FIPS is enabled, but FIPS account endpoints are not supported"],
+        ["https://dynamodb-fips.{Region}.{PartitionResult#dualStackDnsSuffix}", E],
+        [a$4, "FIPS and DualStack are enabled, but this partition does not support one or both"],
+        ["https://dynamodb.{Region}.{PartitionResult#dnsSuffix}", E],
+        ["https://dynamodb-fips.{Region}.{PartitionResult#dnsSuffix}", E],
+        [a$4, "FIPS is enabled but this partition does not support FIPS"],
+        [q$1(2), F],
+        [q$1(1), F],
+        ["https://{AccountId}.ddb.{Region}.{PartitionResult#dualStackDnsSuffix}", F],
+        [a$4, "Credentials-sourced account ID parameter is invalid"],
+        [a$4, "AccountIdEndpointMode is required but no AccountID was provided or able to be loaded"],
+        [a$4, "Invalid Configuration: AccountIdEndpointMode is required but account endpoints are not supported in this partition"],
+        [i$4, E],
+        [a$4, "DualStack is enabled but this partition does not support DualStack"],
+        [s(2), F],
+        [s(1), F],
+        ["https://{AccountId}.ddb.{Region}.{PartitionResult#dnsSuffix}", F],
+        [a$4, "Invalid Configuration: Missing Region"]
+    ]
+};
+const root$4 = 2;
+const r$4 = 100_000_000;
+const nodes$4 = new Int32Array([
+    -1, 1, -1,
+    0, 5, 3,
+    1, 4, r$4 + 25,
+    2, r$4 + 1, 65,
+    1, 63, 6,
+    2, 52, 7,
+    3, 8, r$4 + 25,
+    4, 51, 9,
+    6, 30, 10,
+    9, 11, r$4 + 11,
+    10, 13, 12,
+    26, r$4 + 19, r$4 + 11,
+    11, 29, 14,
+    12, 15, 20,
+    13, 16, 20,
+    14, 17, 20,
+    15, 18, 20,
+    16, 19, 20,
+    17, r$4 + 22, 20,
+    18, 21, 27,
+    19, 22, 27,
+    20, 23, 27,
+    21, 24, 27,
+    22, 25, 27,
+    23, 26, 27,
+    24, r$4 + 23, 27,
+    25, 28, 29,
+    27, r$4 + 24, r$4 + 17,
+    26, r$4 + 18, r$4 + 11,
+    7, 31, r$4 + 21,
+    9, 32, r$4 + 20,
+    10, 34, 33,
+    26, r$4 + 19, r$4 + 20,
+    11, 50, 35,
+    12, 36, 41,
+    13, 37, 41,
+    14, 38, 41,
+    15, 39, 41,
+    16, 40, 41,
+    17, r$4 + 14, 41,
+    18, 42, 48,
+    19, 43, 48,
+    20, 44, 48,
+    21, 45, 48,
+    22, 46, 48,
+    23, 47, 48,
+    24, r$4 + 15, 48,
+    25, 49, 50,
+    27, r$4 + 16, r$4 + 17,
+    26, r$4 + 18, r$4 + 20,
+    6, r$4 + 6, r$4 + 7,
+    3, 53, r$4 + 25,
+    4, r$4 + 5, 54,
+    5, 56, 55,
+    6, r$4 + 10, r$4 + 13,
+    6, 60, 57,
+    9, 58, 59,
+    26, r$4 + 8, 59,
+    28, r$4 + 11, r$4 + 12,
+    7, 61, r$4 + 10,
+    9, 62, r$4 + 9,
+    26, r$4 + 8, r$4 + 9,
+    2, r$4 + 1, 64,
+    3, 66, 65,
+    6, r$4 + 2, r$4 + 4,
+    6, r$4 + 2, 67,
+    8, r$4 + 3, r$4 + 4,
+]);
+const bdd$4 = BinaryDecisionDiagram.from(nodes$4, root$4, _data$4.conditions, _data$4.results);
 
-const cache$4 = new EndpointCache({
+const cache$4 = new EndpointCache$1({
     size: 50,
     params: [
         "AccountId",
@@ -44964,7 +44682,7 @@ const cache$4 = new EndpointCache({
     ],
 });
 const defaultEndpointResolver$4 = (endpointParams, context = {}) => {
-    return cache$4.get(endpointParams, () => resolveEndpoint(ruleSet$4, {
+    return cache$4.get(endpointParams, () => decideEndpoint(bdd$4, {
         endpointParams: endpointParams,
         logger: context.logger,
     }));
@@ -44974,8 +44692,8 @@ customEndpointFunctions.aws = awsEndpointFunctions;
 const getRuntimeConfig$9 = (config) => {
     return {
         apiVersion: "2012-08-10",
-        base64Decoder: config?.base64Decoder ?? fromBase64,
-        base64Encoder: config?.base64Encoder ?? toBase64,
+        base64Decoder: config?.base64Decoder ?? fromBase64$1,
+        base64Encoder: config?.base64Encoder ?? toBase64$1,
         disableHostPrefix: config?.disableHostPrefix ?? false,
         endpointProvider: config?.endpointProvider ?? defaultEndpointResolver$4,
         extensions: config?.extensions ?? [],
@@ -44991,6 +44709,7 @@ const getRuntimeConfig$9 = (config) => {
         protocol: config?.protocol ?? AwsJson1_0Protocol,
         protocolSettings: config?.protocolSettings ?? {
             defaultNamespace: "com.amazonaws.dynamodb",
+            errorTypeRegistries: errorTypeRegistries$4,
             xmlNamespace: "http://dynamodb.amazonaws.com/doc/2012-08-10/",
             version: "2012-08-10",
             serviceTarget: "DynamoDB_20120810",
@@ -44998,17 +44717,17 @@ const getRuntimeConfig$9 = (config) => {
         },
         serviceId: config?.serviceId ?? "DynamoDB",
         urlParser: config?.urlParser ?? parseUrl,
-        utf8Decoder: config?.utf8Decoder ?? fromUtf8,
-        utf8Encoder: config?.utf8Encoder ?? toUtf8,
+        utf8Decoder: config?.utf8Decoder ?? fromUtf8$2,
+        utf8Encoder: config?.utf8Encoder ?? toUtf8$1,
     };
 };
 
 const getRuntimeConfig$8 = (config) => {
-    emitWarningIfUnsupportedVersion(process.version);
+    emitWarningIfUnsupportedVersion$1(process.version);
     const defaultsMode = resolveDefaultsModeConfig(config);
     const defaultConfigProvider = () => defaultsMode().then(loadConfigsForDefaultMode);
     const clientSharedValues = getRuntimeConfig$9(config);
-    emitWarningIfUnsupportedVersion$1(process.version);
+    emitWarningIfUnsupportedVersion(process.version);
     const loaderConfig = {
         profile: config?.profile,
         logger: clientSharedValues.logger,
@@ -45022,9 +44741,9 @@ const getRuntimeConfig$8 = (config) => {
         authSchemePreference: config?.authSchemePreference ?? loadConfig(NODE_AUTH_SCHEME_PREFERENCE_OPTIONS, loaderConfig),
         bodyLengthChecker: config?.bodyLengthChecker ?? calculateBodyLength,
         credentialDefaultProvider: config?.credentialDefaultProvider ?? defaultProvider,
-        defaultUserAgentProvider: config?.defaultUserAgentProvider ?? createDefaultUserAgentProvider({ serviceId: clientSharedValues.serviceId, clientVersion: packageInfo$2.version }),
+        defaultUserAgentProvider: config?.defaultUserAgentProvider ?? createDefaultUserAgentProvider({ serviceId: clientSharedValues.serviceId, clientVersion: packageInfo$1.version }),
         endpointDiscoveryEnabledProvider: config?.endpointDiscoveryEnabledProvider ?? loadConfig(NODE_ENDPOINT_DISCOVERY_CONFIG_OPTIONS, loaderConfig),
-        maxAttempts: config?.maxAttempts ?? loadConfig(NODE_MAX_ATTEMPT_CONFIG_OPTIONS, config),
+        maxAttempts: config?.maxAttempts ?? loadConfig(Retry.v2026 ? { ...NODE_MAX_ATTEMPT_CONFIG_OPTIONS, default: 4 } : NODE_MAX_ATTEMPT_CONFIG_OPTIONS, config),
         region: config?.region ?? loadConfig(NODE_REGION_CONFIG_OPTIONS, { ...NODE_REGION_CONFIG_FILE_OPTIONS, ...loaderConfig }),
         requestHandler: NodeHttpHandler.create(config?.requestHandler ?? defaultConfigProvider),
         retryMode: config?.retryMode ??
@@ -45033,40 +44752,12 @@ const getRuntimeConfig$8 = (config) => {
                 default: async () => (await defaultConfigProvider()).retryMode || DEFAULT_RETRY_MODE,
             }, config),
         sha256: config?.sha256 ?? Hash.bind(null, "sha256"),
-        streamCollector: config?.streamCollector ?? streamCollector$1,
+        streamCollector: config?.streamCollector ?? streamCollector,
         useDualstackEndpoint: config?.useDualstackEndpoint ?? loadConfig(NODE_USE_DUALSTACK_ENDPOINT_CONFIG_OPTIONS, loaderConfig),
         useFipsEndpoint: config?.useFipsEndpoint ?? loadConfig(NODE_USE_FIPS_ENDPOINT_CONFIG_OPTIONS, loaderConfig),
         userAgentAppId: config?.userAgentAppId ?? loadConfig(NODE_APP_ID_CONFIG_OPTIONS, loaderConfig),
     };
 };
-
-const getAwsRegionExtensionConfiguration = (runtimeConfig) => {
-    return {
-        setRegion(region) {
-            runtimeConfig.region = region;
-        },
-        region() {
-            return runtimeConfig.region;
-        },
-    };
-};
-const resolveAwsRegionExtensionConfiguration = (awsRegionExtensionConfiguration) => {
-    return {
-        region: awsRegionExtensionConfiguration.region(),
-    };
-};
-
-function stsRegionDefaultResolver(loaderConfig = {}) {
-    return loadConfig({
-        ...NODE_REGION_CONFIG_OPTIONS,
-        async default() {
-            {
-                console.warn("@aws-sdk - WARN - default STS region of us-east-1 used. See @aws-sdk/credential-providers README and set a region explicitly.");
-            }
-            return "us-east-1";
-        },
-    }, { ...NODE_REGION_CONFIG_FILE_OPTIONS, ...loaderConfig });
-}
 
 const getHttpAuthExtensionConfiguration$4 = (runtimeConfig) => {
     const _httpAuthSchemes = runtimeConfig.httpAuthSchemes;
@@ -45122,7 +44813,7 @@ class DynamoDBClient extends Client {
         const _config_1 = resolveClientEndpointParameters$4(_config_0);
         const _config_2 = resolveAccountIdEndpointModeConfig(_config_1);
         const _config_3 = resolveUserAgentConfig(_config_2);
-        const _config_4 = resolveRetryConfig(_config_3);
+        const _config_4 = resolveRetryConfig(_config_3, { defaultBaseDelay: Retry.v2026 ? 25 : undefined, defaultMaxAttempts: Retry.v2026 ? 4 : undefined });
         const _config_5 = resolveRegionConfig(_config_4);
         const _config_6 = resolveHostHeaderConfig(_config_5);
         const _config_7 = resolveEndpointConfig(_config_6);
@@ -45580,19 +45271,19 @@ class DynamoDBDocumentClientCommand extends Command {
 class PutCommand extends DynamoDBDocumentClientCommand {
     input;
     inputKeyNodes = {
-        'Item': ALL_VALUES,
-        'Expected': {
-            '*': {
-                'Value': SELF,
-                'AttributeValueList': ALL_MEMBERS,
-            }
+        Item: ALL_VALUES,
+        Expected: {
+            "*": {
+                Value: SELF,
+                AttributeValueList: ALL_MEMBERS,
+            },
         },
-        'ExpressionAttributeValues': ALL_VALUES,
+        ExpressionAttributeValues: ALL_VALUES,
     };
     outputKeyNodes = {
-        'Attributes': ALL_VALUES,
-        'ItemCollectionMetrics': {
-            'ItemCollectionKey': ALL_VALUES,
+        Attributes: ALL_VALUES,
+        ItemCollectionMetrics: {
+            ItemCollectionKey: ALL_VALUES,
         },
     };
     clientCommand;
@@ -45619,8 +45310,8 @@ class DynamoDBDocumentClient extends Client {
         this.config.translateConfig = translateConfig;
         this.middlewareStack = client.middlewareStack;
         if (this.config?.cacheMiddleware) {
-            throw new Error("@aws-sdk/lib-dynamodb - cacheMiddleware=true is not compatible with the"
-                + " DynamoDBDocumentClient. This option must be set to false.");
+            throw new Error("@aws-sdk/lib-dynamodb - cacheMiddleware=true is not compatible with the" +
+                " DynamoDBDocumentClient. This option must be set to false.");
         }
     }
     static from(client, translateConfig) {
@@ -45731,6 +45422,728 @@ catch (error) {
     setFailed(`Action failed with error: ${error}`);
 }
 
+/******************************************************************************
+Copyright (c) Microsoft Corporation.
+
+Permission to use, copy, modify, and/or distribute this software for any
+purpose with or without fee is hereby granted.
+
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
+REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
+AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
+INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
+LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
+OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+PERFORMANCE OF THIS SOFTWARE.
+***************************************************************************** */
+/* global Reflect, Promise, SuppressedError, Symbol, Iterator */
+
+
+function __values(o) {
+    var s = typeof Symbol === "function" && Symbol.iterator, m = s && o[s], i = 0;
+    if (m) return m.call(o);
+    if (o && typeof o.length === "number") return {
+        next: function () {
+            if (o && i >= o.length) o = void 0;
+            return { value: o && o[i++], done: !o };
+        }
+    };
+    throw new TypeError(s ? "Object is not iterable." : "Symbol.iterator is not defined.");
+}
+
+typeof SuppressedError === "function" ? SuppressedError : function (error, suppressed, message) {
+    var e = new Error(message);
+    return e.name = "SuppressedError", e.error = error, e.suppressed = suppressed, e;
+};
+
+const fromString = (input, encoding) => {
+    if (typeof input !== "string") {
+        throw new TypeError(`The "input" argument must be of type string. Received type ${typeof input} (${input})`);
+    }
+    return Buffer$1.from(input, encoding) ;
+};
+
+const fromUtf8 = (input) => {
+    const buf = fromString(input, "utf8");
+    return new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength / Uint8Array.BYTES_PER_ELEMENT);
+};
+
+// Copyright Amazon.com Inc. or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: Apache-2.0
+// Quick polyfill
+typeof Buffer !== "undefined" && Buffer.from
+    ? function (input) { return Buffer.from(input, "utf8"); }
+    : fromUtf8;
+
+// Copyright Amazon.com Inc. or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: Apache-2.0
+// IE 11 does not support Array.from, so we do it manually
+function uint32ArrayFrom(a_lookUpTable) {
+    if (!Uint32Array.from) {
+        var return_array = new Uint32Array(a_lookUpTable.length);
+        var a_index = 0;
+        while (a_index < a_lookUpTable.length) {
+            return_array[a_index] = a_lookUpTable[a_index];
+            a_index += 1;
+        }
+        return return_array;
+    }
+    return Uint32Array.from(a_lookUpTable);
+}
+
+var Crc32 = /** @class */ (function () {
+    function Crc32() {
+        this.checksum = 0xffffffff;
+    }
+    Crc32.prototype.update = function (data) {
+        var e_1, _a;
+        try {
+            for (var data_1 = __values(data), data_1_1 = data_1.next(); !data_1_1.done; data_1_1 = data_1.next()) {
+                var byte = data_1_1.value;
+                this.checksum =
+                    (this.checksum >>> 8) ^ lookupTable[(this.checksum ^ byte) & 0xff];
+            }
+        }
+        catch (e_1_1) { e_1 = { error: e_1_1 }; }
+        finally {
+            try {
+                if (data_1_1 && !data_1_1.done && (_a = data_1.return)) _a.call(data_1);
+            }
+            finally { if (e_1) throw e_1.error; }
+        }
+        return this;
+    };
+    Crc32.prototype.digest = function () {
+        return (this.checksum ^ 0xffffffff) >>> 0;
+    };
+    return Crc32;
+}());
+// prettier-ignore
+var a_lookUpTable = [
+    0x00000000, 0x77073096, 0xEE0E612C, 0x990951BA,
+    0x076DC419, 0x706AF48F, 0xE963A535, 0x9E6495A3,
+    0x0EDB8832, 0x79DCB8A4, 0xE0D5E91E, 0x97D2D988,
+    0x09B64C2B, 0x7EB17CBD, 0xE7B82D07, 0x90BF1D91,
+    0x1DB71064, 0x6AB020F2, 0xF3B97148, 0x84BE41DE,
+    0x1ADAD47D, 0x6DDDE4EB, 0xF4D4B551, 0x83D385C7,
+    0x136C9856, 0x646BA8C0, 0xFD62F97A, 0x8A65C9EC,
+    0x14015C4F, 0x63066CD9, 0xFA0F3D63, 0x8D080DF5,
+    0x3B6E20C8, 0x4C69105E, 0xD56041E4, 0xA2677172,
+    0x3C03E4D1, 0x4B04D447, 0xD20D85FD, 0xA50AB56B,
+    0x35B5A8FA, 0x42B2986C, 0xDBBBC9D6, 0xACBCF940,
+    0x32D86CE3, 0x45DF5C75, 0xDCD60DCF, 0xABD13D59,
+    0x26D930AC, 0x51DE003A, 0xC8D75180, 0xBFD06116,
+    0x21B4F4B5, 0x56B3C423, 0xCFBA9599, 0xB8BDA50F,
+    0x2802B89E, 0x5F058808, 0xC60CD9B2, 0xB10BE924,
+    0x2F6F7C87, 0x58684C11, 0xC1611DAB, 0xB6662D3D,
+    0x76DC4190, 0x01DB7106, 0x98D220BC, 0xEFD5102A,
+    0x71B18589, 0x06B6B51F, 0x9FBFE4A5, 0xE8B8D433,
+    0x7807C9A2, 0x0F00F934, 0x9609A88E, 0xE10E9818,
+    0x7F6A0DBB, 0x086D3D2D, 0x91646C97, 0xE6635C01,
+    0x6B6B51F4, 0x1C6C6162, 0x856530D8, 0xF262004E,
+    0x6C0695ED, 0x1B01A57B, 0x8208F4C1, 0xF50FC457,
+    0x65B0D9C6, 0x12B7E950, 0x8BBEB8EA, 0xFCB9887C,
+    0x62DD1DDF, 0x15DA2D49, 0x8CD37CF3, 0xFBD44C65,
+    0x4DB26158, 0x3AB551CE, 0xA3BC0074, 0xD4BB30E2,
+    0x4ADFA541, 0x3DD895D7, 0xA4D1C46D, 0xD3D6F4FB,
+    0x4369E96A, 0x346ED9FC, 0xAD678846, 0xDA60B8D0,
+    0x44042D73, 0x33031DE5, 0xAA0A4C5F, 0xDD0D7CC9,
+    0x5005713C, 0x270241AA, 0xBE0B1010, 0xC90C2086,
+    0x5768B525, 0x206F85B3, 0xB966D409, 0xCE61E49F,
+    0x5EDEF90E, 0x29D9C998, 0xB0D09822, 0xC7D7A8B4,
+    0x59B33D17, 0x2EB40D81, 0xB7BD5C3B, 0xC0BA6CAD,
+    0xEDB88320, 0x9ABFB3B6, 0x03B6E20C, 0x74B1D29A,
+    0xEAD54739, 0x9DD277AF, 0x04DB2615, 0x73DC1683,
+    0xE3630B12, 0x94643B84, 0x0D6D6A3E, 0x7A6A5AA8,
+    0xE40ECF0B, 0x9309FF9D, 0x0A00AE27, 0x7D079EB1,
+    0xF00F9344, 0x8708A3D2, 0x1E01F268, 0x6906C2FE,
+    0xF762575D, 0x806567CB, 0x196C3671, 0x6E6B06E7,
+    0xFED41B76, 0x89D32BE0, 0x10DA7A5A, 0x67DD4ACC,
+    0xF9B9DF6F, 0x8EBEEFF9, 0x17B7BE43, 0x60B08ED5,
+    0xD6D6A3E8, 0xA1D1937E, 0x38D8C2C4, 0x4FDFF252,
+    0xD1BB67F1, 0xA6BC5767, 0x3FB506DD, 0x48B2364B,
+    0xD80D2BDA, 0xAF0A1B4C, 0x36034AF6, 0x41047A60,
+    0xDF60EFC3, 0xA867DF55, 0x316E8EEF, 0x4669BE79,
+    0xCB61B38C, 0xBC66831A, 0x256FD2A0, 0x5268E236,
+    0xCC0C7795, 0xBB0B4703, 0x220216B9, 0x5505262F,
+    0xC5BA3BBE, 0xB2BD0B28, 0x2BB45A92, 0x5CB36A04,
+    0xC2D7FFA7, 0xB5D0CF31, 0x2CD99E8B, 0x5BDEAE1D,
+    0x9B64C2B0, 0xEC63F226, 0x756AA39C, 0x026D930A,
+    0x9C0906A9, 0xEB0E363F, 0x72076785, 0x05005713,
+    0x95BF4A82, 0xE2B87A14, 0x7BB12BAE, 0x0CB61B38,
+    0x92D28E9B, 0xE5D5BE0D, 0x7CDCEFB7, 0x0BDBDF21,
+    0x86D3D2D4, 0xF1D4E242, 0x68DDB3F8, 0x1FDA836E,
+    0x81BE16CD, 0xF6B9265B, 0x6FB077E1, 0x18B74777,
+    0x88085AE6, 0xFF0F6A70, 0x66063BCA, 0x11010B5C,
+    0x8F659EFF, 0xF862AE69, 0x616BFFD3, 0x166CCF45,
+    0xA00AE278, 0xD70DD2EE, 0x4E048354, 0x3903B3C2,
+    0xA7672661, 0xD06016F7, 0x4969474D, 0x3E6E77DB,
+    0xAED16A4A, 0xD9D65ADC, 0x40DF0B66, 0x37D83BF0,
+    0xA9BCAE53, 0xDEBB9EC5, 0x47B2CF7F, 0x30B5FFE9,
+    0xBDBDF21C, 0xCABAC28A, 0x53B39330, 0x24B4A3A6,
+    0xBAD03605, 0xCDD70693, 0x54DE5729, 0x23D967BF,
+    0xB3667A2E, 0xC4614AB8, 0x5D681B02, 0x2A6F2B94,
+    0xB40BBE37, 0xC30C8EA1, 0x5A05DF1B, 0x2D02EF8D,
+];
+var lookupTable = uint32ArrayFrom(a_lookUpTable);
+
+class Int64 {
+    bytes;
+    constructor(bytes) {
+        this.bytes = bytes;
+        if (bytes.byteLength !== 8) {
+            throw new Error("Int64 buffers must be exactly 8 bytes");
+        }
+    }
+    static fromNumber(number) {
+        if (number > 9_223_372_036_854_775_807 || number < -9223372036854776e3) {
+            throw new Error(`${number} is too large (or, if negative, too small) to represent as an Int64`);
+        }
+        const bytes = new Uint8Array(8);
+        for (let i = 7, remaining = Math.abs(Math.round(number)); i > -1 && remaining > 0; i--, remaining /= 256) {
+            bytes[i] = remaining;
+        }
+        if (number < 0) {
+            negate(bytes);
+        }
+        return new Int64(bytes);
+    }
+    valueOf() {
+        const bytes = this.bytes.slice(0);
+        const negative = bytes[0] & 0b10000000;
+        if (negative) {
+            negate(bytes);
+        }
+        return parseInt(toHex(bytes), 16) * (negative ? -1 : 1);
+    }
+    toString() {
+        return String(this.valueOf());
+    }
+}
+function negate(bytes) {
+    for (let i = 0; i < 8; i++) {
+        bytes[i] ^= 0xff;
+    }
+    for (let i = 7; i > -1; i--) {
+        bytes[i]++;
+        if (bytes[i] !== 0)
+            break;
+    }
+}
+
+class HeaderMarshaller {
+    toUtf8;
+    fromUtf8;
+    constructor(toUtf8, fromUtf8) {
+        this.toUtf8 = toUtf8;
+        this.fromUtf8 = fromUtf8;
+    }
+    format(headers) {
+        const chunks = [];
+        for (const headerName of Object.keys(headers)) {
+            const bytes = this.fromUtf8(headerName);
+            chunks.push(Uint8Array.from([bytes.byteLength]), bytes, this.formatHeaderValue(headers[headerName]));
+        }
+        const out = new Uint8Array(chunks.reduce((carry, bytes) => carry + bytes.byteLength, 0));
+        let position = 0;
+        for (const chunk of chunks) {
+            out.set(chunk, position);
+            position += chunk.byteLength;
+        }
+        return out;
+    }
+    formatHeaderValue(header) {
+        switch (header.type) {
+            case "boolean":
+                return Uint8Array.from([header.value ? 0 : 1]);
+            case "byte":
+                return Uint8Array.from([2, header.value]);
+            case "short":
+                const shortView = new DataView(new ArrayBuffer(3));
+                shortView.setUint8(0, 3);
+                shortView.setInt16(1, header.value, false);
+                return new Uint8Array(shortView.buffer);
+            case "integer":
+                const intView = new DataView(new ArrayBuffer(5));
+                intView.setUint8(0, 4);
+                intView.setInt32(1, header.value, false);
+                return new Uint8Array(intView.buffer);
+            case "long":
+                const longBytes = new Uint8Array(9);
+                longBytes[0] = 5;
+                longBytes.set(header.value.bytes, 1);
+                return longBytes;
+            case "binary":
+                const binView = new DataView(new ArrayBuffer(3 + header.value.byteLength));
+                binView.setUint8(0, 6);
+                binView.setUint16(1, header.value.byteLength, false);
+                const binBytes = new Uint8Array(binView.buffer);
+                binBytes.set(header.value, 3);
+                return binBytes;
+            case "string":
+                const utf8Bytes = this.fromUtf8(header.value);
+                const strView = new DataView(new ArrayBuffer(3 + utf8Bytes.byteLength));
+                strView.setUint8(0, 7);
+                strView.setUint16(1, utf8Bytes.byteLength, false);
+                const strBytes = new Uint8Array(strView.buffer);
+                strBytes.set(utf8Bytes, 3);
+                return strBytes;
+            case "timestamp":
+                const tsBytes = new Uint8Array(9);
+                tsBytes[0] = 8;
+                tsBytes.set(Int64.fromNumber(header.value.valueOf()).bytes, 1);
+                return tsBytes;
+            case "uuid":
+                if (!UUID_PATTERN.test(header.value)) {
+                    throw new Error(`Invalid UUID received: ${header.value}`);
+                }
+                const uuidBytes = new Uint8Array(17);
+                uuidBytes[0] = 9;
+                uuidBytes.set(fromHex(header.value.replace(/\-/g, "")), 1);
+                return uuidBytes;
+        }
+    }
+    parse(headers) {
+        const out = {};
+        let position = 0;
+        while (position < headers.byteLength) {
+            const nameLength = headers.getUint8(position++);
+            const name = this.toUtf8(new Uint8Array(headers.buffer, headers.byteOffset + position, nameLength));
+            position += nameLength;
+            switch (headers.getUint8(position++)) {
+                case 0:
+                    out[name] = {
+                        type: BOOLEAN_TAG,
+                        value: true,
+                    };
+                    break;
+                case 1:
+                    out[name] = {
+                        type: BOOLEAN_TAG,
+                        value: false,
+                    };
+                    break;
+                case 2:
+                    out[name] = {
+                        type: BYTE_TAG,
+                        value: headers.getInt8(position++),
+                    };
+                    break;
+                case 3:
+                    out[name] = {
+                        type: SHORT_TAG,
+                        value: headers.getInt16(position, false),
+                    };
+                    position += 2;
+                    break;
+                case 4:
+                    out[name] = {
+                        type: INT_TAG,
+                        value: headers.getInt32(position, false),
+                    };
+                    position += 4;
+                    break;
+                case 5:
+                    out[name] = {
+                        type: LONG_TAG,
+                        value: new Int64(new Uint8Array(headers.buffer, headers.byteOffset + position, 8)),
+                    };
+                    position += 8;
+                    break;
+                case 6:
+                    const binaryLength = headers.getUint16(position, false);
+                    position += 2;
+                    out[name] = {
+                        type: BINARY_TAG,
+                        value: new Uint8Array(headers.buffer, headers.byteOffset + position, binaryLength),
+                    };
+                    position += binaryLength;
+                    break;
+                case 7:
+                    const stringLength = headers.getUint16(position, false);
+                    position += 2;
+                    out[name] = {
+                        type: STRING_TAG,
+                        value: this.toUtf8(new Uint8Array(headers.buffer, headers.byteOffset + position, stringLength)),
+                    };
+                    position += stringLength;
+                    break;
+                case 8:
+                    out[name] = {
+                        type: TIMESTAMP_TAG,
+                        value: new Date(new Int64(new Uint8Array(headers.buffer, headers.byteOffset + position, 8)).valueOf()),
+                    };
+                    position += 8;
+                    break;
+                case 9:
+                    const uuidBytes = new Uint8Array(headers.buffer, headers.byteOffset + position, 16);
+                    position += 16;
+                    out[name] = {
+                        type: UUID_TAG,
+                        value: `${toHex(uuidBytes.subarray(0, 4))}-${toHex(uuidBytes.subarray(4, 6))}-${toHex(uuidBytes.subarray(6, 8))}-${toHex(uuidBytes.subarray(8, 10))}-${toHex(uuidBytes.subarray(10))}`,
+                    };
+                    break;
+                default:
+                    throw new Error(`Unrecognized header type tag`);
+            }
+        }
+        return out;
+    }
+}
+var HEADER_VALUE_TYPE;
+(function (HEADER_VALUE_TYPE) {
+    HEADER_VALUE_TYPE[HEADER_VALUE_TYPE["boolTrue"] = 0] = "boolTrue";
+    HEADER_VALUE_TYPE[HEADER_VALUE_TYPE["boolFalse"] = 1] = "boolFalse";
+    HEADER_VALUE_TYPE[HEADER_VALUE_TYPE["byte"] = 2] = "byte";
+    HEADER_VALUE_TYPE[HEADER_VALUE_TYPE["short"] = 3] = "short";
+    HEADER_VALUE_TYPE[HEADER_VALUE_TYPE["integer"] = 4] = "integer";
+    HEADER_VALUE_TYPE[HEADER_VALUE_TYPE["long"] = 5] = "long";
+    HEADER_VALUE_TYPE[HEADER_VALUE_TYPE["byteArray"] = 6] = "byteArray";
+    HEADER_VALUE_TYPE[HEADER_VALUE_TYPE["string"] = 7] = "string";
+    HEADER_VALUE_TYPE[HEADER_VALUE_TYPE["timestamp"] = 8] = "timestamp";
+    HEADER_VALUE_TYPE[HEADER_VALUE_TYPE["uuid"] = 9] = "uuid";
+})(HEADER_VALUE_TYPE || (HEADER_VALUE_TYPE = {}));
+const BOOLEAN_TAG = "boolean";
+const BYTE_TAG = "byte";
+const SHORT_TAG = "short";
+const INT_TAG = "integer";
+const LONG_TAG = "long";
+const BINARY_TAG = "binary";
+const STRING_TAG = "string";
+const TIMESTAMP_TAG = "timestamp";
+const UUID_TAG = "uuid";
+const UUID_PATTERN = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
+
+const PRELUDE_MEMBER_LENGTH = 4;
+const PRELUDE_LENGTH = PRELUDE_MEMBER_LENGTH * 2;
+const CHECKSUM_LENGTH = 4;
+const MINIMUM_MESSAGE_LENGTH = PRELUDE_LENGTH + CHECKSUM_LENGTH * 2;
+function splitMessage({ byteLength, byteOffset, buffer }) {
+    if (byteLength < MINIMUM_MESSAGE_LENGTH) {
+        throw new Error("Provided message too short to accommodate event stream message overhead");
+    }
+    const view = new DataView(buffer, byteOffset, byteLength);
+    const messageLength = view.getUint32(0, false);
+    if (byteLength !== messageLength) {
+        throw new Error("Reported message length does not match received message length");
+    }
+    const headerLength = view.getUint32(PRELUDE_MEMBER_LENGTH, false);
+    const expectedPreludeChecksum = view.getUint32(PRELUDE_LENGTH, false);
+    const expectedMessageChecksum = view.getUint32(byteLength - CHECKSUM_LENGTH, false);
+    const checksummer = new Crc32().update(new Uint8Array(buffer, byteOffset, PRELUDE_LENGTH));
+    if (expectedPreludeChecksum !== checksummer.digest()) {
+        throw new Error(`The prelude checksum specified in the message (${expectedPreludeChecksum}) does not match the calculated CRC32 checksum (${checksummer.digest()})`);
+    }
+    checksummer.update(new Uint8Array(buffer, byteOffset + PRELUDE_LENGTH, byteLength - (PRELUDE_LENGTH + CHECKSUM_LENGTH)));
+    if (expectedMessageChecksum !== checksummer.digest()) {
+        throw new Error(`The message checksum (${checksummer.digest()}) did not match the expected value of ${expectedMessageChecksum}`);
+    }
+    return {
+        headers: new DataView(buffer, byteOffset + PRELUDE_LENGTH + CHECKSUM_LENGTH, headerLength),
+        body: new Uint8Array(buffer, byteOffset + PRELUDE_LENGTH + CHECKSUM_LENGTH + headerLength, messageLength - headerLength - (PRELUDE_LENGTH + CHECKSUM_LENGTH + CHECKSUM_LENGTH)),
+    };
+}
+
+class EventStreamCodec {
+    headerMarshaller;
+    messageBuffer;
+    isEndOfStream;
+    constructor(toUtf8, fromUtf8) {
+        this.headerMarshaller = new HeaderMarshaller(toUtf8, fromUtf8);
+        this.messageBuffer = [];
+        this.isEndOfStream = false;
+    }
+    feed(message) {
+        this.messageBuffer.push(this.decode(message));
+    }
+    endOfStream() {
+        this.isEndOfStream = true;
+    }
+    getMessage() {
+        const message = this.messageBuffer.pop();
+        const isEndOfStream = this.isEndOfStream;
+        return {
+            getMessage() {
+                return message;
+            },
+            isEndOfStream() {
+                return isEndOfStream;
+            },
+        };
+    }
+    getAvailableMessages() {
+        const messages = this.messageBuffer;
+        this.messageBuffer = [];
+        const isEndOfStream = this.isEndOfStream;
+        return {
+            getMessages() {
+                return messages;
+            },
+            isEndOfStream() {
+                return isEndOfStream;
+            },
+        };
+    }
+    encode({ headers: rawHeaders, body }) {
+        const headers = this.headerMarshaller.format(rawHeaders);
+        const length = headers.byteLength + body.byteLength + 16;
+        const out = new Uint8Array(length);
+        const view = new DataView(out.buffer, out.byteOffset, out.byteLength);
+        const checksum = new Crc32();
+        view.setUint32(0, length, false);
+        view.setUint32(4, headers.byteLength, false);
+        view.setUint32(8, checksum.update(out.subarray(0, 8)).digest(), false);
+        out.set(headers, 12);
+        out.set(body, headers.byteLength + 12);
+        view.setUint32(length - 4, checksum.update(out.subarray(8, length - 4)).digest(), false);
+        return out;
+    }
+    decode(message) {
+        const { headers, body } = splitMessage(message);
+        return { headers: this.headerMarshaller.parse(headers), body };
+    }
+    formatHeaders(rawHeaders) {
+        return this.headerMarshaller.format(rawHeaders);
+    }
+}
+
+class MessageDecoderStream {
+    options;
+    constructor(options) {
+        this.options = options;
+    }
+    [Symbol.asyncIterator]() {
+        return this.asyncIterator();
+    }
+    async *asyncIterator() {
+        for await (const bytes of this.options.inputStream) {
+            const decoded = this.options.decoder.decode(bytes);
+            yield decoded;
+        }
+    }
+}
+
+class MessageEncoderStream {
+    options;
+    constructor(options) {
+        this.options = options;
+    }
+    [Symbol.asyncIterator]() {
+        return this.asyncIterator();
+    }
+    async *asyncIterator() {
+        for await (const msg of this.options.messageStream) {
+            const encoded = this.options.encoder.encode(msg);
+            yield encoded;
+        }
+        if (this.options.includeEndFrame) {
+            yield new Uint8Array(0);
+        }
+    }
+}
+
+class SmithyMessageDecoderStream {
+    options;
+    constructor(options) {
+        this.options = options;
+    }
+    [Symbol.asyncIterator]() {
+        return this.asyncIterator();
+    }
+    async *asyncIterator() {
+        for await (const message of this.options.messageStream) {
+            const deserialized = await this.options.deserializer(message);
+            if (deserialized === undefined)
+                continue;
+            yield deserialized;
+        }
+    }
+}
+
+class SmithyMessageEncoderStream {
+    options;
+    constructor(options) {
+        this.options = options;
+    }
+    [Symbol.asyncIterator]() {
+        return this.asyncIterator();
+    }
+    async *asyncIterator() {
+        for await (const chunk of this.options.inputStream) {
+            const payloadBuf = this.options.serializer(chunk);
+            yield payloadBuf;
+        }
+    }
+}
+
+function getChunkedStream(source) {
+    let currentMessageTotalLength = 0;
+    let currentMessagePendingLength = 0;
+    let currentMessage = null;
+    let messageLengthBuffer = null;
+    const allocateMessage = (size) => {
+        if (typeof size !== "number") {
+            throw new Error("Attempted to allocate an event message where size was not a number: " + size);
+        }
+        currentMessageTotalLength = size;
+        currentMessagePendingLength = 4;
+        currentMessage = new Uint8Array(size);
+        const currentMessageView = new DataView(currentMessage.buffer);
+        currentMessageView.setUint32(0, size, false);
+    };
+    const iterator = async function* () {
+        const sourceIterator = source[Symbol.asyncIterator]();
+        while (true) {
+            const { value, done } = await sourceIterator.next();
+            if (done) {
+                if (!currentMessageTotalLength) {
+                    return;
+                }
+                else if (currentMessageTotalLength === currentMessagePendingLength) {
+                    yield currentMessage;
+                }
+                else {
+                    throw new Error("Truncated event message received.");
+                }
+                return;
+            }
+            const chunkLength = value.length;
+            let currentOffset = 0;
+            while (currentOffset < chunkLength) {
+                if (!currentMessage) {
+                    const bytesRemaining = chunkLength - currentOffset;
+                    if (!messageLengthBuffer) {
+                        messageLengthBuffer = new Uint8Array(4);
+                    }
+                    const numBytesForTotal = Math.min(4 - currentMessagePendingLength, bytesRemaining);
+                    messageLengthBuffer.set(value.slice(currentOffset, currentOffset + numBytesForTotal), currentMessagePendingLength);
+                    currentMessagePendingLength += numBytesForTotal;
+                    currentOffset += numBytesForTotal;
+                    if (currentMessagePendingLength < 4) {
+                        break;
+                    }
+                    allocateMessage(new DataView(messageLengthBuffer.buffer).getUint32(0, false));
+                    messageLengthBuffer = null;
+                }
+                const numBytesToWrite = Math.min(currentMessageTotalLength - currentMessagePendingLength, chunkLength - currentOffset);
+                currentMessage.set(value.slice(currentOffset, currentOffset + numBytesToWrite), currentMessagePendingLength);
+                currentMessagePendingLength += numBytesToWrite;
+                currentOffset += numBytesToWrite;
+                if (currentMessageTotalLength && currentMessageTotalLength === currentMessagePendingLength) {
+                    yield currentMessage;
+                    currentMessage = null;
+                    currentMessageTotalLength = 0;
+                    currentMessagePendingLength = 0;
+                }
+            }
+        }
+    };
+    return {
+        [Symbol.asyncIterator]: iterator,
+    };
+}
+
+function getMessageUnmarshaller(deserializer, toUtf8) {
+    return async function (message) {
+        const { value: messageType } = message.headers[":message-type"];
+        if (messageType === "error") {
+            const unmodeledError = new Error(message.headers[":error-message"].value || "UnknownError");
+            unmodeledError.name = message.headers[":error-code"].value;
+            throw unmodeledError;
+        }
+        else if (messageType === "exception") {
+            const code = message.headers[":exception-type"].value;
+            const exception = { [code]: message };
+            const deserializedException = await deserializer(exception);
+            if (deserializedException.$unknown) {
+                const error = new Error(toUtf8(message.body));
+                error.name = code;
+                throw error;
+            }
+            throw deserializedException[code];
+        }
+        else if (messageType === "event") {
+            const event = {
+                [message.headers[":event-type"].value]: message,
+            };
+            const deserialized = await deserializer(event);
+            if (deserialized.$unknown)
+                return;
+            return deserialized;
+        }
+        else {
+            throw Error(`Unrecognizable event type: ${message.headers[":event-type"].value}`);
+        }
+    };
+}
+
+let EventStreamMarshaller$1 = class EventStreamMarshaller {
+    eventStreamCodec;
+    utfEncoder;
+    constructor({ utf8Encoder, utf8Decoder }) {
+        this.eventStreamCodec = new EventStreamCodec(utf8Encoder, utf8Decoder);
+        this.utfEncoder = utf8Encoder;
+    }
+    deserialize(body, deserializer) {
+        const inputStream = getChunkedStream(body);
+        return new SmithyMessageDecoderStream({
+            messageStream: new MessageDecoderStream({ inputStream, decoder: this.eventStreamCodec }),
+            deserializer: getMessageUnmarshaller(deserializer, this.utfEncoder),
+        });
+    }
+    serialize(inputStream, serializer) {
+        return new MessageEncoderStream({
+            messageStream: new SmithyMessageEncoderStream({ inputStream, serializer }),
+            encoder: this.eventStreamCodec,
+            includeEndFrame: true,
+        });
+    }
+};
+
+class EventStreamMarshaller {
+    universalMarshaller;
+    constructor({ utf8Encoder, utf8Decoder }) {
+        this.universalMarshaller = new EventStreamMarshaller$1({
+            utf8Decoder,
+            utf8Encoder,
+        });
+    }
+    deserialize(body, deserializer) {
+        const bodyIterable = typeof body[Symbol.asyncIterator] === "function" ? body : readableToIterable(body);
+        return this.universalMarshaller.deserialize(bodyIterable, deserializer);
+    }
+    serialize(input, serializer) {
+        return Readable.from(this.universalMarshaller.serialize(input, serializer));
+    }
+}
+const eventStreamSerdeProvider = (options) => new EventStreamMarshaller(options);
+async function* readableToIterable(readStream) {
+    let streamEnded = false;
+    let generationEnded = false;
+    const records = new Array();
+    readStream.on("error", (err) => {
+        if (!streamEnded) {
+            streamEnded = true;
+        }
+        if (err) {
+            throw err;
+        }
+    });
+    readStream.on("data", (data) => {
+        records.push(data);
+    });
+    readStream.on("end", () => {
+        streamEnded = true;
+    });
+    while (!generationEnded) {
+        const value = await new Promise((resolve) => setTimeout(() => resolve(records.shift()), 0));
+        if (value) {
+            yield value;
+        }
+        generationEnded = streamEnded && records.length === 0;
+    }
+}
+
 class EventStreamSerde {
     marshaller;
     serializer;
@@ -45779,9 +46192,13 @@ class EventStreamSerde {
                     body: event.body,
                 };
             }
-            const unionMember = Object.keys(event).find((key) => {
-                return key !== "__type";
-            }) ?? "";
+            let unionMember = "";
+            for (const key in event) {
+                if (key !== "__type") {
+                    unionMember = key;
+                    break;
+                }
+            }
             const { additionalHeaders, body, eventType, explicitPayloadContentType } = this.writeEventBody(unionMember, unionSchema, event);
             const headers = {
                 ":event-type": { type: "string", value: eventType },
@@ -45802,9 +46219,13 @@ class EventStreamSerde {
         const memberSchemas = unionSchema.getMemberSchemas();
         const initialResponseMarker = Symbol("initialResponseMarker");
         const asyncIterable = marshaller.deserialize(response.body, async (event) => {
-            const unionMember = Object.keys(event).find((key) => {
-                return key !== "__type";
-            }) ?? "";
+            let unionMember = "";
+            for (const key in event) {
+                if (key !== "__type") {
+                    unionMember = key;
+                    break;
+                }
+            }
             const body = event[unionMember].body;
             if (unionMember === "initial-response") {
                 const dataObject = await this.deserializer.read(responseSchema, body);
@@ -45827,7 +46248,7 @@ class EventStreamSerde {
                                 out[name] = body;
                             }
                             else if (member.isStringSchema()) {
-                                out[name] = (this.serdeContext?.utf8Encoder ?? toUtf8)(body);
+                                out[name] = (this.serdeContext?.utf8Encoder ?? toUtf8$1)(body);
                             }
                             else if (member.isStructSchema()) {
                                 out[name] = await this.deserializer.read(member, body);
@@ -45880,8 +46301,8 @@ class EventStreamSerde {
             if (!responseSchema) {
                 throw new Error("@smithy::core/protocols - initial-response event encountered in event stream but no response schema given.");
             }
-            for (const [key, value] of Object.entries(firstEvent.value)) {
-                initialResponseContainer[key] = value;
+            for (const key in firstEvent.value) {
+                initialResponseContainer[key] = firstEvent.value[key];
             }
         }
         return {
@@ -45965,13 +46386,16 @@ class EventStreamSerde {
                     serializer.write(eventSchema, event[unionMember]);
                 }
             }
+            else if (eventSchema.isUnitSchema()) {
+                serializer.write(eventSchema, {});
+            }
             else {
                 throw new Error("@smithy/core/event-streams - non-struct member not supported in event stream union.");
             }
         }
-        const messageSerialization = serializer.flush();
+        const messageSerialization = serializer.flush() ?? new Uint8Array();
         const body = typeof messageSerialization === "string"
-            ? (this.serdeContext?.utf8Decoder ?? fromUtf8)(messageSerialization)
+            ? (this.serdeContext?.utf8Decoder ?? fromUtf8$2)(messageSerialization)
             : messageSerialization;
         return {
             body,
@@ -45984,12 +46408,42 @@ class EventStreamSerde {
 
 var index$9 = /*#__PURE__*/Object.freeze({
     __proto__: null,
-    EventStreamSerde: EventStreamSerde
+    EventStreamCodec: EventStreamCodec,
+    EventStreamMarshaller: EventStreamMarshaller,
+    EventStreamSerde: EventStreamSerde,
+    HeaderMarshaller: HeaderMarshaller,
+    Int64: Int64,
+    MessageDecoderStream: MessageDecoderStream,
+    MessageEncoderStream: MessageEncoderStream,
+    SmithyMessageDecoderStream: SmithyMessageDecoderStream,
+    SmithyMessageEncoderStream: SmithyMessageEncoderStream,
+    UniversalEventStreamMarshaller: EventStreamMarshaller$1,
+    eventStreamSerdeProvider: eventStreamSerdeProvider,
+    getChunkedStream: getChunkedStream,
+    getMessageUnmarshaller: getMessageUnmarshaller
 });
+
+const isImdsCredentials = (arg) => Boolean(arg) &&
+    typeof arg === "object" &&
+    typeof arg.AccessKeyId === "string" &&
+    typeof arg.SecretAccessKey === "string" &&
+    typeof arg.Token === "string" &&
+    typeof arg.Expiration === "string";
+const fromImdsCredentials = (creds) => ({
+    accessKeyId: creds.AccessKeyId,
+    secretAccessKey: creds.SecretAccessKey,
+    sessionToken: creds.Token,
+    expiration: new Date(creds.Expiration),
+    ...(creds.AccountId && { accountId: creds.AccountId }),
+});
+
+const DEFAULT_TIMEOUT = 1000;
+const DEFAULT_MAX_RETRIES = 0;
+const providerConfigFromInit = ({ maxRetries = DEFAULT_MAX_RETRIES, timeout = DEFAULT_TIMEOUT, }) => ({ maxRetries, timeout });
 
 function httpRequest(options) {
     return new Promise((resolve, reject) => {
-        const req = request$3({
+        const req = require$$2.request({
             method: "GET",
             ...options,
             hostname: options.hostname?.replace(/^\[(.+)\]$/, "$1"),
@@ -46013,31 +46467,13 @@ function httpRequest(options) {
                 chunks.push(chunk);
             });
             res.on("end", () => {
-                resolve(Buffer$1.concat(chunks));
+                resolve(Buffer.concat(chunks));
                 req.destroy();
             });
         });
         req.end();
     });
 }
-
-const isImdsCredentials = (arg) => Boolean(arg) &&
-    typeof arg === "object" &&
-    typeof arg.AccessKeyId === "string" &&
-    typeof arg.SecretAccessKey === "string" &&
-    typeof arg.Token === "string" &&
-    typeof arg.Expiration === "string";
-const fromImdsCredentials = (creds) => ({
-    accessKeyId: creds.AccessKeyId,
-    secretAccessKey: creds.SecretAccessKey,
-    sessionToken: creds.Token,
-    expiration: new Date(creds.Expiration),
-    ...(creds.AccountId && { accountId: creds.AccountId }),
-});
-
-const DEFAULT_TIMEOUT = 1000;
-const DEFAULT_MAX_RETRIES = 0;
-const providerConfigFromInit = ({ maxRetries = DEFAULT_MAX_RETRIES, timeout = DEFAULT_TIMEOUT, }) => ({ maxRetries, timeout });
 
 const retry = (toRetry, maxRetries) => {
     let promise = toRetry();
@@ -46077,14 +46513,8 @@ const requestFromEcsImds = async (timeout, options) => {
     return buffer.toString();
 };
 const CMDS_IP = "169.254.170.2";
-const GREENGRASS_HOSTS = {
-    localhost: true,
-    "127.0.0.1": true,
-};
-const GREENGRASS_PROTOCOLS = {
-    "http:": true,
-    "https:": true,
-};
+const GREENGRASS_HOSTS = new Set(["localhost", "127.0.0.1"]);
+const GREENGRASS_PROTOCOLS = new Set(["http:", "https:"]);
 const getCmdsUri = async ({ logger }) => {
     if (process.env[ENV_CMDS_RELATIVE_URI]) {
         return {
@@ -46093,21 +46523,29 @@ const getCmdsUri = async ({ logger }) => {
         };
     }
     if (process.env[ENV_CMDS_FULL_URI]) {
-        const parsed = parse$2(process.env[ENV_CMDS_FULL_URI]);
-        if (!parsed.hostname || !(parsed.hostname in GREENGRASS_HOSTS)) {
+        let parsed;
+        try {
+            parsed = new URL(process.env[ENV_CMDS_FULL_URI]);
+        }
+        catch {
+            throw new CredentialsProviderError(`${process.env[ENV_CMDS_FULL_URI]} is not a valid container metadata service URL`, { tryNextLink: false, logger });
+        }
+        if (!parsed.hostname || !GREENGRASS_HOSTS.has(parsed.hostname)) {
             throw new CredentialsProviderError(`${parsed.hostname} is not a valid container metadata service hostname`, {
                 tryNextLink: false,
                 logger,
             });
         }
-        if (!parsed.protocol || !(parsed.protocol in GREENGRASS_PROTOCOLS)) {
+        if (!parsed.protocol || !GREENGRASS_PROTOCOLS.has(parsed.protocol)) {
             throw new CredentialsProviderError(`${parsed.protocol} is not a valid container metadata service protocol`, {
                 tryNextLink: false,
                 logger,
             });
         }
         return {
-            ...parsed,
+            protocol: parsed.protocol,
+            hostname: parsed.hostname,
+            path: parsed.pathname + parsed.search,
             port: parsed.port ? parseInt(parsed.port, 10) : undefined,
         };
     }
@@ -46492,11 +46930,9 @@ Set AWS_CONTAINER_CREDENTIALS_FULL_URI or AWS_CONTAINER_CREDENTIALS_RELATIVE_URI
     }
     const url = new URL(host);
     checkUrl(url, options.logger);
-    const requestHandler = NodeHttpHandler.create({
-        requestTimeout: options.timeout ?? 1000,
-        connectionTimeout: options.timeout ?? 1000,
-    });
-    return retryWrapper(async () => {
+    const requestHandler = NodeHttpHandler.create({ connectionTimeout: options.timeout ?? 1000 });
+    const requestTimeout = options.timeout ?? 1000;
+    const provider = retryWrapper(async () => {
         const request = createGetRequest(url);
         if (token) {
             request.headers.Authorization = token;
@@ -46505,13 +46941,21 @@ Set AWS_CONTAINER_CREDENTIALS_FULL_URI or AWS_CONTAINER_CREDENTIALS_RELATIVE_URI
             request.headers.Authorization = (await fs$1.readFile(tokenFile)).toString();
         }
         try {
-            const result = await requestHandler.handle(request);
+            const result = await requestHandler.handle(request, { requestTimeout });
             return getCredentials(result.response).then((creds) => setCredentialFeature(creds, "CREDENTIALS_HTTP", "z"));
         }
         catch (e) {
             throw new CredentialsProviderError(String(e), { logger: options.logger });
         }
     }, options.maxRetries ?? 3, options.timeout ?? 1000);
+    return async () => {
+        try {
+            return await provider();
+        }
+        finally {
+            requestHandler.destroy?.();
+        }
+    };
 };
 
 var index$7 = /*#__PURE__*/Object.freeze({
@@ -46563,7 +47007,7 @@ const validateTokenKey = (key, value, forRefresh = false) => {
     }
 };
 
-const { writeFile } = promises;
+const { writeFile } = promises$1;
 const writeSSOTokenToFile = (id, ssoToken) => {
     const tokenFilepath = getSSOTokenFilepath(id);
     const tokenString = JSON.stringify(ssoToken, null, 2);
@@ -46656,7 +47100,10 @@ const resolveSSOCredentials = async ({ ssoStartUrl, ssoSession, ssoAccountId, ss
                 filepath,
                 configFilepath,
                 ignoreCache,
-            })();
+                clientConfig,
+                parentClientConfig,
+                logger,
+            })({ callerClientConfig });
             token = {
                 accessToken: _token.token,
                 expiresAt: new Date(_token.expiration).toISOString(),
@@ -47096,10 +47543,10 @@ class LoginCredentialsFetcher {
         await promises$1.writeFile(tokenFilePath, JSON.stringify(token, null, 2), "utf8");
     }
     getTokenFilePath() {
-        const directory = process.env.AWS_LOGIN_CACHE_DIRECTORY ?? join$1(homedir$1(), ".aws", "login", "cache");
+        const directory = process.env.AWS_LOGIN_CACHE_DIRECTORY ?? join(homedir(), ".aws", "login", "cache");
         const loginSessionBytes = Buffer.from(this.loginSession, "utf8");
-        const loginSessionSha256 = createHash$1("sha256").update(loginSessionBytes).digest("hex");
-        return join$1(directory, `${loginSessionSha256}.json`);
+        const loginSessionSha256 = createHash("sha256").update(loginSessionBytes).digest("hex");
+        return join(directory, `${loginSessionSha256}.json`);
     }
     derToRawSignature(derSignature) {
         let offset = 2;
@@ -47219,10 +47666,14 @@ const resolveLoginCredentials = async (profileName, options, callerClientConfig)
 };
 
 const isProcessProfile = (arg) => Boolean(arg) && typeof arg === "object" && typeof arg.credential_process === "string";
-const resolveProcessCredentials$1 = async (options, profile) => Promise.resolve().then(function () { return index$4; }).then(({ fromProcess }) => fromProcess({
-    ...options,
-    profile,
-})().then((creds) => setCredentialFeature(creds, "CREDENTIALS_PROFILE_PROCESS", "v")));
+const resolveProcessCredentials$1 = async (options, profile) => {
+    const { fromProcess } = await Promise.resolve().then(function () { return index$4; });
+    const credentials = await fromProcess({
+        ...options,
+        profile,
+    })();
+    return setCredentialFeature(credentials, "CREDENTIALS_PROFILE_PROCESS", "v");
+};
 
 const resolveSsoCredentials = async (profile, profileData, options = {}, callerClientConfig) => {
     const { fromSSO } = await Promise.resolve().then(function () { return index$6; });
@@ -47272,16 +47723,20 @@ const isWebIdentityProfile = (arg) => Boolean(arg) &&
     typeof arg.web_identity_token_file === "string" &&
     typeof arg.role_arn === "string" &&
     ["undefined", "string"].indexOf(typeof arg.role_session_name) > -1;
-const resolveWebIdentityCredentials = async (profile, options, callerClientConfig) => Promise.resolve().then(function () { return index$3; }).then(({ fromTokenFile }) => fromTokenFile({
-    webIdentityTokenFile: profile.web_identity_token_file,
-    roleArn: profile.role_arn,
-    roleSessionName: profile.role_session_name,
-    roleAssumerWithWebIdentity: options.roleAssumerWithWebIdentity,
-    logger: options.logger,
-    parentClientConfig: options.parentClientConfig,
-})({
-    callerClientConfig,
-}).then((creds) => setCredentialFeature(creds, "CREDENTIALS_PROFILE_STS_WEB_ID_TOKEN", "q")));
+const resolveWebIdentityCredentials = async (profile, options, callerClientConfig) => {
+    const { fromTokenFile } = await Promise.resolve().then(function () { return index$3; });
+    const credentials = await fromTokenFile({
+        webIdentityTokenFile: profile.web_identity_token_file,
+        roleArn: profile.role_arn,
+        roleSessionName: profile.role_session_name,
+        roleAssumerWithWebIdentity: options.roleAssumerWithWebIdentity,
+        logger: options.logger,
+        parentClientConfig: options.parentClientConfig,
+    })({
+        callerClientConfig,
+    });
+    return setCredentialFeature(credentials, "CREDENTIALS_PROFILE_STS_WEB_ID_TOKEN", "q");
+};
 
 const resolveProfileData = async (profileName, profiles, options, callerClientConfig, visitedProfiles = {}, isAssumeRoleRecursiveCall = false) => {
     const data = profiles[profileName];
@@ -47458,10 +47913,9 @@ var index$3 = /*#__PURE__*/Object.freeze({
 const defaultSSOOIDCHttpAuthSchemeParametersProvider = async (config, context, input) => {
     return {
         operation: getSmithyContext(context).operation,
-        region: (await normalizeProvider$1(config.region)()) ||
-            (() => {
-                throw new Error("expected `region` to be configured for `aws.auth#sigv4`");
-            })(),
+        region: await normalizeProvider$1(config.region)() || (() => {
+            throw new Error("expected `region` to be configured for `aws.auth#sigv4`");
+        })(),
     };
 };
 function createAwsAuthSigv4HttpAuthOption$3(authParameters) {
@@ -47518,177 +47972,70 @@ const commonParams$3 = {
     UseDualStack: { type: "builtInParams", name: "useDualstackEndpoint" },
 };
 
-var version$1 = "3.980.0";
-var packageInfo$1 = {
-	version: version$1};
+var version = "3.997.23";
+var packageInfo = {
+	version: version};
 
-const u$3 = "required", v$3 = "fn", w$3 = "argv", x$3 = "ref";
-const a$3 = true, b$3 = "isSet", c$3 = "booleanEquals", d$3 = "error", e$3 = "endpoint", f$3 = "tree", g$3 = "PartitionResult", h$3 = "getAttr", i$3 = { [u$3]: false, "type": "string" }, j$3 = { [u$3]: true, "default": false, "type": "boolean" }, k$3 = { [x$3]: "Endpoint" }, l$3 = { [v$3]: c$3, [w$3]: [{ [x$3]: "UseFIPS" }, true] }, m$3 = { [v$3]: c$3, [w$3]: [{ [x$3]: "UseDualStack" }, true] }, n$3 = {}, o$3 = { [v$3]: h$3, [w$3]: [{ [x$3]: g$3 }, "supportsFIPS"] }, p$3 = { [x$3]: g$3 }, q$3 = { [v$3]: c$3, [w$3]: [true, { [v$3]: h$3, [w$3]: [p$3, "supportsDualStack"] }] }, r$3 = [l$3], s$3 = [m$3], t$3 = [{ [x$3]: "Region" }];
-const _data$3 = { parameters: { Region: i$3, UseDualStack: j$3, UseFIPS: j$3, Endpoint: i$3 }, rules: [{ conditions: [{ [v$3]: b$3, [w$3]: [k$3] }], rules: [{ conditions: r$3, error: "Invalid Configuration: FIPS and custom endpoint are not supported", type: d$3 }, { conditions: s$3, error: "Invalid Configuration: Dualstack and custom endpoint are not supported", type: d$3 }, { endpoint: { url: k$3, properties: n$3, headers: n$3 }, type: e$3 }], type: f$3 }, { conditions: [{ [v$3]: b$3, [w$3]: t$3 }], rules: [{ conditions: [{ [v$3]: "aws.partition", [w$3]: t$3, assign: g$3 }], rules: [{ conditions: [l$3, m$3], rules: [{ conditions: [{ [v$3]: c$3, [w$3]: [a$3, o$3] }, q$3], rules: [{ endpoint: { url: "https://oidc-fips.{Region}.{PartitionResult#dualStackDnsSuffix}", properties: n$3, headers: n$3 }, type: e$3 }], type: f$3 }, { error: "FIPS and DualStack are enabled, but this partition does not support one or both", type: d$3 }], type: f$3 }, { conditions: r$3, rules: [{ conditions: [{ [v$3]: c$3, [w$3]: [o$3, a$3] }], rules: [{ conditions: [{ [v$3]: "stringEquals", [w$3]: [{ [v$3]: h$3, [w$3]: [p$3, "name"] }, "aws-us-gov"] }], endpoint: { url: "https://oidc.{Region}.amazonaws.com", properties: n$3, headers: n$3 }, type: e$3 }, { endpoint: { url: "https://oidc-fips.{Region}.{PartitionResult#dnsSuffix}", properties: n$3, headers: n$3 }, type: e$3 }], type: f$3 }, { error: "FIPS is enabled but this partition does not support FIPS", type: d$3 }], type: f$3 }, { conditions: s$3, rules: [{ conditions: [q$3], rules: [{ endpoint: { url: "https://oidc.{Region}.{PartitionResult#dualStackDnsSuffix}", properties: n$3, headers: n$3 }, type: e$3 }], type: f$3 }, { error: "DualStack is enabled but this partition does not support DualStack", type: d$3 }], type: f$3 }, { endpoint: { url: "https://oidc.{Region}.{PartitionResult#dnsSuffix}", properties: n$3, headers: n$3 }, type: e$3 }], type: f$3 }], type: f$3 }, { error: "Invalid Configuration: Missing Region", type: d$3 }] };
-const ruleSet$3 = _data$3;
+const k$3 = "ref";
+const a$3 = -1, b$3 = true, c$3 = "isSet", d$3 = "PartitionResult", e$3 = "booleanEquals", f$3 = "getAttr", g$3 = { [k$3]: "Endpoint" }, h$3 = { [k$3]: d$3 }, i$3 = {}, j$3 = [{ [k$3]: "Region" }];
+const _data$3 = {
+    conditions: [
+        [c$3, [g$3]],
+        [c$3, j$3],
+        ["aws.partition", j$3, d$3],
+        [e$3, [{ [k$3]: "UseFIPS" }, b$3]],
+        [e$3, [{ [k$3]: "UseDualStack" }, b$3]],
+        [e$3, [{ fn: f$3, argv: [h$3, "supportsDualStack"] }, b$3]],
+        [e$3, [{ fn: f$3, argv: [h$3, "supportsFIPS"] }, b$3]],
+        ["stringEquals", [{ fn: f$3, argv: [h$3, "name"] }, "aws-us-gov"]]
+    ],
+    results: [
+        [a$3],
+        [a$3, "Invalid Configuration: FIPS and custom endpoint are not supported"],
+        [a$3, "Invalid Configuration: Dualstack and custom endpoint are not supported"],
+        [g$3, i$3],
+        ["https://oidc-fips.{Region}.{PartitionResult#dualStackDnsSuffix}", i$3],
+        [a$3, "FIPS and DualStack are enabled, but this partition does not support one or both"],
+        ["https://oidc.{Region}.amazonaws.com", i$3],
+        ["https://oidc-fips.{Region}.{PartitionResult#dnsSuffix}", i$3],
+        [a$3, "FIPS is enabled but this partition does not support FIPS"],
+        ["https://oidc.{Region}.{PartitionResult#dualStackDnsSuffix}", i$3],
+        [a$3, "DualStack is enabled but this partition does not support DualStack"],
+        ["https://oidc.{Region}.{PartitionResult#dnsSuffix}", i$3],
+        [a$3, "Invalid Configuration: Missing Region"]
+    ]
+};
+const root$3 = 2;
+const r$3 = 100_000_000;
+const nodes$3 = new Int32Array([
+    -1, 1, -1,
+    0, 13, 3,
+    1, 4, r$3 + 12,
+    2, 5, r$3 + 12,
+    3, 8, 6,
+    4, 7, r$3 + 11,
+    5, r$3 + 9, r$3 + 10,
+    4, 11, 9,
+    6, 10, r$3 + 8,
+    7, r$3 + 6, r$3 + 7,
+    5, 12, r$3 + 5,
+    6, r$3 + 4, r$3 + 5,
+    3, r$3 + 1, 14,
+    4, r$3 + 2, r$3 + 3,
+]);
+const bdd$3 = BinaryDecisionDiagram.from(nodes$3, root$3, _data$3.conditions, _data$3.results);
 
-const cache$3 = new EndpointCache({
+const cache$3 = new EndpointCache$1({
     size: 50,
     params: ["Endpoint", "Region", "UseDualStack", "UseFIPS"],
 });
 const defaultEndpointResolver$3 = (endpointParams, context = {}) => {
-    return cache$3.get(endpointParams, () => resolveEndpoint(ruleSet$3, {
+    return cache$3.get(endpointParams, () => decideEndpoint(bdd$3, {
         endpointParams: endpointParams,
         logger: context.logger,
     }));
 };
 customEndpointFunctions.aws = awsEndpointFunctions;
-
-const getRuntimeConfig$7 = (config) => {
-    return {
-        apiVersion: "2019-06-10",
-        base64Decoder: config?.base64Decoder ?? fromBase64,
-        base64Encoder: config?.base64Encoder ?? toBase64,
-        disableHostPrefix: config?.disableHostPrefix ?? false,
-        endpointProvider: config?.endpointProvider ?? defaultEndpointResolver$3,
-        extensions: config?.extensions ?? [],
-        httpAuthSchemeProvider: config?.httpAuthSchemeProvider ?? defaultSSOOIDCHttpAuthSchemeProvider,
-        httpAuthSchemes: config?.httpAuthSchemes ?? [
-            {
-                schemeId: "aws.auth#sigv4",
-                identityProvider: (ipc) => ipc.getIdentityProvider("aws.auth#sigv4"),
-                signer: new AwsSdkSigV4Signer(),
-            },
-            {
-                schemeId: "smithy.api#noAuth",
-                identityProvider: (ipc) => ipc.getIdentityProvider("smithy.api#noAuth") || (async () => ({})),
-                signer: new NoAuthSigner(),
-            },
-        ],
-        logger: config?.logger ?? new NoOpLogger(),
-        protocol: config?.protocol ?? AwsRestJsonProtocol,
-        protocolSettings: config?.protocolSettings ?? {
-            defaultNamespace: "com.amazonaws.ssooidc",
-            version: "2019-06-10",
-            serviceTarget: "AWSSSOOIDCService",
-        },
-        serviceId: config?.serviceId ?? "SSO OIDC",
-        urlParser: config?.urlParser ?? parseUrl,
-        utf8Decoder: config?.utf8Decoder ?? fromUtf8,
-        utf8Encoder: config?.utf8Encoder ?? toUtf8,
-    };
-};
-
-const getRuntimeConfig$6 = (config) => {
-    emitWarningIfUnsupportedVersion(process.version);
-    const defaultsMode = resolveDefaultsModeConfig(config);
-    const defaultConfigProvider = () => defaultsMode().then(loadConfigsForDefaultMode);
-    const clientSharedValues = getRuntimeConfig$7(config);
-    emitWarningIfUnsupportedVersion$1(process.version);
-    const loaderConfig = {
-        profile: config?.profile,
-        logger: clientSharedValues.logger,
-    };
-    return {
-        ...clientSharedValues,
-        ...config,
-        runtime: "node",
-        defaultsMode,
-        authSchemePreference: config?.authSchemePreference ?? loadConfig(NODE_AUTH_SCHEME_PREFERENCE_OPTIONS, loaderConfig),
-        bodyLengthChecker: config?.bodyLengthChecker ?? calculateBodyLength,
-        defaultUserAgentProvider: config?.defaultUserAgentProvider ??
-            createDefaultUserAgentProvider({ serviceId: clientSharedValues.serviceId, clientVersion: packageInfo$1.version }),
-        maxAttempts: config?.maxAttempts ?? loadConfig(NODE_MAX_ATTEMPT_CONFIG_OPTIONS, config),
-        region: config?.region ??
-            loadConfig(NODE_REGION_CONFIG_OPTIONS, { ...NODE_REGION_CONFIG_FILE_OPTIONS, ...loaderConfig }),
-        requestHandler: NodeHttpHandler.create(config?.requestHandler ?? defaultConfigProvider),
-        retryMode: config?.retryMode ??
-            loadConfig({
-                ...NODE_RETRY_MODE_CONFIG_OPTIONS,
-                default: async () => (await defaultConfigProvider()).retryMode || DEFAULT_RETRY_MODE,
-            }, config),
-        sha256: config?.sha256 ?? Hash.bind(null, "sha256"),
-        streamCollector: config?.streamCollector ?? streamCollector$1,
-        useDualstackEndpoint: config?.useDualstackEndpoint ?? loadConfig(NODE_USE_DUALSTACK_ENDPOINT_CONFIG_OPTIONS, loaderConfig),
-        useFipsEndpoint: config?.useFipsEndpoint ?? loadConfig(NODE_USE_FIPS_ENDPOINT_CONFIG_OPTIONS, loaderConfig),
-        userAgentAppId: config?.userAgentAppId ?? loadConfig(NODE_APP_ID_CONFIG_OPTIONS, loaderConfig),
-    };
-};
-
-const getHttpAuthExtensionConfiguration$3 = (runtimeConfig) => {
-    const _httpAuthSchemes = runtimeConfig.httpAuthSchemes;
-    let _httpAuthSchemeProvider = runtimeConfig.httpAuthSchemeProvider;
-    let _credentials = runtimeConfig.credentials;
-    return {
-        setHttpAuthScheme(httpAuthScheme) {
-            const index = _httpAuthSchemes.findIndex((scheme) => scheme.schemeId === httpAuthScheme.schemeId);
-            if (index === -1) {
-                _httpAuthSchemes.push(httpAuthScheme);
-            }
-            else {
-                _httpAuthSchemes.splice(index, 1, httpAuthScheme);
-            }
-        },
-        httpAuthSchemes() {
-            return _httpAuthSchemes;
-        },
-        setHttpAuthSchemeProvider(httpAuthSchemeProvider) {
-            _httpAuthSchemeProvider = httpAuthSchemeProvider;
-        },
-        httpAuthSchemeProvider() {
-            return _httpAuthSchemeProvider;
-        },
-        setCredentials(credentials) {
-            _credentials = credentials;
-        },
-        credentials() {
-            return _credentials;
-        },
-    };
-};
-const resolveHttpAuthRuntimeConfig$3 = (config) => {
-    return {
-        httpAuthSchemes: config.httpAuthSchemes(),
-        httpAuthSchemeProvider: config.httpAuthSchemeProvider(),
-        credentials: config.credentials(),
-    };
-};
-
-const resolveRuntimeExtensions$3 = (runtimeConfig, extensions) => {
-    const extensionConfiguration = Object.assign(getAwsRegionExtensionConfiguration(runtimeConfig), getDefaultExtensionConfiguration(runtimeConfig), getHttpHandlerExtensionConfiguration(runtimeConfig), getHttpAuthExtensionConfiguration$3(runtimeConfig));
-    extensions.forEach((extension) => extension.configure(extensionConfiguration));
-    return Object.assign(runtimeConfig, resolveAwsRegionExtensionConfiguration(extensionConfiguration), resolveDefaultRuntimeConfig(extensionConfiguration), resolveHttpHandlerRuntimeConfig(extensionConfiguration), resolveHttpAuthRuntimeConfig$3(extensionConfiguration));
-};
-
-class SSOOIDCClient extends Client {
-    config;
-    constructor(...[configuration]) {
-        const _config_0 = getRuntimeConfig$6(configuration || {});
-        super(_config_0);
-        this.initConfig = _config_0;
-        const _config_1 = resolveClientEndpointParameters$3(_config_0);
-        const _config_2 = resolveUserAgentConfig(_config_1);
-        const _config_3 = resolveRetryConfig(_config_2);
-        const _config_4 = resolveRegionConfig(_config_3);
-        const _config_5 = resolveHostHeaderConfig(_config_4);
-        const _config_6 = resolveEndpointConfig(_config_5);
-        const _config_7 = resolveHttpAuthSchemeConfig$3(_config_6);
-        const _config_8 = resolveRuntimeExtensions$3(_config_7, configuration?.extensions || []);
-        this.config = _config_8;
-        this.middlewareStack.use(getSchemaSerdePlugin(this.config));
-        this.middlewareStack.use(getUserAgentPlugin(this.config));
-        this.middlewareStack.use(getRetryPlugin(this.config));
-        this.middlewareStack.use(getContentLengthPlugin(this.config));
-        this.middlewareStack.use(getHostHeaderPlugin(this.config));
-        this.middlewareStack.use(getLoggerPlugin(this.config));
-        this.middlewareStack.use(getRecursionDetectionPlugin(this.config));
-        this.middlewareStack.use(getHttpAuthSchemeEndpointRuleSetPlugin(this.config, {
-            httpAuthSchemeParametersProvider: defaultSSOOIDCHttpAuthSchemeParametersProvider,
-            identityProviderConfigProvider: async (config) => new DefaultIdentityProviderConfig({
-                "aws.auth#sigv4": config.credentials,
-            }),
-        }));
-        this.middlewareStack.use(getHttpSigningPlugin(this.config));
-    }
-    destroy() {
-        super.destroy();
-    }
-}
 
 class SSOOIDCServiceException extends ServiceException {
     constructor(options) {
@@ -47914,100 +48261,253 @@ const _iT$1 = "idToken";
 const _r = "reason";
 const _rT$1 = "refreshToken";
 const _rU$1 = "redirectUri";
-const _s$3 = "scope";
-const _se = "server";
-const _sm$1 = "smithy.ts.sdk.synthetic.com.amazonaws.ssooidc";
+const _s$3 = "smithy.ts.sdk.synthetic.com.amazonaws.ssooidc";
+const _sc = "scope";
+const _se$1 = "server";
 const _tT$1 = "tokenType";
 const n0$3 = "com.amazonaws.ssooidc";
+const _s_registry$3 = TypeRegistry.for(_s$3);
+var SSOOIDCServiceException$ = [-3, _s$3, "SSOOIDCServiceException", 0, [], []];
+_s_registry$3.registerError(SSOOIDCServiceException$, SSOOIDCServiceException);
+const n0_registry$3 = TypeRegistry.for(n0$3);
+var AccessDeniedException$$1 = [-3, n0$3, _ADE$1,
+    { [_e$3]: _c$3, [_hE$3]: 400 },
+    [_e$3, _r, _ed],
+    [0, 0, 0]
+];
+n0_registry$3.registerError(AccessDeniedException$$1, AccessDeniedException$1);
+var AuthorizationPendingException$ = [-3, n0$3, _APE,
+    { [_e$3]: _c$3, [_hE$3]: 400 },
+    [_e$3, _ed],
+    [0, 0]
+];
+n0_registry$3.registerError(AuthorizationPendingException$, AuthorizationPendingException);
+var ExpiredTokenException$$1 = [-3, n0$3, _ETE$1,
+    { [_e$3]: _c$3, [_hE$3]: 400 },
+    [_e$3, _ed],
+    [0, 0]
+];
+n0_registry$3.registerError(ExpiredTokenException$$1, ExpiredTokenException$1);
+var InternalServerException$$1 = [-3, n0$3, _ISE$1,
+    { [_e$3]: _se$1, [_hE$3]: 500 },
+    [_e$3, _ed],
+    [0, 0]
+];
+n0_registry$3.registerError(InternalServerException$$1, InternalServerException$1);
+var InvalidClientException$ = [-3, n0$3, _ICE,
+    { [_e$3]: _c$3, [_hE$3]: 401 },
+    [_e$3, _ed],
+    [0, 0]
+];
+n0_registry$3.registerError(InvalidClientException$, InvalidClientException);
+var InvalidGrantException$ = [-3, n0$3, _IGE,
+    { [_e$3]: _c$3, [_hE$3]: 400 },
+    [_e$3, _ed],
+    [0, 0]
+];
+n0_registry$3.registerError(InvalidGrantException$, InvalidGrantException);
+var InvalidRequestException$$1 = [-3, n0$3, _IRE$1,
+    { [_e$3]: _c$3, [_hE$3]: 400 },
+    [_e$3, _r, _ed],
+    [0, 0, 0]
+];
+n0_registry$3.registerError(InvalidRequestException$$1, InvalidRequestException$1);
+var InvalidScopeException$ = [-3, n0$3, _ISEn,
+    { [_e$3]: _c$3, [_hE$3]: 400 },
+    [_e$3, _ed],
+    [0, 0]
+];
+n0_registry$3.registerError(InvalidScopeException$, InvalidScopeException);
+var SlowDownException$ = [-3, n0$3, _SDE,
+    { [_e$3]: _c$3, [_hE$3]: 400 },
+    [_e$3, _ed],
+    [0, 0]
+];
+n0_registry$3.registerError(SlowDownException$, SlowDownException);
+var UnauthorizedClientException$ = [-3, n0$3, _UCE,
+    { [_e$3]: _c$3, [_hE$3]: 400 },
+    [_e$3, _ed],
+    [0, 0]
+];
+n0_registry$3.registerError(UnauthorizedClientException$, UnauthorizedClientException);
+var UnsupportedGrantTypeException$ = [-3, n0$3, _UGTE,
+    { [_e$3]: _c$3, [_hE$3]: 400 },
+    [_e$3, _ed],
+    [0, 0]
+];
+n0_registry$3.registerError(UnsupportedGrantTypeException$, UnsupportedGrantTypeException);
+const errorTypeRegistries$3 = [
+    _s_registry$3,
+    n0_registry$3,
+];
 var AccessToken = [0, n0$3, _AT$1, 8, 0];
 var ClientSecret = [0, n0$3, _CS, 8, 0];
 var CodeVerifier = [0, n0$3, _CV, 8, 0];
 var IdToken = [0, n0$3, _IT, 8, 0];
 var RefreshToken$1 = [0, n0$3, _RT$1, 8, 0];
-var AccessDeniedException$$1 = [
-    -3,
-    n0$3,
-    _ADE$1,
-    { [_e$3]: _c$3, [_hE$3]: 400 },
-    [_e$3, _r, _ed],
-    [0, 0, 0],
-];
-TypeRegistry.for(n0$3).registerError(AccessDeniedException$$1, AccessDeniedException$1);
-var AuthorizationPendingException$ = [
-    -3,
-    n0$3,
-    _APE,
-    { [_e$3]: _c$3, [_hE$3]: 400 },
-    [_e$3, _ed],
-    [0, 0],
-];
-TypeRegistry.for(n0$3).registerError(AuthorizationPendingException$, AuthorizationPendingException);
-var CreateTokenRequest$ = [
-    3,
-    n0$3,
-    _CTR,
+var CreateTokenRequest$ = [3, n0$3, _CTR,
     0,
-    [_cI$1, _cS, _gT$1, _dC, _co$1, _rT$1, _s$3, _rU$1, _cV$1],
-    [0, [() => ClientSecret, 0], 0, 0, 0, [() => RefreshToken$1, 0], 64 | 0, 0, [() => CodeVerifier, 0]],
-    3,
+    [_cI$1, _cS, _gT$1, _dC, _co$1, _rT$1, _sc, _rU$1, _cV$1],
+    [0, [() => ClientSecret, 0], 0, 0, 0, [() => RefreshToken$1, 0], 64 | 0, 0, [() => CodeVerifier, 0]], 3
 ];
-var CreateTokenResponse$ = [
-    3,
-    n0$3,
-    _CTRr,
+var CreateTokenResponse$ = [3, n0$3, _CTRr,
     0,
     [_aT$2, _tT$1, _eI$1, _rT$1, _iT$1],
-    [[() => AccessToken, 0], 0, 1, [() => RefreshToken$1, 0], [() => IdToken, 0]],
+    [[() => AccessToken, 0], 0, 1, [() => RefreshToken$1, 0], [() => IdToken, 0]]
 ];
-var ExpiredTokenException$$1 = [-3, n0$3, _ETE$1, { [_e$3]: _c$3, [_hE$3]: 400 }, [_e$3, _ed], [0, 0]];
-TypeRegistry.for(n0$3).registerError(ExpiredTokenException$$1, ExpiredTokenException$1);
-var InternalServerException$$1 = [-3, n0$3, _ISE$1, { [_e$3]: _se, [_hE$3]: 500 }, [_e$3, _ed], [0, 0]];
-TypeRegistry.for(n0$3).registerError(InternalServerException$$1, InternalServerException$1);
-var InvalidClientException$ = [-3, n0$3, _ICE, { [_e$3]: _c$3, [_hE$3]: 401 }, [_e$3, _ed], [0, 0]];
-TypeRegistry.for(n0$3).registerError(InvalidClientException$, InvalidClientException);
-var InvalidGrantException$ = [-3, n0$3, _IGE, { [_e$3]: _c$3, [_hE$3]: 400 }, [_e$3, _ed], [0, 0]];
-TypeRegistry.for(n0$3).registerError(InvalidGrantException$, InvalidGrantException);
-var InvalidRequestException$$1 = [
-    -3,
-    n0$3,
-    _IRE$1,
-    { [_e$3]: _c$3, [_hE$3]: 400 },
-    [_e$3, _r, _ed],
-    [0, 0, 0],
+var CreateToken$ = [9, n0$3, _CT,
+    { [_h$2]: ["POST", "/token", 200] }, () => CreateTokenRequest$, () => CreateTokenResponse$
 ];
-TypeRegistry.for(n0$3).registerError(InvalidRequestException$$1, InvalidRequestException$1);
-var InvalidScopeException$ = [-3, n0$3, _ISEn, { [_e$3]: _c$3, [_hE$3]: 400 }, [_e$3, _ed], [0, 0]];
-TypeRegistry.for(n0$3).registerError(InvalidScopeException$, InvalidScopeException);
-var SlowDownException$ = [-3, n0$3, _SDE, { [_e$3]: _c$3, [_hE$3]: 400 }, [_e$3, _ed], [0, 0]];
-TypeRegistry.for(n0$3).registerError(SlowDownException$, SlowDownException);
-var UnauthorizedClientException$ = [
-    -3,
-    n0$3,
-    _UCE,
-    { [_e$3]: _c$3, [_hE$3]: 400 },
-    [_e$3, _ed],
-    [0, 0],
-];
-TypeRegistry.for(n0$3).registerError(UnauthorizedClientException$, UnauthorizedClientException);
-var UnsupportedGrantTypeException$ = [
-    -3,
-    n0$3,
-    _UGTE,
-    { [_e$3]: _c$3, [_hE$3]: 400 },
-    [_e$3, _ed],
-    [0, 0],
-];
-TypeRegistry.for(n0$3).registerError(UnsupportedGrantTypeException$, UnsupportedGrantTypeException);
-var SSOOIDCServiceException$ = [-3, _sm$1, "SSOOIDCServiceException", 0, [], []];
-TypeRegistry.for(_sm$1).registerError(SSOOIDCServiceException$, SSOOIDCServiceException);
-var CreateToken$ = [
-    9,
-    n0$3,
-    _CT,
-    { [_h$2]: ["POST", "/token", 200] },
-    () => CreateTokenRequest$,
-    () => CreateTokenResponse$,
-];
+
+const getRuntimeConfig$7 = (config) => {
+    return {
+        apiVersion: "2019-06-10",
+        base64Decoder: config?.base64Decoder ?? fromBase64$1,
+        base64Encoder: config?.base64Encoder ?? toBase64$1,
+        disableHostPrefix: config?.disableHostPrefix ?? false,
+        endpointProvider: config?.endpointProvider ?? defaultEndpointResolver$3,
+        extensions: config?.extensions ?? [],
+        httpAuthSchemeProvider: config?.httpAuthSchemeProvider ?? defaultSSOOIDCHttpAuthSchemeProvider,
+        httpAuthSchemes: config?.httpAuthSchemes ?? [
+            {
+                schemeId: "aws.auth#sigv4",
+                identityProvider: (ipc) => ipc.getIdentityProvider("aws.auth#sigv4"),
+                signer: new AwsSdkSigV4Signer(),
+            },
+            {
+                schemeId: "smithy.api#noAuth",
+                identityProvider: (ipc) => ipc.getIdentityProvider("smithy.api#noAuth") || (async () => ({})),
+                signer: new NoAuthSigner(),
+            },
+        ],
+        logger: config?.logger ?? new NoOpLogger(),
+        protocol: config?.protocol ?? AwsRestJsonProtocol,
+        protocolSettings: config?.protocolSettings ?? {
+            defaultNamespace: "com.amazonaws.ssooidc",
+            errorTypeRegistries: errorTypeRegistries$3,
+            version: "2019-06-10",
+            serviceTarget: "AWSSSOOIDCService",
+        },
+        serviceId: config?.serviceId ?? "SSO OIDC",
+        urlParser: config?.urlParser ?? parseUrl,
+        utf8Decoder: config?.utf8Decoder ?? fromUtf8$2,
+        utf8Encoder: config?.utf8Encoder ?? toUtf8$1,
+    };
+};
+
+const getRuntimeConfig$6 = (config) => {
+    emitWarningIfUnsupportedVersion$1(process.version);
+    const defaultsMode = resolveDefaultsModeConfig(config);
+    const defaultConfigProvider = () => defaultsMode().then(loadConfigsForDefaultMode);
+    const clientSharedValues = getRuntimeConfig$7(config);
+    emitWarningIfUnsupportedVersion(process.version);
+    const loaderConfig = {
+        profile: config?.profile,
+        logger: clientSharedValues.logger,
+    };
+    return {
+        ...clientSharedValues,
+        ...config,
+        runtime: "node",
+        defaultsMode,
+        authSchemePreference: config?.authSchemePreference ?? loadConfig(NODE_AUTH_SCHEME_PREFERENCE_OPTIONS, loaderConfig),
+        bodyLengthChecker: config?.bodyLengthChecker ?? calculateBodyLength,
+        defaultUserAgentProvider: config?.defaultUserAgentProvider ?? createDefaultUserAgentProvider({ serviceId: clientSharedValues.serviceId, clientVersion: packageInfo.version }),
+        maxAttempts: config?.maxAttempts ?? loadConfig(NODE_MAX_ATTEMPT_CONFIG_OPTIONS, config),
+        region: config?.region ?? loadConfig(NODE_REGION_CONFIG_OPTIONS, { ...NODE_REGION_CONFIG_FILE_OPTIONS, ...loaderConfig }),
+        requestHandler: NodeHttpHandler.create(config?.requestHandler ?? defaultConfigProvider),
+        retryMode: config?.retryMode ??
+            loadConfig({
+                ...NODE_RETRY_MODE_CONFIG_OPTIONS,
+                default: async () => (await defaultConfigProvider()).retryMode || DEFAULT_RETRY_MODE,
+            }, config),
+        sha256: config?.sha256 ?? Hash.bind(null, "sha256"),
+        streamCollector: config?.streamCollector ?? streamCollector,
+        useDualstackEndpoint: config?.useDualstackEndpoint ?? loadConfig(NODE_USE_DUALSTACK_ENDPOINT_CONFIG_OPTIONS, loaderConfig),
+        useFipsEndpoint: config?.useFipsEndpoint ?? loadConfig(NODE_USE_FIPS_ENDPOINT_CONFIG_OPTIONS, loaderConfig),
+        userAgentAppId: config?.userAgentAppId ?? loadConfig(NODE_APP_ID_CONFIG_OPTIONS, loaderConfig),
+    };
+};
+
+const getHttpAuthExtensionConfiguration$3 = (runtimeConfig) => {
+    const _httpAuthSchemes = runtimeConfig.httpAuthSchemes;
+    let _httpAuthSchemeProvider = runtimeConfig.httpAuthSchemeProvider;
+    let _credentials = runtimeConfig.credentials;
+    return {
+        setHttpAuthScheme(httpAuthScheme) {
+            const index = _httpAuthSchemes.findIndex((scheme) => scheme.schemeId === httpAuthScheme.schemeId);
+            if (index === -1) {
+                _httpAuthSchemes.push(httpAuthScheme);
+            }
+            else {
+                _httpAuthSchemes.splice(index, 1, httpAuthScheme);
+            }
+        },
+        httpAuthSchemes() {
+            return _httpAuthSchemes;
+        },
+        setHttpAuthSchemeProvider(httpAuthSchemeProvider) {
+            _httpAuthSchemeProvider = httpAuthSchemeProvider;
+        },
+        httpAuthSchemeProvider() {
+            return _httpAuthSchemeProvider;
+        },
+        setCredentials(credentials) {
+            _credentials = credentials;
+        },
+        credentials() {
+            return _credentials;
+        },
+    };
+};
+const resolveHttpAuthRuntimeConfig$3 = (config) => {
+    return {
+        httpAuthSchemes: config.httpAuthSchemes(),
+        httpAuthSchemeProvider: config.httpAuthSchemeProvider(),
+        credentials: config.credentials(),
+    };
+};
+
+const resolveRuntimeExtensions$3 = (runtimeConfig, extensions) => {
+    const extensionConfiguration = Object.assign(getAwsRegionExtensionConfiguration(runtimeConfig), getDefaultExtensionConfiguration(runtimeConfig), getHttpHandlerExtensionConfiguration(runtimeConfig), getHttpAuthExtensionConfiguration$3(runtimeConfig));
+    extensions.forEach((extension) => extension.configure(extensionConfiguration));
+    return Object.assign(runtimeConfig, resolveAwsRegionExtensionConfiguration(extensionConfiguration), resolveDefaultRuntimeConfig(extensionConfiguration), resolveHttpHandlerRuntimeConfig(extensionConfiguration), resolveHttpAuthRuntimeConfig$3(extensionConfiguration));
+};
+
+class SSOOIDCClient extends Client {
+    config;
+    constructor(...[configuration]) {
+        const _config_0 = getRuntimeConfig$6(configuration || {});
+        super(_config_0);
+        this.initConfig = _config_0;
+        const _config_1 = resolveClientEndpointParameters$3(_config_0);
+        const _config_2 = resolveUserAgentConfig(_config_1);
+        const _config_3 = resolveRetryConfig(_config_2);
+        const _config_4 = resolveRegionConfig(_config_3);
+        const _config_5 = resolveHostHeaderConfig(_config_4);
+        const _config_6 = resolveEndpointConfig(_config_5);
+        const _config_7 = resolveHttpAuthSchemeConfig$3(_config_6);
+        const _config_8 = resolveRuntimeExtensions$3(_config_7, configuration?.extensions || []);
+        this.config = _config_8;
+        this.middlewareStack.use(getSchemaSerdePlugin(this.config));
+        this.middlewareStack.use(getUserAgentPlugin(this.config));
+        this.middlewareStack.use(getRetryPlugin(this.config));
+        this.middlewareStack.use(getContentLengthPlugin(this.config));
+        this.middlewareStack.use(getHostHeaderPlugin(this.config));
+        this.middlewareStack.use(getLoggerPlugin(this.config));
+        this.middlewareStack.use(getRecursionDetectionPlugin(this.config));
+        this.middlewareStack.use(getHttpAuthSchemeEndpointRuleSetPlugin(this.config, {
+            httpAuthSchemeParametersProvider: defaultSSOOIDCHttpAuthSchemeParametersProvider,
+            identityProviderConfigProvider: async (config) => new DefaultIdentityProviderConfig({
+                "aws.auth#sigv4": config.credentials,
+            }),
+        }));
+        this.middlewareStack.use(getHttpSigningPlugin(this.config));
+    }
+    destroy() {
+        super.destroy();
+    }
+}
 
 class CreateTokenCommand extends Command
     .classBuilder()
@@ -48053,7 +48553,8 @@ var index$2 = /*#__PURE__*/Object.freeze({
     UnauthorizedClientException$: UnauthorizedClientException$,
     UnsupportedGrantTypeException: UnsupportedGrantTypeException,
     UnsupportedGrantTypeException$: UnsupportedGrantTypeException$,
-    __Client: Client
+    __Client: Client,
+    errorTypeRegistries: errorTypeRegistries$3
 });
 
 const defaultSSOHttpAuthSchemeParametersProvider = async (config, context, input) => {
@@ -48087,26 +48588,10 @@ function createSmithyApiNoAuthHttpAuthOption$2(authParameters) {
 const defaultSSOHttpAuthSchemeProvider = (authParameters) => {
     const options = [];
     switch (authParameters.operation) {
-        case "GetRoleCredentials":
-            {
-                options.push(createSmithyApiNoAuthHttpAuthOption$2());
-                break;
-            }
-        case "ListAccountRoles":
-            {
-                options.push(createSmithyApiNoAuthHttpAuthOption$2());
-                break;
-            }
-        case "ListAccounts":
-            {
-                options.push(createSmithyApiNoAuthHttpAuthOption$2());
-                break;
-            }
-        case "Logout":
-            {
-                options.push(createSmithyApiNoAuthHttpAuthOption$2());
-                break;
-            }
+        case "GetRoleCredentials": {
+            options.push(createSmithyApiNoAuthHttpAuthOption$2());
+            break;
+        }
         default: {
             options.push(createAwsAuthSigv4HttpAuthOption$2(authParameters));
         }
@@ -48134,175 +48619,66 @@ const commonParams$2 = {
     UseDualStack: { type: "builtInParams", name: "useDualstackEndpoint" },
 };
 
-var version = "3.980.0";
-var packageInfo = {
-	version: version};
+const k$2 = "ref";
+const a$2 = -1, b$2 = true, c$2 = "isSet", d$2 = "PartitionResult", e$2 = "booleanEquals", f$2 = "getAttr", g$2 = { [k$2]: "Endpoint" }, h$2 = { [k$2]: d$2 }, i$2 = {}, j$2 = [{ [k$2]: "Region" }];
+const _data$2 = {
+    conditions: [
+        [c$2, [g$2]],
+        [c$2, j$2],
+        ["aws.partition", j$2, d$2],
+        [e$2, [{ [k$2]: "UseFIPS" }, b$2]],
+        [e$2, [{ [k$2]: "UseDualStack" }, b$2]],
+        [e$2, [{ fn: f$2, argv: [h$2, "supportsDualStack"] }, b$2]],
+        [e$2, [{ fn: f$2, argv: [h$2, "supportsFIPS"] }, b$2]],
+        ["stringEquals", [{ fn: f$2, argv: [h$2, "name"] }, "aws-us-gov"]]
+    ],
+    results: [
+        [a$2],
+        [a$2, "Invalid Configuration: FIPS and custom endpoint are not supported"],
+        [a$2, "Invalid Configuration: Dualstack and custom endpoint are not supported"],
+        [g$2, i$2],
+        ["https://portal.sso-fips.{Region}.{PartitionResult#dualStackDnsSuffix}", i$2],
+        [a$2, "FIPS and DualStack are enabled, but this partition does not support one or both"],
+        ["https://portal.sso.{Region}.amazonaws.com", i$2],
+        ["https://portal.sso-fips.{Region}.{PartitionResult#dnsSuffix}", i$2],
+        [a$2, "FIPS is enabled but this partition does not support FIPS"],
+        ["https://portal.sso.{Region}.{PartitionResult#dualStackDnsSuffix}", i$2],
+        [a$2, "DualStack is enabled but this partition does not support DualStack"],
+        ["https://portal.sso.{Region}.{PartitionResult#dnsSuffix}", i$2],
+        [a$2, "Invalid Configuration: Missing Region"]
+    ]
+};
+const root$2 = 2;
+const r$2 = 100_000_000;
+const nodes$2 = new Int32Array([
+    -1, 1, -1,
+    0, 13, 3,
+    1, 4, r$2 + 12,
+    2, 5, r$2 + 12,
+    3, 8, 6,
+    4, 7, r$2 + 11,
+    5, r$2 + 9, r$2 + 10,
+    4, 11, 9,
+    6, 10, r$2 + 8,
+    7, r$2 + 6, r$2 + 7,
+    5, 12, r$2 + 5,
+    6, r$2 + 4, r$2 + 5,
+    3, r$2 + 1, 14,
+    4, r$2 + 2, r$2 + 3,
+]);
+const bdd$2 = BinaryDecisionDiagram.from(nodes$2, root$2, _data$2.conditions, _data$2.results);
 
-const u$2 = "required", v$2 = "fn", w$2 = "argv", x$2 = "ref";
-const a$2 = true, b$2 = "isSet", c$2 = "booleanEquals", d$2 = "error", e$2 = "endpoint", f$2 = "tree", g$2 = "PartitionResult", h$2 = "getAttr", i$2 = { [u$2]: false, "type": "string" }, j$2 = { [u$2]: true, "default": false, "type": "boolean" }, k$2 = { [x$2]: "Endpoint" }, l$2 = { [v$2]: c$2, [w$2]: [{ [x$2]: "UseFIPS" }, true] }, m$2 = { [v$2]: c$2, [w$2]: [{ [x$2]: "UseDualStack" }, true] }, n$2 = {}, o$2 = { [v$2]: h$2, [w$2]: [{ [x$2]: g$2 }, "supportsFIPS"] }, p$2 = { [x$2]: g$2 }, q$2 = { [v$2]: c$2, [w$2]: [true, { [v$2]: h$2, [w$2]: [p$2, "supportsDualStack"] }] }, r$2 = [l$2], s$2 = [m$2], t$2 = [{ [x$2]: "Region" }];
-const _data$2 = { parameters: { Region: i$2, UseDualStack: j$2, UseFIPS: j$2, Endpoint: i$2 }, rules: [{ conditions: [{ [v$2]: b$2, [w$2]: [k$2] }], rules: [{ conditions: r$2, error: "Invalid Configuration: FIPS and custom endpoint are not supported", type: d$2 }, { conditions: s$2, error: "Invalid Configuration: Dualstack and custom endpoint are not supported", type: d$2 }, { endpoint: { url: k$2, properties: n$2, headers: n$2 }, type: e$2 }], type: f$2 }, { conditions: [{ [v$2]: b$2, [w$2]: t$2 }], rules: [{ conditions: [{ [v$2]: "aws.partition", [w$2]: t$2, assign: g$2 }], rules: [{ conditions: [l$2, m$2], rules: [{ conditions: [{ [v$2]: c$2, [w$2]: [a$2, o$2] }, q$2], rules: [{ endpoint: { url: "https://portal.sso-fips.{Region}.{PartitionResult#dualStackDnsSuffix}", properties: n$2, headers: n$2 }, type: e$2 }], type: f$2 }, { error: "FIPS and DualStack are enabled, but this partition does not support one or both", type: d$2 }], type: f$2 }, { conditions: r$2, rules: [{ conditions: [{ [v$2]: c$2, [w$2]: [o$2, a$2] }], rules: [{ conditions: [{ [v$2]: "stringEquals", [w$2]: [{ [v$2]: h$2, [w$2]: [p$2, "name"] }, "aws-us-gov"] }], endpoint: { url: "https://portal.sso.{Region}.amazonaws.com", properties: n$2, headers: n$2 }, type: e$2 }, { endpoint: { url: "https://portal.sso-fips.{Region}.{PartitionResult#dnsSuffix}", properties: n$2, headers: n$2 }, type: e$2 }], type: f$2 }, { error: "FIPS is enabled but this partition does not support FIPS", type: d$2 }], type: f$2 }, { conditions: s$2, rules: [{ conditions: [q$2], rules: [{ endpoint: { url: "https://portal.sso.{Region}.{PartitionResult#dualStackDnsSuffix}", properties: n$2, headers: n$2 }, type: e$2 }], type: f$2 }, { error: "DualStack is enabled but this partition does not support DualStack", type: d$2 }], type: f$2 }, { endpoint: { url: "https://portal.sso.{Region}.{PartitionResult#dnsSuffix}", properties: n$2, headers: n$2 }, type: e$2 }], type: f$2 }], type: f$2 }, { error: "Invalid Configuration: Missing Region", type: d$2 }] };
-const ruleSet$2 = _data$2;
-
-const cache$2 = new EndpointCache({
+const cache$2 = new EndpointCache$1({
     size: 50,
     params: ["Endpoint", "Region", "UseDualStack", "UseFIPS"],
 });
 const defaultEndpointResolver$2 = (endpointParams, context = {}) => {
-    return cache$2.get(endpointParams, () => resolveEndpoint(ruleSet$2, {
+    return cache$2.get(endpointParams, () => decideEndpoint(bdd$2, {
         endpointParams: endpointParams,
         logger: context.logger,
     }));
 };
 customEndpointFunctions.aws = awsEndpointFunctions;
-
-const getRuntimeConfig$5 = (config) => {
-    return {
-        apiVersion: "2019-06-10",
-        base64Decoder: config?.base64Decoder ?? fromBase64,
-        base64Encoder: config?.base64Encoder ?? toBase64,
-        disableHostPrefix: config?.disableHostPrefix ?? false,
-        endpointProvider: config?.endpointProvider ?? defaultEndpointResolver$2,
-        extensions: config?.extensions ?? [],
-        httpAuthSchemeProvider: config?.httpAuthSchemeProvider ?? defaultSSOHttpAuthSchemeProvider,
-        httpAuthSchemes: config?.httpAuthSchemes ?? [
-            {
-                schemeId: "aws.auth#sigv4",
-                identityProvider: (ipc) => ipc.getIdentityProvider("aws.auth#sigv4"),
-                signer: new AwsSdkSigV4Signer(),
-            },
-            {
-                schemeId: "smithy.api#noAuth",
-                identityProvider: (ipc) => ipc.getIdentityProvider("smithy.api#noAuth") || (async () => ({})),
-                signer: new NoAuthSigner(),
-            },
-        ],
-        logger: config?.logger ?? new NoOpLogger(),
-        protocol: config?.protocol ?? AwsRestJsonProtocol,
-        protocolSettings: config?.protocolSettings ?? {
-            defaultNamespace: "com.amazonaws.sso",
-            version: "2019-06-10",
-            serviceTarget: "SWBPortalService",
-        },
-        serviceId: config?.serviceId ?? "SSO",
-        urlParser: config?.urlParser ?? parseUrl,
-        utf8Decoder: config?.utf8Decoder ?? fromUtf8,
-        utf8Encoder: config?.utf8Encoder ?? toUtf8,
-    };
-};
-
-const getRuntimeConfig$4 = (config) => {
-    emitWarningIfUnsupportedVersion(process.version);
-    const defaultsMode = resolveDefaultsModeConfig(config);
-    const defaultConfigProvider = () => defaultsMode().then(loadConfigsForDefaultMode);
-    const clientSharedValues = getRuntimeConfig$5(config);
-    emitWarningIfUnsupportedVersion$1(process.version);
-    const loaderConfig = {
-        profile: config?.profile,
-        logger: clientSharedValues.logger,
-    };
-    return {
-        ...clientSharedValues,
-        ...config,
-        runtime: "node",
-        defaultsMode,
-        authSchemePreference: config?.authSchemePreference ?? loadConfig(NODE_AUTH_SCHEME_PREFERENCE_OPTIONS, loaderConfig),
-        bodyLengthChecker: config?.bodyLengthChecker ?? calculateBodyLength,
-        defaultUserAgentProvider: config?.defaultUserAgentProvider ?? createDefaultUserAgentProvider({ serviceId: clientSharedValues.serviceId, clientVersion: packageInfo.version }),
-        maxAttempts: config?.maxAttempts ?? loadConfig(NODE_MAX_ATTEMPT_CONFIG_OPTIONS, config),
-        region: config?.region ?? loadConfig(NODE_REGION_CONFIG_OPTIONS, { ...NODE_REGION_CONFIG_FILE_OPTIONS, ...loaderConfig }),
-        requestHandler: NodeHttpHandler.create(config?.requestHandler ?? defaultConfigProvider),
-        retryMode: config?.retryMode ??
-            loadConfig({
-                ...NODE_RETRY_MODE_CONFIG_OPTIONS,
-                default: async () => (await defaultConfigProvider()).retryMode || DEFAULT_RETRY_MODE,
-            }, config),
-        sha256: config?.sha256 ?? Hash.bind(null, "sha256"),
-        streamCollector: config?.streamCollector ?? streamCollector$1,
-        useDualstackEndpoint: config?.useDualstackEndpoint ?? loadConfig(NODE_USE_DUALSTACK_ENDPOINT_CONFIG_OPTIONS, loaderConfig),
-        useFipsEndpoint: config?.useFipsEndpoint ?? loadConfig(NODE_USE_FIPS_ENDPOINT_CONFIG_OPTIONS, loaderConfig),
-        userAgentAppId: config?.userAgentAppId ?? loadConfig(NODE_APP_ID_CONFIG_OPTIONS, loaderConfig),
-    };
-};
-
-const getHttpAuthExtensionConfiguration$2 = (runtimeConfig) => {
-    const _httpAuthSchemes = runtimeConfig.httpAuthSchemes;
-    let _httpAuthSchemeProvider = runtimeConfig.httpAuthSchemeProvider;
-    let _credentials = runtimeConfig.credentials;
-    return {
-        setHttpAuthScheme(httpAuthScheme) {
-            const index = _httpAuthSchemes.findIndex((scheme) => scheme.schemeId === httpAuthScheme.schemeId);
-            if (index === -1) {
-                _httpAuthSchemes.push(httpAuthScheme);
-            }
-            else {
-                _httpAuthSchemes.splice(index, 1, httpAuthScheme);
-            }
-        },
-        httpAuthSchemes() {
-            return _httpAuthSchemes;
-        },
-        setHttpAuthSchemeProvider(httpAuthSchemeProvider) {
-            _httpAuthSchemeProvider = httpAuthSchemeProvider;
-        },
-        httpAuthSchemeProvider() {
-            return _httpAuthSchemeProvider;
-        },
-        setCredentials(credentials) {
-            _credentials = credentials;
-        },
-        credentials() {
-            return _credentials;
-        },
-    };
-};
-const resolveHttpAuthRuntimeConfig$2 = (config) => {
-    return {
-        httpAuthSchemes: config.httpAuthSchemes(),
-        httpAuthSchemeProvider: config.httpAuthSchemeProvider(),
-        credentials: config.credentials(),
-    };
-};
-
-const resolveRuntimeExtensions$2 = (runtimeConfig, extensions) => {
-    const extensionConfiguration = Object.assign(getAwsRegionExtensionConfiguration(runtimeConfig), getDefaultExtensionConfiguration(runtimeConfig), getHttpHandlerExtensionConfiguration(runtimeConfig), getHttpAuthExtensionConfiguration$2(runtimeConfig));
-    extensions.forEach((extension) => extension.configure(extensionConfiguration));
-    return Object.assign(runtimeConfig, resolveAwsRegionExtensionConfiguration(extensionConfiguration), resolveDefaultRuntimeConfig(extensionConfiguration), resolveHttpHandlerRuntimeConfig(extensionConfiguration), resolveHttpAuthRuntimeConfig$2(extensionConfiguration));
-};
-
-class SSOClient extends Client {
-    config;
-    constructor(...[configuration]) {
-        const _config_0 = getRuntimeConfig$4(configuration || {});
-        super(_config_0);
-        this.initConfig = _config_0;
-        const _config_1 = resolveClientEndpointParameters$2(_config_0);
-        const _config_2 = resolveUserAgentConfig(_config_1);
-        const _config_3 = resolveRetryConfig(_config_2);
-        const _config_4 = resolveRegionConfig(_config_3);
-        const _config_5 = resolveHostHeaderConfig(_config_4);
-        const _config_6 = resolveEndpointConfig(_config_5);
-        const _config_7 = resolveHttpAuthSchemeConfig$2(_config_6);
-        const _config_8 = resolveRuntimeExtensions$2(_config_7, configuration?.extensions || []);
-        this.config = _config_8;
-        this.middlewareStack.use(getSchemaSerdePlugin(this.config));
-        this.middlewareStack.use(getUserAgentPlugin(this.config));
-        this.middlewareStack.use(getRetryPlugin(this.config));
-        this.middlewareStack.use(getContentLengthPlugin(this.config));
-        this.middlewareStack.use(getHostHeaderPlugin(this.config));
-        this.middlewareStack.use(getLoggerPlugin(this.config));
-        this.middlewareStack.use(getRecursionDetectionPlugin(this.config));
-        this.middlewareStack.use(getHttpAuthSchemeEndpointRuleSetPlugin(this.config, {
-            httpAuthSchemeParametersProvider: defaultSSOHttpAuthSchemeParametersProvider,
-            identityProviderConfigProvider: async (config) => new DefaultIdentityProviderConfig({
-                "aws.auth#sigv4": config.credentials,
-            }),
-        }));
-        this.middlewareStack.use(getHttpSigningPlugin(this.config));
-    }
-    destroy() {
-        super.destroy();
-    }
-}
 
 class SSOServiceException extends ServiceException {
     constructor(options) {
@@ -48391,6 +48767,38 @@ const _sAK$1 = "secretAccessKey";
 const _sT$1 = "sessionToken";
 const _xasbt = "x-amz-sso_bearer_token";
 const n0$2 = "com.amazonaws.sso";
+const _s_registry$2 = TypeRegistry.for(_s$2);
+var SSOServiceException$ = [-3, _s$2, "SSOServiceException", 0, [], []];
+_s_registry$2.registerError(SSOServiceException$, SSOServiceException);
+const n0_registry$2 = TypeRegistry.for(n0$2);
+var InvalidRequestException$ = [-3, n0$2, _IRE,
+    { [_e$2]: _c$2, [_hE$2]: 400 },
+    [_m$2],
+    [0]
+];
+n0_registry$2.registerError(InvalidRequestException$, InvalidRequestException);
+var ResourceNotFoundException$ = [-3, n0$2, _RNFE,
+    { [_e$2]: _c$2, [_hE$2]: 404 },
+    [_m$2],
+    [0]
+];
+n0_registry$2.registerError(ResourceNotFoundException$, ResourceNotFoundException);
+var TooManyRequestsException$ = [-3, n0$2, _TMRE$1,
+    { [_e$2]: _c$2, [_hE$2]: 429 },
+    [_m$2],
+    [0]
+];
+n0_registry$2.registerError(TooManyRequestsException$, TooManyRequestsException);
+var UnauthorizedException$ = [-3, n0$2, _UE,
+    { [_e$2]: _c$2, [_hE$2]: 401 },
+    [_m$2],
+    [0]
+];
+n0_registry$2.registerError(UnauthorizedException$, UnauthorizedException);
+const errorTypeRegistries$2 = [
+    _s_registry$2,
+    n0_registry$2,
+];
 var AccessTokenType = [0, n0$2, _ATT, 8, 0];
 var SecretAccessKeyType = [0, n0$2, _SAKT, 8, 0];
 var SessionTokenType = [0, n0$2, _STT, 8, 0];
@@ -48404,154 +48812,24 @@ var GetRoleCredentialsResponse$ = [3, n0$2, _GRCRe,
     [_rC],
     [[() => RoleCredentials$, 0]]
 ];
-var InvalidRequestException$ = [-3, n0$2, _IRE,
-    { [_e$2]: _c$2, [_hE$2]: 400 },
-    [_m$2],
-    [0]
-];
-TypeRegistry.for(n0$2).registerError(InvalidRequestException$, InvalidRequestException);
-var ResourceNotFoundException$ = [-3, n0$2, _RNFE,
-    { [_e$2]: _c$2, [_hE$2]: 404 },
-    [_m$2],
-    [0]
-];
-TypeRegistry.for(n0$2).registerError(ResourceNotFoundException$, ResourceNotFoundException);
 var RoleCredentials$ = [3, n0$2, _RC,
     0,
     [_aKI$1, _sAK$1, _sT$1, _ex],
     [0, [() => SecretAccessKeyType, 0], [() => SessionTokenType, 0], 1]
 ];
-var TooManyRequestsException$ = [-3, n0$2, _TMRE$1,
-    { [_e$2]: _c$2, [_hE$2]: 429 },
-    [_m$2],
-    [0]
-];
-TypeRegistry.for(n0$2).registerError(TooManyRequestsException$, TooManyRequestsException);
-var UnauthorizedException$ = [-3, n0$2, _UE,
-    { [_e$2]: _c$2, [_hE$2]: 401 },
-    [_m$2],
-    [0]
-];
-TypeRegistry.for(n0$2).registerError(UnauthorizedException$, UnauthorizedException);
-var SSOServiceException$ = [-3, _s$2, "SSOServiceException", 0, [], []];
-TypeRegistry.for(_s$2).registerError(SSOServiceException$, SSOServiceException);
 var GetRoleCredentials$ = [9, n0$2, _GRC,
     { [_h$1]: ["GET", "/federation/credentials", 200] }, () => GetRoleCredentialsRequest$, () => GetRoleCredentialsResponse$
 ];
 
-class GetRoleCredentialsCommand extends Command
-    .classBuilder()
-    .ep(commonParams$2)
-    .m(function (Command, cs, config, o) {
-    return [getEndpointPlugin(config, Command.getEndpointParameterInstructions())];
-})
-    .s("SWBPortalService", "GetRoleCredentials", {})
-    .n("SSOClient", "GetRoleCredentialsCommand")
-    .sc(GetRoleCredentials$)
-    .build() {
-}
-
-var loadSso = /*#__PURE__*/Object.freeze({
-    __proto__: null,
-    GetRoleCredentialsCommand: GetRoleCredentialsCommand,
-    SSOClient: SSOClient
-});
-
-const defaultSTSHttpAuthSchemeParametersProvider = async (config, context, input) => {
+const getRuntimeConfig$5 = (config) => {
     return {
-        operation: getSmithyContext(context).operation,
-        region: (await normalizeProvider$1(config.region)()) ||
-            (() => {
-                throw new Error("expected `region` to be configured for `aws.auth#sigv4`");
-            })(),
-    };
-};
-function createAwsAuthSigv4HttpAuthOption$1(authParameters) {
-    return {
-        schemeId: "aws.auth#sigv4",
-        signingProperties: {
-            name: "sts",
-            region: authParameters.region,
-        },
-        propertiesExtractor: (config, context) => ({
-            signingProperties: {
-                config,
-                context,
-            },
-        }),
-    };
-}
-function createSmithyApiNoAuthHttpAuthOption$1(authParameters) {
-    return {
-        schemeId: "smithy.api#noAuth",
-    };
-}
-const defaultSTSHttpAuthSchemeProvider = (authParameters) => {
-    const options = [];
-    switch (authParameters.operation) {
-        case "AssumeRoleWithWebIdentity": {
-            options.push(createSmithyApiNoAuthHttpAuthOption$1());
-            break;
-        }
-        default: {
-            options.push(createAwsAuthSigv4HttpAuthOption$1(authParameters));
-        }
-    }
-    return options;
-};
-const resolveStsAuthConfig = (input) => Object.assign(input, {
-    stsClientCtor: STSClient,
-});
-const resolveHttpAuthSchemeConfig$1 = (config) => {
-    const config_0 = resolveStsAuthConfig(config);
-    const config_1 = resolveAwsSdkSigV4Config(config_0);
-    return Object.assign(config_1, {
-        authSchemePreference: normalizeProvider$1(config.authSchemePreference ?? []),
-    });
-};
-
-const resolveClientEndpointParameters$1 = (options) => {
-    return Object.assign(options, {
-        useDualstackEndpoint: options.useDualstackEndpoint ?? false,
-        useFipsEndpoint: options.useFipsEndpoint ?? false,
-        useGlobalEndpoint: options.useGlobalEndpoint ?? false,
-        defaultSigningName: "sts",
-    });
-};
-const commonParams$1 = {
-    UseGlobalEndpoint: { type: "builtInParams", name: "useGlobalEndpoint" },
-    UseFIPS: { type: "builtInParams", name: "useFipsEndpoint" },
-    Endpoint: { type: "builtInParams", name: "endpoint" },
-    Region: { type: "builtInParams", name: "region" },
-    UseDualStack: { type: "builtInParams", name: "useDualstackEndpoint" },
-};
-
-const F = "required", G = "type", H = "fn", I = "argv", J = "ref";
-const a$1 = false, b$1 = true, c$1 = "booleanEquals", d$1 = "stringEquals", e$1 = "sigv4", f$1 = "sts", g$1 = "us-east-1", h$1 = "endpoint", i$1 = "https://sts.{Region}.{PartitionResult#dnsSuffix}", j$1 = "tree", k$1 = "error", l$1 = "getAttr", m$1 = { [F]: false, [G]: "string" }, n$1 = { [F]: true, "default": false, [G]: "boolean" }, o$1 = { [J]: "Endpoint" }, p$1 = { [H]: "isSet", [I]: [{ [J]: "Region" }] }, q$1 = { [J]: "Region" }, r$1 = { [H]: "aws.partition", [I]: [q$1], "assign": "PartitionResult" }, s$1 = { [J]: "UseFIPS" }, t$1 = { [J]: "UseDualStack" }, u$1 = { "url": "https://sts.amazonaws.com", "properties": { "authSchemes": [{ "name": e$1, "signingName": f$1, "signingRegion": g$1 }] }, "headers": {} }, v$1 = {}, w$1 = { "conditions": [{ [H]: d$1, [I]: [q$1, "aws-global"] }], [h$1]: u$1, [G]: h$1 }, x$1 = { [H]: c$1, [I]: [s$1, true] }, y = { [H]: c$1, [I]: [t$1, true] }, z = { [H]: l$1, [I]: [{ [J]: "PartitionResult" }, "supportsFIPS"] }, A = { [J]: "PartitionResult" }, B = { [H]: c$1, [I]: [true, { [H]: l$1, [I]: [A, "supportsDualStack"] }] }, C = [{ [H]: "isSet", [I]: [o$1] }], D = [x$1], E = [y];
-const _data$1 = { parameters: { Region: m$1, UseDualStack: n$1, UseFIPS: n$1, Endpoint: m$1, UseGlobalEndpoint: n$1 }, rules: [{ conditions: [{ [H]: c$1, [I]: [{ [J]: "UseGlobalEndpoint" }, b$1] }, { [H]: "not", [I]: C }, p$1, r$1, { [H]: c$1, [I]: [s$1, a$1] }, { [H]: c$1, [I]: [t$1, a$1] }], rules: [{ conditions: [{ [H]: d$1, [I]: [q$1, "ap-northeast-1"] }], endpoint: u$1, [G]: h$1 }, { conditions: [{ [H]: d$1, [I]: [q$1, "ap-south-1"] }], endpoint: u$1, [G]: h$1 }, { conditions: [{ [H]: d$1, [I]: [q$1, "ap-southeast-1"] }], endpoint: u$1, [G]: h$1 }, { conditions: [{ [H]: d$1, [I]: [q$1, "ap-southeast-2"] }], endpoint: u$1, [G]: h$1 }, w$1, { conditions: [{ [H]: d$1, [I]: [q$1, "ca-central-1"] }], endpoint: u$1, [G]: h$1 }, { conditions: [{ [H]: d$1, [I]: [q$1, "eu-central-1"] }], endpoint: u$1, [G]: h$1 }, { conditions: [{ [H]: d$1, [I]: [q$1, "eu-north-1"] }], endpoint: u$1, [G]: h$1 }, { conditions: [{ [H]: d$1, [I]: [q$1, "eu-west-1"] }], endpoint: u$1, [G]: h$1 }, { conditions: [{ [H]: d$1, [I]: [q$1, "eu-west-2"] }], endpoint: u$1, [G]: h$1 }, { conditions: [{ [H]: d$1, [I]: [q$1, "eu-west-3"] }], endpoint: u$1, [G]: h$1 }, { conditions: [{ [H]: d$1, [I]: [q$1, "sa-east-1"] }], endpoint: u$1, [G]: h$1 }, { conditions: [{ [H]: d$1, [I]: [q$1, g$1] }], endpoint: u$1, [G]: h$1 }, { conditions: [{ [H]: d$1, [I]: [q$1, "us-east-2"] }], endpoint: u$1, [G]: h$1 }, { conditions: [{ [H]: d$1, [I]: [q$1, "us-west-1"] }], endpoint: u$1, [G]: h$1 }, { conditions: [{ [H]: d$1, [I]: [q$1, "us-west-2"] }], endpoint: u$1, [G]: h$1 }, { endpoint: { url: i$1, properties: { authSchemes: [{ name: e$1, signingName: f$1, signingRegion: "{Region}" }] }, headers: v$1 }, [G]: h$1 }], [G]: j$1 }, { conditions: C, rules: [{ conditions: D, error: "Invalid Configuration: FIPS and custom endpoint are not supported", [G]: k$1 }, { conditions: E, error: "Invalid Configuration: Dualstack and custom endpoint are not supported", [G]: k$1 }, { endpoint: { url: o$1, properties: v$1, headers: v$1 }, [G]: h$1 }], [G]: j$1 }, { conditions: [p$1], rules: [{ conditions: [r$1], rules: [{ conditions: [x$1, y], rules: [{ conditions: [{ [H]: c$1, [I]: [b$1, z] }, B], rules: [{ endpoint: { url: "https://sts-fips.{Region}.{PartitionResult#dualStackDnsSuffix}", properties: v$1, headers: v$1 }, [G]: h$1 }], [G]: j$1 }, { error: "FIPS and DualStack are enabled, but this partition does not support one or both", [G]: k$1 }], [G]: j$1 }, { conditions: D, rules: [{ conditions: [{ [H]: c$1, [I]: [z, b$1] }], rules: [{ conditions: [{ [H]: d$1, [I]: [{ [H]: l$1, [I]: [A, "name"] }, "aws-us-gov"] }], endpoint: { url: "https://sts.{Region}.amazonaws.com", properties: v$1, headers: v$1 }, [G]: h$1 }, { endpoint: { url: "https://sts-fips.{Region}.{PartitionResult#dnsSuffix}", properties: v$1, headers: v$1 }, [G]: h$1 }], [G]: j$1 }, { error: "FIPS is enabled but this partition does not support FIPS", [G]: k$1 }], [G]: j$1 }, { conditions: E, rules: [{ conditions: [B], rules: [{ endpoint: { url: "https://sts.{Region}.{PartitionResult#dualStackDnsSuffix}", properties: v$1, headers: v$1 }, [G]: h$1 }], [G]: j$1 }, { error: "DualStack is enabled but this partition does not support DualStack", [G]: k$1 }], [G]: j$1 }, w$1, { endpoint: { url: i$1, properties: v$1, headers: v$1 }, [G]: h$1 }], [G]: j$1 }], [G]: j$1 }, { error: "Invalid Configuration: Missing Region", [G]: k$1 }] };
-const ruleSet$1 = _data$1;
-
-const cache$1 = new EndpointCache({
-    size: 50,
-    params: ["Endpoint", "Region", "UseDualStack", "UseFIPS", "UseGlobalEndpoint"],
-});
-const defaultEndpointResolver$1 = (endpointParams, context = {}) => {
-    return cache$1.get(endpointParams, () => resolveEndpoint(ruleSet$1, {
-        endpointParams: endpointParams,
-        logger: context.logger,
-    }));
-};
-customEndpointFunctions.aws = awsEndpointFunctions;
-
-const getRuntimeConfig$3 = (config) => {
-    return {
-        apiVersion: "2011-06-15",
-        base64Decoder: config?.base64Decoder ?? fromBase64,
-        base64Encoder: config?.base64Encoder ?? toBase64,
+        apiVersion: "2019-06-10",
+        base64Decoder: config?.base64Decoder ?? fromBase64$1,
+        base64Encoder: config?.base64Encoder ?? toBase64$1,
         disableHostPrefix: config?.disableHostPrefix ?? false,
-        endpointProvider: config?.endpointProvider ?? defaultEndpointResolver$1,
+        endpointProvider: config?.endpointProvider ?? defaultEndpointResolver$2,
         extensions: config?.extensions ?? [],
-        httpAuthSchemeProvider: config?.httpAuthSchemeProvider ?? defaultSTSHttpAuthSchemeProvider,
+        httpAuthSchemeProvider: config?.httpAuthSchemeProvider ?? defaultSSOHttpAuthSchemeProvider,
         httpAuthSchemes: config?.httpAuthSchemes ?? [
             {
                 schemeId: "aws.auth#sigv4",
@@ -48565,26 +48843,26 @@ const getRuntimeConfig$3 = (config) => {
             },
         ],
         logger: config?.logger ?? new NoOpLogger(),
-        protocol: config?.protocol ?? AwsQueryProtocol,
+        protocol: config?.protocol ?? AwsRestJsonProtocol,
         protocolSettings: config?.protocolSettings ?? {
-            defaultNamespace: "com.amazonaws.sts",
-            xmlNamespace: "https://sts.amazonaws.com/doc/2011-06-15/",
-            version: "2011-06-15",
-            serviceTarget: "AWSSecurityTokenServiceV20110615",
+            defaultNamespace: "com.amazonaws.sso",
+            errorTypeRegistries: errorTypeRegistries$2,
+            version: "2019-06-10",
+            serviceTarget: "SWBPortalService",
         },
-        serviceId: config?.serviceId ?? "STS",
+        serviceId: config?.serviceId ?? "SSO",
         urlParser: config?.urlParser ?? parseUrl,
-        utf8Decoder: config?.utf8Decoder ?? fromUtf8,
-        utf8Encoder: config?.utf8Encoder ?? toUtf8,
+        utf8Decoder: config?.utf8Decoder ?? fromUtf8$2,
+        utf8Encoder: config?.utf8Encoder ?? toUtf8$1,
     };
 };
 
-const getRuntimeConfig$2 = (config) => {
-    emitWarningIfUnsupportedVersion(process.version);
+const getRuntimeConfig$4 = (config) => {
+    emitWarningIfUnsupportedVersion$1(process.version);
     const defaultsMode = resolveDefaultsModeConfig(config);
     const defaultConfigProvider = () => defaultsMode().then(loadConfigsForDefaultMode);
-    const clientSharedValues = getRuntimeConfig$3(config);
-    emitWarningIfUnsupportedVersion$1(process.version);
+    const clientSharedValues = getRuntimeConfig$5(config);
+    emitWarningIfUnsupportedVersion(process.version);
     const loaderConfig = {
         profile: config?.profile,
         logger: clientSharedValues.logger,
@@ -48596,24 +48874,9 @@ const getRuntimeConfig$2 = (config) => {
         defaultsMode,
         authSchemePreference: config?.authSchemePreference ?? loadConfig(NODE_AUTH_SCHEME_PREFERENCE_OPTIONS, loaderConfig),
         bodyLengthChecker: config?.bodyLengthChecker ?? calculateBodyLength,
-        defaultUserAgentProvider: config?.defaultUserAgentProvider ??
-            createDefaultUserAgentProvider({ serviceId: clientSharedValues.serviceId, clientVersion: packageInfo$1.version }),
-        httpAuthSchemes: config?.httpAuthSchemes ?? [
-            {
-                schemeId: "aws.auth#sigv4",
-                identityProvider: (ipc) => ipc.getIdentityProvider("aws.auth#sigv4") ||
-                    (async (idProps) => await config.credentialDefaultProvider(idProps?.__config || {})()),
-                signer: new AwsSdkSigV4Signer(),
-            },
-            {
-                schemeId: "smithy.api#noAuth",
-                identityProvider: (ipc) => ipc.getIdentityProvider("smithy.api#noAuth") || (async () => ({})),
-                signer: new NoAuthSigner(),
-            },
-        ],
+        defaultUserAgentProvider: config?.defaultUserAgentProvider ?? createDefaultUserAgentProvider({ serviceId: clientSharedValues.serviceId, clientVersion: packageInfo.version }),
         maxAttempts: config?.maxAttempts ?? loadConfig(NODE_MAX_ATTEMPT_CONFIG_OPTIONS, config),
-        region: config?.region ??
-            loadConfig(NODE_REGION_CONFIG_OPTIONS, { ...NODE_REGION_CONFIG_FILE_OPTIONS, ...loaderConfig }),
+        region: config?.region ?? loadConfig(NODE_REGION_CONFIG_OPTIONS, { ...NODE_REGION_CONFIG_FILE_OPTIONS, ...loaderConfig }),
         requestHandler: NodeHttpHandler.create(config?.requestHandler ?? defaultConfigProvider),
         retryMode: config?.retryMode ??
             loadConfig({
@@ -48621,14 +48884,14 @@ const getRuntimeConfig$2 = (config) => {
                 default: async () => (await defaultConfigProvider()).retryMode || DEFAULT_RETRY_MODE,
             }, config),
         sha256: config?.sha256 ?? Hash.bind(null, "sha256"),
-        streamCollector: config?.streamCollector ?? streamCollector$1,
+        streamCollector: config?.streamCollector ?? streamCollector,
         useDualstackEndpoint: config?.useDualstackEndpoint ?? loadConfig(NODE_USE_DUALSTACK_ENDPOINT_CONFIG_OPTIONS, loaderConfig),
         useFipsEndpoint: config?.useFipsEndpoint ?? loadConfig(NODE_USE_FIPS_ENDPOINT_CONFIG_OPTIONS, loaderConfig),
         userAgentAppId: config?.userAgentAppId ?? loadConfig(NODE_APP_ID_CONFIG_OPTIONS, loaderConfig),
     };
 };
 
-const getHttpAuthExtensionConfiguration$1 = (runtimeConfig) => {
+const getHttpAuthExtensionConfiguration$2 = (runtimeConfig) => {
     const _httpAuthSchemes = runtimeConfig.httpAuthSchemes;
     let _httpAuthSchemeProvider = runtimeConfig.httpAuthSchemeProvider;
     let _credentials = runtimeConfig.credentials;
@@ -48659,7 +48922,7 @@ const getHttpAuthExtensionConfiguration$1 = (runtimeConfig) => {
         },
     };
 };
-const resolveHttpAuthRuntimeConfig$1 = (config) => {
+const resolveHttpAuthRuntimeConfig$2 = (config) => {
     return {
         httpAuthSchemes: config.httpAuthSchemes(),
         httpAuthSchemeProvider: config.httpAuthSchemeProvider(),
@@ -48667,26 +48930,26 @@ const resolveHttpAuthRuntimeConfig$1 = (config) => {
     };
 };
 
-const resolveRuntimeExtensions$1 = (runtimeConfig, extensions) => {
-    const extensionConfiguration = Object.assign(getAwsRegionExtensionConfiguration(runtimeConfig), getDefaultExtensionConfiguration(runtimeConfig), getHttpHandlerExtensionConfiguration(runtimeConfig), getHttpAuthExtensionConfiguration$1(runtimeConfig));
+const resolveRuntimeExtensions$2 = (runtimeConfig, extensions) => {
+    const extensionConfiguration = Object.assign(getAwsRegionExtensionConfiguration(runtimeConfig), getDefaultExtensionConfiguration(runtimeConfig), getHttpHandlerExtensionConfiguration(runtimeConfig), getHttpAuthExtensionConfiguration$2(runtimeConfig));
     extensions.forEach((extension) => extension.configure(extensionConfiguration));
-    return Object.assign(runtimeConfig, resolveAwsRegionExtensionConfiguration(extensionConfiguration), resolveDefaultRuntimeConfig(extensionConfiguration), resolveHttpHandlerRuntimeConfig(extensionConfiguration), resolveHttpAuthRuntimeConfig$1(extensionConfiguration));
+    return Object.assign(runtimeConfig, resolveAwsRegionExtensionConfiguration(extensionConfiguration), resolveDefaultRuntimeConfig(extensionConfiguration), resolveHttpHandlerRuntimeConfig(extensionConfiguration), resolveHttpAuthRuntimeConfig$2(extensionConfiguration));
 };
 
-class STSClient extends Client {
+class SSOClient extends Client {
     config;
     constructor(...[configuration]) {
-        const _config_0 = getRuntimeConfig$2(configuration || {});
+        const _config_0 = getRuntimeConfig$4(configuration || {});
         super(_config_0);
         this.initConfig = _config_0;
-        const _config_1 = resolveClientEndpointParameters$1(_config_0);
+        const _config_1 = resolveClientEndpointParameters$2(_config_0);
         const _config_2 = resolveUserAgentConfig(_config_1);
         const _config_3 = resolveRetryConfig(_config_2);
         const _config_4 = resolveRegionConfig(_config_3);
         const _config_5 = resolveHostHeaderConfig(_config_4);
         const _config_6 = resolveEndpointConfig(_config_5);
-        const _config_7 = resolveHttpAuthSchemeConfig$1(_config_6);
-        const _config_8 = resolveRuntimeExtensions$1(_config_7, configuration?.extensions || []);
+        const _config_7 = resolveHttpAuthSchemeConfig$2(_config_6);
+        const _config_8 = resolveRuntimeExtensions$2(_config_7, configuration?.extensions || []);
         this.config = _config_8;
         this.middlewareStack.use(getSchemaSerdePlugin(this.config));
         this.middlewareStack.use(getUserAgentPlugin(this.config));
@@ -48696,7 +48959,7 @@ class STSClient extends Client {
         this.middlewareStack.use(getLoggerPlugin(this.config));
         this.middlewareStack.use(getRecursionDetectionPlugin(this.config));
         this.middlewareStack.use(getHttpAuthSchemeEndpointRuleSetPlugin(this.config, {
-            httpAuthSchemeParametersProvider: defaultSTSHttpAuthSchemeParametersProvider,
+            httpAuthSchemeParametersProvider: defaultSSOHttpAuthSchemeParametersProvider,
             identityProviderConfigProvider: async (config) => new DefaultIdentityProviderConfig({
                 "aws.auth#sigv4": config.credentials,
             }),
@@ -48707,6 +48970,376 @@ class STSClient extends Client {
         super.destroy();
     }
 }
+
+class GetRoleCredentialsCommand extends Command
+    .classBuilder()
+    .ep(commonParams$2)
+    .m(function (Command, cs, config, o) {
+    return [getEndpointPlugin(config, Command.getEndpointParameterInstructions())];
+})
+    .s("SWBPortalService", "GetRoleCredentials", {})
+    .n("SSOClient", "GetRoleCredentialsCommand")
+    .sc(GetRoleCredentials$)
+    .build() {
+}
+
+var loadSso = /*#__PURE__*/Object.freeze({
+    __proto__: null,
+    GetRoleCredentialsCommand: GetRoleCredentialsCommand,
+    SSOClient: SSOClient
+});
+
+const SESSION_TOKEN_QUERY_PARAM = "X-Amz-S3session-Token";
+const SESSION_TOKEN_HEADER = SESSION_TOKEN_QUERY_PARAM.toLowerCase();
+class SignatureV4SignWithCredentials extends SignatureV4 {
+    async signWithCredentials(requestToSign, credentials, options) {
+        const credentialsWithoutSessionToken = getCredentialsWithoutSessionToken(credentials);
+        requestToSign.headers[SESSION_TOKEN_HEADER] = credentials.sessionToken;
+        const privateAccess = this;
+        setSingleOverride(privateAccess, credentialsWithoutSessionToken);
+        return privateAccess.signRequest(requestToSign, options ?? {});
+    }
+    async presignWithCredentials(requestToSign, credentials, options) {
+        const credentialsWithoutSessionToken = getCredentialsWithoutSessionToken(credentials);
+        delete requestToSign.headers[SESSION_TOKEN_HEADER];
+        requestToSign.headers[SESSION_TOKEN_QUERY_PARAM] = credentials.sessionToken;
+        requestToSign.query = requestToSign.query ?? {};
+        requestToSign.query[SESSION_TOKEN_QUERY_PARAM] = credentials.sessionToken;
+        const privateAccess = this;
+        setSingleOverride(privateAccess, credentialsWithoutSessionToken);
+        return this.presign(requestToSign, options);
+    }
+}
+function getCredentialsWithoutSessionToken(credentials) {
+    return {
+        accessKeyId: credentials.accessKeyId,
+        secretAccessKey: credentials.secretAccessKey,
+        expiration: credentials.expiration,
+    };
+}
+function setSingleOverride(privateAccess, credentialsWithoutSessionToken) {
+    const currentCredentialProvider = privateAccess.credentialProvider;
+    privateAccess.credentialProvider = () => {
+        privateAccess.credentialProvider = currentCredentialProvider;
+        return Promise.resolve(credentialsWithoutSessionToken);
+    };
+}
+
+class SignatureV4MultiRegion {
+    sigv4aSigner;
+    sigv4Signer;
+    signerOptions;
+    static sigv4aDependency() {
+        return "none";
+    }
+    constructor(options) {
+        this.sigv4Signer = new SignatureV4SignWithCredentials(options);
+        this.signerOptions = options;
+    }
+    async sign(requestToSign, options = {}) {
+        if (options.signingRegion === "*") {
+            return this.getSigv4aSigner().sign(requestToSign, options);
+        }
+        return this.sigv4Signer.sign(requestToSign, options);
+    }
+    async signWithCredentials(requestToSign, credentials, options = {}) {
+        if (options.signingRegion === "*") {
+            this.getSigv4aSigner();
+            {
+                throw new Error(`signWithCredentials with signingRegion '*' is only supported when using the CRT dependency @aws-sdk/signature-v4-crt. ` +
+                    `Please check whether you have installed the "@aws-sdk/signature-v4-crt" package explicitly. ` +
+                    `You must also register the package by calling [require("@aws-sdk/signature-v4-crt");] ` +
+                    `or an ESM equivalent such as [import "@aws-sdk/signature-v4-crt";]. ` +
+                    `For more information please go to https://github.com/aws/aws-sdk-js-v3#functionality-requiring-aws-common-runtime-crt`);
+            }
+        }
+        return this.sigv4Signer.signWithCredentials(requestToSign, credentials, options);
+    }
+    async presign(originalRequest, options = {}) {
+        if (options.signingRegion === "*") {
+            this.getSigv4aSigner();
+            {
+                throw new Error(`presign with signingRegion '*' is only supported when using the CRT dependency @aws-sdk/signature-v4-crt. ` +
+                    `Please check whether you have installed the "@aws-sdk/signature-v4-crt" package explicitly. ` +
+                    `You must also register the package by calling [require("@aws-sdk/signature-v4-crt");] ` +
+                    `or an ESM equivalent such as [import "@aws-sdk/signature-v4-crt";]. ` +
+                    `For more information please go to https://github.com/aws/aws-sdk-js-v3#functionality-requiring-aws-common-runtime-crt`);
+            }
+        }
+        return this.sigv4Signer.presign(originalRequest, options);
+    }
+    async presignWithCredentials(originalRequest, credentials, options = {}) {
+        if (options.signingRegion === "*") {
+            throw new Error("Method presignWithCredentials is not supported for [signingRegion=*].");
+        }
+        return this.sigv4Signer.presignWithCredentials(originalRequest, credentials, options);
+    }
+    getSigv4aSigner() {
+        if (!this.sigv4aSigner) {
+            if (this.signerOptions.runtime === "node") {
+                {
+                    throw new Error("Neither CRT nor JS SigV4a implementation is available. " +
+                        "Please load either @aws-sdk/signature-v4-crt or @aws-sdk/signature-v4a. " +
+                        "For more information please go to " +
+                        "https://github.com/aws/aws-sdk-js-v3#functionality-requiring-aws-common-runtime-crt");
+                }
+            }
+            else {
+                {
+                    throw new Error("JS SigV4a implementation is not available or not a valid constructor. " +
+                        "Please check whether you have installed the @aws-sdk/signature-v4a package explicitly. The CRT implementation is not available for browsers. " +
+                        "You must also register the package by calling [require('@aws-sdk/signature-v4a');] " +
+                        "or an ESM equivalent such as [import '@aws-sdk/signature-v4a';]. " +
+                        "For more information please go to " +
+                        "https://github.com/aws/aws-sdk-js-v3#using-javascript-non-crt-implementation-of-sigv4a");
+                }
+            }
+        }
+        return this.sigv4aSigner;
+    }
+}
+
+const q = "ref";
+const a$1 = -1, b$1 = true, c$1 = "isSet", d$1 = "PartitionResult", e$1 = "booleanEquals", f$1 = "stringEquals", g$1 = "getAttr", h$1 = "us-east-1", i$1 = "sigv4", j$1 = "sts", k$1 = "https://sts.{Region}.{PartitionResult#dnsSuffix}", l$1 = { [q]: "Endpoint" }, m$1 = { [q]: "Region" }, n$1 = { [q]: d$1 }, o$1 = {}, p$1 = [m$1];
+const _data$1 = {
+    conditions: [
+        [c$1, [l$1]],
+        [c$1, p$1],
+        ["aws.partition", p$1, d$1],
+        [e$1, [{ [q]: "UseFIPS" }, b$1]],
+        [e$1, [{ [q]: "UseDualStack" }, b$1]],
+        [f$1, [m$1, "aws-global"]],
+        [e$1, [{ [q]: "UseGlobalEndpoint" }, b$1]],
+        [f$1, [m$1, "eu-central-1"]],
+        [e$1, [{ fn: g$1, argv: [n$1, "supportsDualStack"] }, b$1]],
+        [e$1, [{ fn: g$1, argv: [n$1, "supportsFIPS"] }, b$1]],
+        [f$1, [m$1, "ap-south-1"]],
+        [f$1, [m$1, "eu-north-1"]],
+        [f$1, [m$1, "eu-west-1"]],
+        [f$1, [m$1, "eu-west-2"]],
+        [f$1, [m$1, "eu-west-3"]],
+        [f$1, [m$1, "sa-east-1"]],
+        [f$1, [m$1, h$1]],
+        [f$1, [m$1, "us-east-2"]],
+        [f$1, [m$1, "us-west-2"]],
+        [f$1, [m$1, "us-west-1"]],
+        [f$1, [m$1, "ca-central-1"]],
+        [f$1, [m$1, "ap-southeast-1"]],
+        [f$1, [m$1, "ap-northeast-1"]],
+        [f$1, [m$1, "ap-southeast-2"]],
+        [f$1, [{ fn: g$1, argv: [n$1, "name"] }, "aws-us-gov"]]
+    ],
+    results: [
+        [a$1],
+        ["https://sts.amazonaws.com", { authSchemes: [{ name: i$1, signingName: j$1, signingRegion: h$1 }] }],
+        [k$1, { authSchemes: [{ name: i$1, signingName: j$1, signingRegion: "{Region}" }] }],
+        [a$1, "Invalid Configuration: FIPS and custom endpoint are not supported"],
+        [a$1, "Invalid Configuration: Dualstack and custom endpoint are not supported"],
+        [l$1, o$1],
+        ["https://sts-fips.{Region}.{PartitionResult#dualStackDnsSuffix}", o$1],
+        [a$1, "FIPS and DualStack are enabled, but this partition does not support one or both"],
+        ["https://sts.{Region}.amazonaws.com", o$1],
+        ["https://sts-fips.{Region}.{PartitionResult#dnsSuffix}", o$1],
+        [a$1, "FIPS is enabled but this partition does not support FIPS"],
+        ["https://sts.{Region}.{PartitionResult#dualStackDnsSuffix}", o$1],
+        [a$1, "DualStack is enabled but this partition does not support DualStack"],
+        [k$1, o$1],
+        [a$1, "Invalid Configuration: Missing Region"]
+    ]
+};
+const root$1 = 2;
+const r$1 = 100_000_000;
+const nodes$1 = new Int32Array([
+    -1, 1, -1,
+    0, 30, 3,
+    1, 4, r$1 + 14,
+    2, 5, r$1 + 14,
+    3, 25, 6,
+    4, 24, 7,
+    5, r$1 + 1, 8,
+    6, 9, r$1 + 13,
+    7, r$1 + 1, 10,
+    10, r$1 + 1, 11,
+    11, r$1 + 1, 12,
+    12, r$1 + 1, 13,
+    13, r$1 + 1, 14,
+    14, r$1 + 1, 15,
+    15, r$1 + 1, 16,
+    16, r$1 + 1, 17,
+    17, r$1 + 1, 18,
+    18, r$1 + 1, 19,
+    19, r$1 + 1, 20,
+    20, r$1 + 1, 21,
+    21, r$1 + 1, 22,
+    22, r$1 + 1, 23,
+    23, r$1 + 1, r$1 + 2,
+    8, r$1 + 11, r$1 + 12,
+    4, 28, 26,
+    9, 27, r$1 + 10,
+    24, r$1 + 8, r$1 + 9,
+    8, 29, r$1 + 7,
+    9, r$1 + 6, r$1 + 7,
+    3, r$1 + 3, 31,
+    4, r$1 + 4, r$1 + 5,
+]);
+const bdd$1 = BinaryDecisionDiagram.from(nodes$1, root$1, _data$1.conditions, _data$1.results);
+
+const cache$1 = new EndpointCache$1({
+    size: 50,
+    params: ["Endpoint", "Region", "UseDualStack", "UseFIPS", "UseGlobalEndpoint"],
+});
+const defaultEndpointResolver$1 = (endpointParams, context = {}) => {
+    return cache$1.get(endpointParams, () => decideEndpoint(bdd$1, {
+        endpointParams: endpointParams,
+        logger: context.logger,
+    }));
+};
+customEndpointFunctions.aws = awsEndpointFunctions;
+
+const createEndpointRuleSetHttpAuthSchemeParametersProvider = (defaultHttpAuthSchemeParametersProvider) => async (config, context, input) => {
+    if (!input) {
+        throw new Error("Could not find `input` for `defaultEndpointRuleSetHttpAuthSchemeParametersProvider`");
+    }
+    const defaultParameters = await defaultHttpAuthSchemeParametersProvider(config, context, input);
+    const instructionsFn = getSmithyContext(context)?.commandInstance?.constructor
+        ?.getEndpointParameterInstructions;
+    if (!instructionsFn) {
+        throw new Error(`getEndpointParameterInstructions() is not defined on '${context.commandName}'`);
+    }
+    const endpointParameters = await resolveParams(input, { getEndpointParameterInstructions: instructionsFn }, config);
+    return Object.assign(defaultParameters, endpointParameters);
+};
+const _defaultSTSHttpAuthSchemeParametersProvider = async (config, context, input) => {
+    return {
+        operation: getSmithyContext(context).operation,
+        region: await normalizeProvider$1(config.region)() || (() => {
+            throw new Error("expected `region` to be configured for `aws.auth#sigv4`");
+        })(),
+    };
+};
+const defaultSTSHttpAuthSchemeParametersProvider = createEndpointRuleSetHttpAuthSchemeParametersProvider(_defaultSTSHttpAuthSchemeParametersProvider);
+function createAwsAuthSigv4HttpAuthOption$1(authParameters) {
+    return {
+        schemeId: "aws.auth#sigv4",
+        signingProperties: {
+            name: "sts",
+            region: authParameters.region,
+        },
+        propertiesExtractor: (config, context) => ({
+            signingProperties: {
+                config,
+                context,
+            },
+        }),
+    };
+}
+function createAwsAuthSigv4aHttpAuthOption(authParameters) {
+    return {
+        schemeId: "aws.auth#sigv4a",
+        signingProperties: {
+            name: "sts",
+            region: authParameters.region,
+        },
+        propertiesExtractor: (config, context) => ({
+            signingProperties: {
+                config,
+                context,
+            },
+        }),
+    };
+}
+function createSmithyApiNoAuthHttpAuthOption$1(authParameters) {
+    return {
+        schemeId: "smithy.api#noAuth",
+    };
+}
+const createEndpointRuleSetHttpAuthSchemeProvider = (defaultEndpointResolver, defaultHttpAuthSchemeResolver, createHttpAuthOptionFunctions) => {
+    const endpointRuleSetHttpAuthSchemeProvider = (authParameters) => {
+        const endpoint = defaultEndpointResolver(authParameters);
+        const authSchemes = endpoint.properties?.authSchemes;
+        if (!authSchemes) {
+            return defaultHttpAuthSchemeResolver(authParameters);
+        }
+        const options = [];
+        for (const scheme of authSchemes) {
+            const { name: resolvedName, properties = {}, ...rest } = scheme;
+            const name = resolvedName.toLowerCase();
+            if (resolvedName !== name) {
+                console.warn(`HttpAuthScheme has been normalized with lowercasing: '${resolvedName}' to '${name}'`);
+            }
+            let schemeId;
+            if (name === "sigv4a") {
+                schemeId = "aws.auth#sigv4a";
+                const sigv4Present = authSchemes.find((s) => {
+                    const name = s.name.toLowerCase();
+                    return name !== "sigv4a" && name.startsWith("sigv4");
+                });
+                if (SignatureV4MultiRegion.sigv4aDependency() === "none" && sigv4Present) {
+                    continue;
+                }
+            }
+            else if (name.startsWith("sigv4")) {
+                schemeId = "aws.auth#sigv4";
+            }
+            else {
+                throw new Error(`Unknown HttpAuthScheme found in '@smithy.rules#endpointRuleSet': '${name}'`);
+            }
+            const createOption = createHttpAuthOptionFunctions[schemeId];
+            if (!createOption) {
+                throw new Error(`Could not find HttpAuthOption create function for '${schemeId}'`);
+            }
+            const option = createOption(authParameters);
+            option.schemeId = schemeId;
+            option.signingProperties = { ...(option.signingProperties || {}), ...rest, ...properties };
+            options.push(option);
+        }
+        return options;
+    };
+    return endpointRuleSetHttpAuthSchemeProvider;
+};
+const _defaultSTSHttpAuthSchemeProvider = (authParameters) => {
+    const options = [];
+    switch (authParameters.operation) {
+        case "AssumeRoleWithWebIdentity": {
+            options.push(createSmithyApiNoAuthHttpAuthOption$1());
+            options.push(createAwsAuthSigv4aHttpAuthOption(authParameters));
+            break;
+        }
+        default: {
+            options.push(createAwsAuthSigv4HttpAuthOption$1(authParameters));
+            options.push(createAwsAuthSigv4aHttpAuthOption(authParameters));
+        }
+    }
+    return options;
+};
+const defaultSTSHttpAuthSchemeProvider = createEndpointRuleSetHttpAuthSchemeProvider(defaultEndpointResolver$1, _defaultSTSHttpAuthSchemeProvider, {
+    "aws.auth#sigv4": createAwsAuthSigv4HttpAuthOption$1,
+    "aws.auth#sigv4a": createAwsAuthSigv4aHttpAuthOption,
+    "smithy.api#noAuth": createSmithyApiNoAuthHttpAuthOption$1,
+});
+const resolveHttpAuthSchemeConfig$1 = (config) => {
+    const config_0 = resolveAwsSdkSigV4Config(config);
+    const config_1 = resolveAwsSdkSigV4AConfig(config_0);
+    return Object.assign(config_1, {
+        authSchemePreference: normalizeProvider$1(config.authSchemePreference ?? []),
+    });
+};
+
+const resolveClientEndpointParameters$1 = (options) => {
+    return Object.assign(options, {
+        useDualstackEndpoint: options.useDualstackEndpoint ?? false,
+        useFipsEndpoint: options.useFipsEndpoint ?? false,
+        useGlobalEndpoint: options.useGlobalEndpoint ?? false,
+        defaultSigningName: "sts",
+    });
+};
+const commonParams$1 = {
+    UseGlobalEndpoint: { type: "builtInParams", name: "useGlobalEndpoint" },
+    UseFIPS: { type: "builtInParams", name: "useFipsEndpoint" },
+    Endpoint: { type: "builtInParams", name: "endpoint" },
+    Region: { type: "builtInParams", name: "region" },
+    UseDualStack: { type: "builtInParams", name: "useDualstackEndpoint" },
+};
 
 class STSServiceException extends ServiceException {
     constructor(options) {
@@ -48790,6 +49423,7 @@ class InvalidIdentityTokenException extends STSServiceException {
 class IDPCommunicationErrorException extends STSServiceException {
     name = "IDPCommunicationErrorException";
     $fault = "client";
+    $retryable = {};
     constructor(opts) {
         super({
             name: "IDPCommunicationErrorException",
@@ -48859,132 +49493,294 @@ const _pDLT = "policyDescriptorListType";
 const _s$1 = "smithy.ts.sdk.synthetic.com.amazonaws.sts";
 const _tLT = "tagListType";
 const n0$1 = "com.amazonaws.sts";
-var accessKeySecretType = [0, n0$1, _aKST, 8, 0];
-var clientTokenType = [0, n0$1, _cTT, 8, 0];
-var AssumedRoleUser$ = [3, n0$1, _ARU, 0, [_ARI, _A], [0, 0], 2];
-var AssumeRoleRequest$ = [
-    3,
-    n0$1,
-    _ARR,
-    0,
-    [_RA, _RSN, _PA, _P, _DS, _T, _TTK, _EI, _SN, _TC, _SI, _PC],
-    [0, 0, () => policyDescriptorListType, 0, 1, () => tagListType, 64 | 0, 0, 0, 0, 0, () => ProvidedContextsListType],
-    2,
-];
-var AssumeRoleResponse$ = [
-    3,
-    n0$1,
-    _ARRs,
-    0,
-    [_C, _ARU, _PPS, _SI],
-    [[() => Credentials$, 0], () => AssumedRoleUser$, 1, 0],
-];
-var AssumeRoleWithWebIdentityRequest$ = [
-    3,
-    n0$1,
-    _ARWWIR,
-    0,
-    [_RA, _RSN, _WIT, _PI, _PA, _P, _DS],
-    [0, 0, [() => clientTokenType, 0], 0, () => policyDescriptorListType, 0, 1],
-    3,
-];
-var AssumeRoleWithWebIdentityResponse$ = [
-    3,
-    n0$1,
-    _ARWWIRs,
-    0,
-    [_C, _SFWIT, _ARU, _PPS, _Pr, _Au, _SI],
-    [[() => Credentials$, 0], 0, () => AssumedRoleUser$, 1, 0, 0, 0],
-];
-var Credentials$ = [
-    3,
-    n0$1,
-    _C,
-    0,
-    [_AKI, _SAK, _ST, _E],
-    [0, [() => accessKeySecretType, 0], 0, 4],
-    4,
-];
-var ExpiredTokenException$ = [
-    -3,
-    n0$1,
-    _ETE,
+const _s_registry$1 = TypeRegistry.for(_s$1);
+var STSServiceException$ = [-3, _s$1, "STSServiceException", 0, [], []];
+_s_registry$1.registerError(STSServiceException$, STSServiceException);
+const n0_registry$1 = TypeRegistry.for(n0$1);
+var ExpiredTokenException$ = [-3, n0$1, _ETE,
     { [_aQE]: [`ExpiredTokenException`, 400], [_e$1]: _c$1, [_hE$1]: 400 },
     [_m$1],
-    [0],
+    [0]
 ];
-TypeRegistry.for(n0$1).registerError(ExpiredTokenException$, ExpiredTokenException);
-var IDPCommunicationErrorException$ = [
-    -3,
-    n0$1,
-    _IDPCEE,
+n0_registry$1.registerError(ExpiredTokenException$, ExpiredTokenException);
+var IDPCommunicationErrorException$ = [-3, n0$1, _IDPCEE,
     { [_aQE]: [`IDPCommunicationError`, 400], [_e$1]: _c$1, [_hE$1]: 400 },
     [_m$1],
-    [0],
+    [0]
 ];
-TypeRegistry.for(n0$1).registerError(IDPCommunicationErrorException$, IDPCommunicationErrorException);
-var IDPRejectedClaimException$ = [
-    -3,
-    n0$1,
-    _IDPRCE,
+n0_registry$1.registerError(IDPCommunicationErrorException$, IDPCommunicationErrorException);
+var IDPRejectedClaimException$ = [-3, n0$1, _IDPRCE,
     { [_aQE]: [`IDPRejectedClaim`, 403], [_e$1]: _c$1, [_hE$1]: 403 },
     [_m$1],
-    [0],
+    [0]
 ];
-TypeRegistry.for(n0$1).registerError(IDPRejectedClaimException$, IDPRejectedClaimException);
-var InvalidIdentityTokenException$ = [
-    -3,
-    n0$1,
-    _IITE,
+n0_registry$1.registerError(IDPRejectedClaimException$, IDPRejectedClaimException);
+var InvalidIdentityTokenException$ = [-3, n0$1, _IITE,
     { [_aQE]: [`InvalidIdentityToken`, 400], [_e$1]: _c$1, [_hE$1]: 400 },
     [_m$1],
-    [0],
+    [0]
 ];
-TypeRegistry.for(n0$1).registerError(InvalidIdentityTokenException$, InvalidIdentityTokenException);
-var MalformedPolicyDocumentException$ = [
-    -3,
-    n0$1,
-    _MPDE,
+n0_registry$1.registerError(InvalidIdentityTokenException$, InvalidIdentityTokenException);
+var MalformedPolicyDocumentException$ = [-3, n0$1, _MPDE,
     { [_aQE]: [`MalformedPolicyDocument`, 400], [_e$1]: _c$1, [_hE$1]: 400 },
     [_m$1],
-    [0],
+    [0]
 ];
-TypeRegistry.for(n0$1).registerError(MalformedPolicyDocumentException$, MalformedPolicyDocumentException);
-var PackedPolicyTooLargeException$ = [
-    -3,
-    n0$1,
-    _PPTLE,
+n0_registry$1.registerError(MalformedPolicyDocumentException$, MalformedPolicyDocumentException);
+var PackedPolicyTooLargeException$ = [-3, n0$1, _PPTLE,
     { [_aQE]: [`PackedPolicyTooLarge`, 400], [_e$1]: _c$1, [_hE$1]: 400 },
     [_m$1],
-    [0],
+    [0]
 ];
-TypeRegistry.for(n0$1).registerError(PackedPolicyTooLargeException$, PackedPolicyTooLargeException);
-var PolicyDescriptorType$ = [3, n0$1, _PDT, 0, [_a], [0]];
-var ProvidedContext$ = [3, n0$1, _PCr, 0, [_PAr, _CA], [0, 0]];
-var RegionDisabledException$ = [
-    -3,
-    n0$1,
-    _RDE,
+n0_registry$1.registerError(PackedPolicyTooLargeException$, PackedPolicyTooLargeException);
+var RegionDisabledException$ = [-3, n0$1, _RDE,
     { [_aQE]: [`RegionDisabledException`, 403], [_e$1]: _c$1, [_hE$1]: 403 },
     [_m$1],
-    [0],
+    [0]
 ];
-TypeRegistry.for(n0$1).registerError(RegionDisabledException$, RegionDisabledException);
-var Tag$ = [3, n0$1, _Ta, 0, [_K, _V], [0, 0], 2];
-var STSServiceException$ = [-3, _s$1, "STSServiceException", 0, [], []];
-TypeRegistry.for(_s$1).registerError(STSServiceException$, STSServiceException);
-var policyDescriptorListType = [1, n0$1, _pDLT, 0, () => PolicyDescriptorType$];
-var ProvidedContextsListType = [1, n0$1, _PCLT, 0, () => ProvidedContext$];
-var tagListType = [1, n0$1, _tLT, 0, () => Tag$];
-var AssumeRole$ = [9, n0$1, _AR, 0, () => AssumeRoleRequest$, () => AssumeRoleResponse$];
-var AssumeRoleWithWebIdentity$ = [
-    9,
-    n0$1,
-    _ARWWI,
+n0_registry$1.registerError(RegionDisabledException$, RegionDisabledException);
+const errorTypeRegistries$1 = [
+    _s_registry$1,
+    n0_registry$1,
+];
+var accessKeySecretType = [0, n0$1, _aKST, 8, 0];
+var clientTokenType = [0, n0$1, _cTT, 8, 0];
+var AssumedRoleUser$ = [3, n0$1, _ARU,
     0,
-    () => AssumeRoleWithWebIdentityRequest$,
-    () => AssumeRoleWithWebIdentityResponse$,
+    [_ARI, _A],
+    [0, 0], 2
 ];
+var AssumeRoleRequest$ = [3, n0$1, _ARR,
+    0,
+    [_RA, _RSN, _PA, _P, _DS, _T, _TTK, _EI, _SN, _TC, _SI, _PC],
+    [0, 0, () => policyDescriptorListType, 0, 1, () => tagListType, 64 | 0, 0, 0, 0, 0, () => ProvidedContextsListType], 2
+];
+var AssumeRoleResponse$ = [3, n0$1, _ARRs,
+    0,
+    [_C, _ARU, _PPS, _SI],
+    [[() => Credentials$, 0], () => AssumedRoleUser$, 1, 0]
+];
+var AssumeRoleWithWebIdentityRequest$ = [3, n0$1, _ARWWIR,
+    0,
+    [_RA, _RSN, _WIT, _PI, _PA, _P, _DS],
+    [0, 0, [() => clientTokenType, 0], 0, () => policyDescriptorListType, 0, 1], 3
+];
+var AssumeRoleWithWebIdentityResponse$ = [3, n0$1, _ARWWIRs,
+    0,
+    [_C, _SFWIT, _ARU, _PPS, _Pr, _Au, _SI],
+    [[() => Credentials$, 0], 0, () => AssumedRoleUser$, 1, 0, 0, 0]
+];
+var Credentials$ = [3, n0$1, _C,
+    0,
+    [_AKI, _SAK, _ST, _E],
+    [0, [() => accessKeySecretType, 0], 0, 4], 4
+];
+var PolicyDescriptorType$ = [3, n0$1, _PDT,
+    0,
+    [_a],
+    [0]
+];
+var ProvidedContext$ = [3, n0$1, _PCr,
+    0,
+    [_PAr, _CA],
+    [0, 0]
+];
+var Tag$ = [3, n0$1, _Ta,
+    0,
+    [_K, _V],
+    [0, 0], 2
+];
+var policyDescriptorListType = [1, n0$1, _pDLT,
+    0, () => PolicyDescriptorType$
+];
+var ProvidedContextsListType = [1, n0$1, _PCLT,
+    0, () => ProvidedContext$
+];
+var tagListType = [1, n0$1, _tLT,
+    0, () => Tag$
+];
+var AssumeRole$ = [9, n0$1, _AR,
+    0, () => AssumeRoleRequest$, () => AssumeRoleResponse$
+];
+var AssumeRoleWithWebIdentity$ = [9, n0$1, _ARWWI,
+    0, () => AssumeRoleWithWebIdentityRequest$, () => AssumeRoleWithWebIdentityResponse$
+];
+
+const getRuntimeConfig$3 = (config) => {
+    return {
+        apiVersion: "2011-06-15",
+        base64Decoder: config?.base64Decoder ?? fromBase64$1,
+        base64Encoder: config?.base64Encoder ?? toBase64$1,
+        disableHostPrefix: config?.disableHostPrefix ?? false,
+        endpointProvider: config?.endpointProvider ?? defaultEndpointResolver$1,
+        extensions: config?.extensions ?? [],
+        httpAuthSchemeProvider: config?.httpAuthSchemeProvider ?? defaultSTSHttpAuthSchemeProvider,
+        httpAuthSchemes: config?.httpAuthSchemes ?? [
+            {
+                schemeId: "aws.auth#sigv4",
+                identityProvider: (ipc) => ipc.getIdentityProvider("aws.auth#sigv4"),
+                signer: new AwsSdkSigV4Signer(),
+            },
+            {
+                schemeId: "aws.auth#sigv4a",
+                identityProvider: (ipc) => ipc.getIdentityProvider("aws.auth#sigv4a"),
+                signer: new AwsSdkSigV4ASigner(),
+            },
+            {
+                schemeId: "smithy.api#noAuth",
+                identityProvider: (ipc) => ipc.getIdentityProvider("smithy.api#noAuth") || (async () => ({})),
+                signer: new NoAuthSigner(),
+            },
+        ],
+        logger: config?.logger ?? new NoOpLogger(),
+        protocol: config?.protocol ?? AwsQueryProtocol,
+        protocolSettings: config?.protocolSettings ?? {
+            defaultNamespace: "com.amazonaws.sts",
+            errorTypeRegistries: errorTypeRegistries$1,
+            xmlNamespace: "https://sts.amazonaws.com/doc/2011-06-15/",
+            version: "2011-06-15",
+            serviceTarget: "AWSSecurityTokenServiceV20110615",
+        },
+        serviceId: config?.serviceId ?? "STS",
+        signerConstructor: config?.signerConstructor ?? SignatureV4MultiRegion,
+        urlParser: config?.urlParser ?? parseUrl,
+        utf8Decoder: config?.utf8Decoder ?? fromUtf8$2,
+        utf8Encoder: config?.utf8Encoder ?? toUtf8$1,
+    };
+};
+
+const getRuntimeConfig$2 = (config) => {
+    emitWarningIfUnsupportedVersion$1(process.version);
+    const defaultsMode = resolveDefaultsModeConfig(config);
+    const defaultConfigProvider = () => defaultsMode().then(loadConfigsForDefaultMode);
+    const clientSharedValues = getRuntimeConfig$3(config);
+    emitWarningIfUnsupportedVersion(process.version);
+    const loaderConfig = {
+        profile: config?.profile,
+        logger: clientSharedValues.logger,
+    };
+    return {
+        ...clientSharedValues,
+        ...config,
+        runtime: "node",
+        defaultsMode,
+        authSchemePreference: config?.authSchemePreference ?? loadConfig(NODE_AUTH_SCHEME_PREFERENCE_OPTIONS, loaderConfig),
+        bodyLengthChecker: config?.bodyLengthChecker ?? calculateBodyLength,
+        defaultUserAgentProvider: config?.defaultUserAgentProvider ?? createDefaultUserAgentProvider({ serviceId: clientSharedValues.serviceId, clientVersion: packageInfo.version }),
+        httpAuthSchemes: config?.httpAuthSchemes ?? [
+            {
+                schemeId: "aws.auth#sigv4",
+                identityProvider: (ipc) => ipc.getIdentityProvider("aws.auth#sigv4") || (async (idProps) => await config.credentialDefaultProvider(idProps?.__config || {})()),
+                signer: new AwsSdkSigV4Signer(),
+            },
+            {
+                schemeId: "aws.auth#sigv4a",
+                identityProvider: (ipc) => ipc.getIdentityProvider("aws.auth#sigv4a"),
+                signer: new AwsSdkSigV4ASigner(),
+            },
+            {
+                schemeId: "smithy.api#noAuth",
+                identityProvider: (ipc) => ipc.getIdentityProvider("smithy.api#noAuth") || (async () => ({})),
+                signer: new NoAuthSigner(),
+            },
+        ],
+        maxAttempts: config?.maxAttempts ?? loadConfig(NODE_MAX_ATTEMPT_CONFIG_OPTIONS, config),
+        region: config?.region ?? loadConfig(NODE_REGION_CONFIG_OPTIONS, { ...NODE_REGION_CONFIG_FILE_OPTIONS, ...loaderConfig }),
+        requestHandler: NodeHttpHandler.create(config?.requestHandler ?? defaultConfigProvider),
+        retryMode: config?.retryMode ??
+            loadConfig({
+                ...NODE_RETRY_MODE_CONFIG_OPTIONS,
+                default: async () => (await defaultConfigProvider()).retryMode || DEFAULT_RETRY_MODE,
+            }, config),
+        sha256: config?.sha256 ?? Hash.bind(null, "sha256"),
+        sigv4aSigningRegionSet: config?.sigv4aSigningRegionSet ?? loadConfig(NODE_SIGV4A_CONFIG_OPTIONS, loaderConfig),
+        streamCollector: config?.streamCollector ?? streamCollector,
+        useDualstackEndpoint: config?.useDualstackEndpoint ?? loadConfig(NODE_USE_DUALSTACK_ENDPOINT_CONFIG_OPTIONS, loaderConfig),
+        useFipsEndpoint: config?.useFipsEndpoint ?? loadConfig(NODE_USE_FIPS_ENDPOINT_CONFIG_OPTIONS, loaderConfig),
+        userAgentAppId: config?.userAgentAppId ?? loadConfig(NODE_APP_ID_CONFIG_OPTIONS, loaderConfig),
+    };
+};
+
+const getHttpAuthExtensionConfiguration$1 = (runtimeConfig) => {
+    const _httpAuthSchemes = runtimeConfig.httpAuthSchemes;
+    let _httpAuthSchemeProvider = runtimeConfig.httpAuthSchemeProvider;
+    let _credentials = runtimeConfig.credentials;
+    return {
+        setHttpAuthScheme(httpAuthScheme) {
+            const index = _httpAuthSchemes.findIndex((scheme) => scheme.schemeId === httpAuthScheme.schemeId);
+            if (index === -1) {
+                _httpAuthSchemes.push(httpAuthScheme);
+            }
+            else {
+                _httpAuthSchemes.splice(index, 1, httpAuthScheme);
+            }
+        },
+        httpAuthSchemes() {
+            return _httpAuthSchemes;
+        },
+        setHttpAuthSchemeProvider(httpAuthSchemeProvider) {
+            _httpAuthSchemeProvider = httpAuthSchemeProvider;
+        },
+        httpAuthSchemeProvider() {
+            return _httpAuthSchemeProvider;
+        },
+        setCredentials(credentials) {
+            _credentials = credentials;
+        },
+        credentials() {
+            return _credentials;
+        },
+    };
+};
+const resolveHttpAuthRuntimeConfig$1 = (config) => {
+    return {
+        httpAuthSchemes: config.httpAuthSchemes(),
+        httpAuthSchemeProvider: config.httpAuthSchemeProvider(),
+        credentials: config.credentials(),
+    };
+};
+
+const resolveRuntimeExtensions$1 = (runtimeConfig, extensions) => {
+    const extensionConfiguration = Object.assign(getAwsRegionExtensionConfiguration(runtimeConfig), getDefaultExtensionConfiguration(runtimeConfig), getHttpHandlerExtensionConfiguration(runtimeConfig), getHttpAuthExtensionConfiguration$1(runtimeConfig));
+    extensions.forEach((extension) => extension.configure(extensionConfiguration));
+    return Object.assign(runtimeConfig, resolveAwsRegionExtensionConfiguration(extensionConfiguration), resolveDefaultRuntimeConfig(extensionConfiguration), resolveHttpHandlerRuntimeConfig(extensionConfiguration), resolveHttpAuthRuntimeConfig$1(extensionConfiguration));
+};
+
+class STSClient extends Client {
+    config;
+    constructor(...[configuration]) {
+        const _config_0 = getRuntimeConfig$2(configuration || {});
+        super(_config_0);
+        this.initConfig = _config_0;
+        const _config_1 = resolveClientEndpointParameters$1(_config_0);
+        const _config_2 = resolveUserAgentConfig(_config_1);
+        const _config_3 = resolveRetryConfig(_config_2);
+        const _config_4 = resolveRegionConfig(_config_3);
+        const _config_5 = resolveHostHeaderConfig(_config_4);
+        const _config_6 = resolveEndpointConfig(_config_5);
+        const _config_7 = resolveHttpAuthSchemeConfig$1(_config_6);
+        const _config_8 = resolveRuntimeExtensions$1(_config_7, configuration?.extensions || []);
+        this.config = _config_8;
+        this.middlewareStack.use(getSchemaSerdePlugin(this.config));
+        this.middlewareStack.use(getUserAgentPlugin(this.config));
+        this.middlewareStack.use(getRetryPlugin(this.config));
+        this.middlewareStack.use(getContentLengthPlugin(this.config));
+        this.middlewareStack.use(getHostHeaderPlugin(this.config));
+        this.middlewareStack.use(getLoggerPlugin(this.config));
+        this.middlewareStack.use(getRecursionDetectionPlugin(this.config));
+        this.middlewareStack.use(getHttpAuthSchemeEndpointRuleSetPlugin(this.config, {
+            httpAuthSchemeParametersProvider: defaultSTSHttpAuthSchemeParametersProvider,
+            identityProviderConfigProvider: async (config) => new DefaultIdentityProviderConfig({
+                "aws.auth#sigv4": config.credentials,
+                "aws.auth#sigv4a": config.credentials,
+            }),
+        }));
+        this.middlewareStack.use(getHttpSigningPlugin(this.config));
+    }
+    destroy() {
+        super.destroy();
+    }
+}
 
 class AssumeRoleCommand extends Command
     .classBuilder()
@@ -49159,6 +49955,7 @@ var index$1 = /*#__PURE__*/Object.freeze({
     STSServiceException$: STSServiceException$,
     Tag$: Tag$,
     __Client: Client,
+    errorTypeRegistries: errorTypeRegistries$1,
     getDefaultRoleAssumer: getDefaultRoleAssumer,
     getDefaultRoleAssumerWithWebIdentity: getDefaultRoleAssumerWithWebIdentity
 });
@@ -49166,10 +49963,9 @@ var index$1 = /*#__PURE__*/Object.freeze({
 const defaultSigninHttpAuthSchemeParametersProvider = async (config, context, input) => {
     return {
         operation: getSmithyContext(context).operation,
-        region: (await normalizeProvider$1(config.region)()) ||
-            (() => {
-                throw new Error("expected `region` to be configured for `aws.auth#sigv4`");
-            })(),
+        region: await normalizeProvider$1(config.region)() || (() => {
+            throw new Error("expected `region` to be configured for `aws.auth#sigv4`");
+        })(),
     };
 };
 function createAwsAuthSigv4HttpAuthOption(authParameters) {
@@ -49226,173 +50022,107 @@ const commonParams = {
     UseDualStack: { type: "builtInParams", name: "useDualstackEndpoint" },
 };
 
-const u = "required", v = "fn", w = "argv", x = "ref";
-const a = true, b = "isSet", c = "booleanEquals", d = "error", e = "endpoint", f = "tree", g = "PartitionResult", h = "stringEquals", i = { [u]: true, "default": false, "type": "boolean" }, j = { [u]: false, "type": "string" }, k = { [x]: "Endpoint" }, l = { [v]: c, [w]: [{ [x]: "UseFIPS" }, true] }, m = { [v]: c, [w]: [{ [x]: "UseDualStack" }, true] }, n = {}, o = { [v]: "getAttr", [w]: [{ [x]: g }, "name"] }, p = { [v]: c, [w]: [{ [x]: "UseFIPS" }, false] }, q = { [v]: c, [w]: [{ [x]: "UseDualStack" }, false] }, r = { [v]: "getAttr", [w]: [{ [x]: g }, "supportsFIPS"] }, s = { [v]: c, [w]: [true, { [v]: "getAttr", [w]: [{ [x]: g }, "supportsDualStack"] }] }, t = [{ [x]: "Region" }];
-const _data = { parameters: { UseDualStack: i, UseFIPS: i, Endpoint: j, Region: j }, rules: [{ conditions: [{ [v]: b, [w]: [k] }], rules: [{ conditions: [l], error: "Invalid Configuration: FIPS and custom endpoint are not supported", type: d }, { rules: [{ conditions: [m], error: "Invalid Configuration: Dualstack and custom endpoint are not supported", type: d }, { endpoint: { url: k, properties: n, headers: n }, type: e }], type: f }], type: f }, { rules: [{ conditions: [{ [v]: b, [w]: t }], rules: [{ conditions: [{ [v]: "aws.partition", [w]: t, assign: g }], rules: [{ conditions: [{ [v]: h, [w]: [o, "aws"] }, p, q], endpoint: { url: "https://{Region}.signin.aws.amazon.com", properties: n, headers: n }, type: e }, { conditions: [{ [v]: h, [w]: [o, "aws-cn"] }, p, q], endpoint: { url: "https://{Region}.signin.amazonaws.cn", properties: n, headers: n }, type: e }, { conditions: [{ [v]: h, [w]: [o, "aws-us-gov"] }, p, q], endpoint: { url: "https://{Region}.signin.amazonaws-us-gov.com", properties: n, headers: n }, type: e }, { conditions: [l, m], rules: [{ conditions: [{ [v]: c, [w]: [a, r] }, s], rules: [{ endpoint: { url: "https://signin-fips.{Region}.{PartitionResult#dualStackDnsSuffix}", properties: n, headers: n }, type: e }], type: f }, { error: "FIPS and DualStack are enabled, but this partition does not support one or both", type: d }], type: f }, { conditions: [l, q], rules: [{ conditions: [{ [v]: c, [w]: [r, a] }], rules: [{ endpoint: { url: "https://signin-fips.{Region}.{PartitionResult#dnsSuffix}", properties: n, headers: n }, type: e }], type: f }, { error: "FIPS is enabled but this partition does not support FIPS", type: d }], type: f }, { conditions: [p, m], rules: [{ conditions: [s], rules: [{ endpoint: { url: "https://signin.{Region}.{PartitionResult#dualStackDnsSuffix}", properties: n, headers: n }, type: e }], type: f }, { error: "DualStack is enabled but this partition does not support DualStack", type: d }], type: f }, { endpoint: { url: "https://signin.{Region}.{PartitionResult#dnsSuffix}", properties: n, headers: n }, type: e }], type: f }], type: f }, { error: "Invalid Configuration: Missing Region", type: d }], type: f }] };
-const ruleSet = _data;
+const p = "ref";
+const a = -1, b = true, c = "isSet", d = "booleanEquals", e = "PartitionResult", f = "stringEquals", g = "getAttr", h = "https://signin.{Region}.{PartitionResult#dualStackDnsSuffix}", i = { [p]: "Endpoint" }, j = { "fn": g, "argv": [{ [p]: e }, "name"] }, k = { [p]: e }, l = { [p]: "Region" }, m = { "authSchemes": [{ "name": "sigv4", "signingName": "signin", "signingRegion": "{Region}" }] }, n = {}, o = [l];
+const _data = {
+    conditions: [
+        [c, o],
+        [d, [{ fn: "coalesce", argv: [{ [p]: "IsControlPlane" }, false] }, b]],
+        [c, [i]],
+        ["aws.partition", o, e],
+        [d, [{ [p]: "UseFIPS" }, b]],
+        [d, [{ [p]: "UseDualStack" }, b]],
+        [f, [j, "aws"]],
+        [f, [j, "aws-cn"]],
+        [d, [{ fn: g, argv: [k, "supportsDualStack"] }, b]],
+        [f, [l, "us-gov-west-1"]],
+        [f, [j, "aws-us-gov"]],
+        [d, [{ fn: g, argv: [k, "supportsFIPS"] }, b]],
+        [f, [j, "aws-iso"]],
+        [f, [j, "aws-iso-b"]],
+        [f, [j, "aws-iso-f"]],
+        [f, [j, "aws-iso-e"]],
+        [f, [j, "aws-eusc"]]
+    ],
+    results: [
+        [a],
+        ["https://signin.{Region}.api.aws", m],
+        ["https://signin.{Region}.api.amazonwebservices.com.cn", m],
+        [h, m],
+        ["https://{Region}.signin.aws.amazon.com", n],
+        ["https://{Region}.signin.amazonaws.cn", n],
+        ["https://{Region}.signin.amazonaws-us-gov.com", n],
+        ["https://{Region}.signin.c2shome.ic.gov", n],
+        ["https://{Region}.signin.sc2shome.sgov.gov", n],
+        ["https://{Region}.signin.csphome.hci.ic.gov", n],
+        ["https://{Region}.signin.csphome.adc-e.uk", n],
+        ["https://{Region}.signin.amazonaws-eusc.eu", n],
+        ["https://signin-fips.amazonaws-us-gov.com", n],
+        ["https://{Region}.signin-fips.amazonaws-us-gov.com", n],
+        ["https://{Region}.signin.{PartitionResult#dnsSuffix}", n],
+        [a, "Invalid Configuration: FIPS and custom endpoint are not supported"],
+        [a, "Invalid Configuration: Dualstack and custom endpoint are not supported"],
+        [i, n],
+        ["https://signin-fips.{Region}.{PartitionResult#dualStackDnsSuffix}", n],
+        [a, "FIPS and DualStack are enabled, but this partition does not support one or both"],
+        ["https://signin-fips.{Region}.{PartitionResult#dnsSuffix}", n],
+        [a, "FIPS is enabled but this partition does not support FIPS"],
+        [h, n],
+        [a, "DualStack is enabled but this partition does not support DualStack"],
+        ["https://signin.{Region}.{PartitionResult#dnsSuffix}", n],
+        [a, "Invalid Configuration: Missing Region"]
+    ]
+};
+const root = 2;
+const r = 100_000_000;
+const nodes = new Int32Array([
+    -1, 1, -1,
+    0, 4, 3,
+    2, 30, r + 25,
+    1, 24, 5,
+    2, 30, 6,
+    3, 7, 26,
+    4, 18, 8,
+    5, 17, 9,
+    6, r + 4, 10,
+    7, r + 5, 11,
+    10, r + 6, 12,
+    12, r + 7, 13,
+    13, r + 8, 14,
+    14, r + 9, 15,
+    15, r + 10, 16,
+    16, r + 11, r + 14,
+    8, r + 22, r + 23,
+    5, 22, 19,
+    9, r + 12, 20,
+    10, r + 13, 21,
+    11, r + 20, r + 21,
+    8, 23, r + 19,
+    11, r + 18, r + 19,
+    2, 29, 25,
+    3, 32, 26,
+    4, 27, r + 25,
+    5, r + 25, 28,
+    9, r + 12, r + 25,
+    3, 32, 30,
+    4, r + 15, 31,
+    5, r + 16, r + 17,
+    6, r + 1, 33,
+    7, r + 2, r + 3,
+]);
+const bdd = BinaryDecisionDiagram.from(nodes, root, _data.conditions, _data.results);
 
-const cache = new EndpointCache({
+const cache = new EndpointCache$1({
     size: 50,
-    params: ["Endpoint", "Region", "UseDualStack", "UseFIPS"],
+    params: ["Endpoint", "IsControlPlane", "Region", "UseDualStack", "UseFIPS"],
 });
 const defaultEndpointResolver = (endpointParams, context = {}) => {
-    return cache.get(endpointParams, () => resolveEndpoint(ruleSet, {
+    return cache.get(endpointParams, () => decideEndpoint(bdd, {
         endpointParams: endpointParams,
         logger: context.logger,
     }));
 };
 customEndpointFunctions.aws = awsEndpointFunctions;
-
-const getRuntimeConfig$1 = (config) => {
-    return {
-        apiVersion: "2023-01-01",
-        base64Decoder: config?.base64Decoder ?? fromBase64,
-        base64Encoder: config?.base64Encoder ?? toBase64,
-        disableHostPrefix: config?.disableHostPrefix ?? false,
-        endpointProvider: config?.endpointProvider ?? defaultEndpointResolver,
-        extensions: config?.extensions ?? [],
-        httpAuthSchemeProvider: config?.httpAuthSchemeProvider ?? defaultSigninHttpAuthSchemeProvider,
-        httpAuthSchemes: config?.httpAuthSchemes ?? [
-            {
-                schemeId: "aws.auth#sigv4",
-                identityProvider: (ipc) => ipc.getIdentityProvider("aws.auth#sigv4"),
-                signer: new AwsSdkSigV4Signer(),
-            },
-            {
-                schemeId: "smithy.api#noAuth",
-                identityProvider: (ipc) => ipc.getIdentityProvider("smithy.api#noAuth") || (async () => ({})),
-                signer: new NoAuthSigner(),
-            },
-        ],
-        logger: config?.logger ?? new NoOpLogger(),
-        protocol: config?.protocol ?? AwsRestJsonProtocol,
-        protocolSettings: config?.protocolSettings ?? {
-            defaultNamespace: "com.amazonaws.signin",
-            version: "2023-01-01",
-            serviceTarget: "Signin",
-        },
-        serviceId: config?.serviceId ?? "Signin",
-        urlParser: config?.urlParser ?? parseUrl,
-        utf8Decoder: config?.utf8Decoder ?? fromUtf8,
-        utf8Encoder: config?.utf8Encoder ?? toUtf8,
-    };
-};
-
-const getRuntimeConfig = (config) => {
-    emitWarningIfUnsupportedVersion(process.version);
-    const defaultsMode = resolveDefaultsModeConfig(config);
-    const defaultConfigProvider = () => defaultsMode().then(loadConfigsForDefaultMode);
-    const clientSharedValues = getRuntimeConfig$1(config);
-    emitWarningIfUnsupportedVersion$1(process.version);
-    const loaderConfig = {
-        profile: config?.profile,
-        logger: clientSharedValues.logger,
-    };
-    return {
-        ...clientSharedValues,
-        ...config,
-        runtime: "node",
-        defaultsMode,
-        authSchemePreference: config?.authSchemePreference ?? loadConfig(NODE_AUTH_SCHEME_PREFERENCE_OPTIONS, loaderConfig),
-        bodyLengthChecker: config?.bodyLengthChecker ?? calculateBodyLength,
-        defaultUserAgentProvider: config?.defaultUserAgentProvider ??
-            createDefaultUserAgentProvider({ serviceId: clientSharedValues.serviceId, clientVersion: packageInfo$1.version }),
-        maxAttempts: config?.maxAttempts ?? loadConfig(NODE_MAX_ATTEMPT_CONFIG_OPTIONS, config),
-        region: config?.region ??
-            loadConfig(NODE_REGION_CONFIG_OPTIONS, { ...NODE_REGION_CONFIG_FILE_OPTIONS, ...loaderConfig }),
-        requestHandler: NodeHttpHandler.create(config?.requestHandler ?? defaultConfigProvider),
-        retryMode: config?.retryMode ??
-            loadConfig({
-                ...NODE_RETRY_MODE_CONFIG_OPTIONS,
-                default: async () => (await defaultConfigProvider()).retryMode || DEFAULT_RETRY_MODE,
-            }, config),
-        sha256: config?.sha256 ?? Hash.bind(null, "sha256"),
-        streamCollector: config?.streamCollector ?? streamCollector$1,
-        useDualstackEndpoint: config?.useDualstackEndpoint ?? loadConfig(NODE_USE_DUALSTACK_ENDPOINT_CONFIG_OPTIONS, loaderConfig),
-        useFipsEndpoint: config?.useFipsEndpoint ?? loadConfig(NODE_USE_FIPS_ENDPOINT_CONFIG_OPTIONS, loaderConfig),
-        userAgentAppId: config?.userAgentAppId ?? loadConfig(NODE_APP_ID_CONFIG_OPTIONS, loaderConfig),
-    };
-};
-
-const getHttpAuthExtensionConfiguration = (runtimeConfig) => {
-    const _httpAuthSchemes = runtimeConfig.httpAuthSchemes;
-    let _httpAuthSchemeProvider = runtimeConfig.httpAuthSchemeProvider;
-    let _credentials = runtimeConfig.credentials;
-    return {
-        setHttpAuthScheme(httpAuthScheme) {
-            const index = _httpAuthSchemes.findIndex((scheme) => scheme.schemeId === httpAuthScheme.schemeId);
-            if (index === -1) {
-                _httpAuthSchemes.push(httpAuthScheme);
-            }
-            else {
-                _httpAuthSchemes.splice(index, 1, httpAuthScheme);
-            }
-        },
-        httpAuthSchemes() {
-            return _httpAuthSchemes;
-        },
-        setHttpAuthSchemeProvider(httpAuthSchemeProvider) {
-            _httpAuthSchemeProvider = httpAuthSchemeProvider;
-        },
-        httpAuthSchemeProvider() {
-            return _httpAuthSchemeProvider;
-        },
-        setCredentials(credentials) {
-            _credentials = credentials;
-        },
-        credentials() {
-            return _credentials;
-        },
-    };
-};
-const resolveHttpAuthRuntimeConfig = (config) => {
-    return {
-        httpAuthSchemes: config.httpAuthSchemes(),
-        httpAuthSchemeProvider: config.httpAuthSchemeProvider(),
-        credentials: config.credentials(),
-    };
-};
-
-const resolveRuntimeExtensions = (runtimeConfig, extensions) => {
-    const extensionConfiguration = Object.assign(getAwsRegionExtensionConfiguration(runtimeConfig), getDefaultExtensionConfiguration(runtimeConfig), getHttpHandlerExtensionConfiguration(runtimeConfig), getHttpAuthExtensionConfiguration(runtimeConfig));
-    extensions.forEach((extension) => extension.configure(extensionConfiguration));
-    return Object.assign(runtimeConfig, resolveAwsRegionExtensionConfiguration(extensionConfiguration), resolveDefaultRuntimeConfig(extensionConfiguration), resolveHttpHandlerRuntimeConfig(extensionConfiguration), resolveHttpAuthRuntimeConfig(extensionConfiguration));
-};
-
-class SigninClient extends Client {
-    config;
-    constructor(...[configuration]) {
-        const _config_0 = getRuntimeConfig(configuration || {});
-        super(_config_0);
-        this.initConfig = _config_0;
-        const _config_1 = resolveClientEndpointParameters(_config_0);
-        const _config_2 = resolveUserAgentConfig(_config_1);
-        const _config_3 = resolveRetryConfig(_config_2);
-        const _config_4 = resolveRegionConfig(_config_3);
-        const _config_5 = resolveHostHeaderConfig(_config_4);
-        const _config_6 = resolveEndpointConfig(_config_5);
-        const _config_7 = resolveHttpAuthSchemeConfig(_config_6);
-        const _config_8 = resolveRuntimeExtensions(_config_7, configuration?.extensions || []);
-        this.config = _config_8;
-        this.middlewareStack.use(getSchemaSerdePlugin(this.config));
-        this.middlewareStack.use(getUserAgentPlugin(this.config));
-        this.middlewareStack.use(getRetryPlugin(this.config));
-        this.middlewareStack.use(getContentLengthPlugin(this.config));
-        this.middlewareStack.use(getHostHeaderPlugin(this.config));
-        this.middlewareStack.use(getLoggerPlugin(this.config));
-        this.middlewareStack.use(getRecursionDetectionPlugin(this.config));
-        this.middlewareStack.use(getHttpAuthSchemeEndpointRuleSetPlugin(this.config, {
-            httpAuthSchemeParametersProvider: defaultSigninHttpAuthSchemeParametersProvider,
-            identityProviderConfigProvider: async (config) => new DefaultIdentityProviderConfig({
-                "aws.auth#sigv4": config.credentials,
-            }),
-        }));
-        this.middlewareStack.use(getHttpSigningPlugin(this.config));
-    }
-    destroy() {
-        super.destroy();
-    }
-}
 
 class SigninServiceException extends ServiceException {
     constructor(options) {
@@ -49485,99 +50215,232 @@ const _jN = "jsonName";
 const _m = "message";
 const _rT = "refreshToken";
 const _rU = "redirectUri";
-const _s = "server";
+const _s = "smithy.ts.sdk.synthetic.com.amazonaws.signin";
 const _sAK = "secretAccessKey";
 const _sT = "sessionToken";
-const _sm = "smithy.ts.sdk.synthetic.com.amazonaws.signin";
+const _se = "server";
 const _tI = "tokenInput";
 const _tO = "tokenOutput";
 const _tT = "tokenType";
 const n0 = "com.amazonaws.signin";
+const _s_registry = TypeRegistry.for(_s);
+var SigninServiceException$ = [-3, _s, "SigninServiceException", 0, [], []];
+_s_registry.registerError(SigninServiceException$, SigninServiceException);
+const n0_registry = TypeRegistry.for(n0);
+var AccessDeniedException$ = [-3, n0, _ADE,
+    { [_e]: _c },
+    [_e, _m],
+    [0, 0], 2
+];
+n0_registry.registerError(AccessDeniedException$, AccessDeniedException);
+var InternalServerException$ = [-3, n0, _ISE,
+    { [_e]: _se, [_hE]: 500 },
+    [_e, _m],
+    [0, 0], 2
+];
+n0_registry.registerError(InternalServerException$, InternalServerException);
+var TooManyRequestsError$ = [-3, n0, _TMRE,
+    { [_e]: _c, [_hE]: 429 },
+    [_e, _m],
+    [0, 0], 2
+];
+n0_registry.registerError(TooManyRequestsError$, TooManyRequestsError);
+var ValidationException$ = [-3, n0, _VE,
+    { [_e]: _c, [_hE]: 400 },
+    [_e, _m],
+    [0, 0], 2
+];
+n0_registry.registerError(ValidationException$, ValidationException);
+const errorTypeRegistries = [
+    _s_registry,
+    n0_registry,
+];
 var RefreshToken = [0, n0, _RT, 8, 0];
-var AccessDeniedException$ = [-3, n0, _ADE, { [_e]: _c }, [_e, _m], [0, 0], 2];
-TypeRegistry.for(n0).registerError(AccessDeniedException$, AccessDeniedException);
-var AccessToken$ = [
-    3,
-    n0,
-    _AT,
+var AccessToken$ = [3, n0, _AT,
     8,
     [_aKI, _sAK, _sT],
-    [
-        [0, { [_jN]: _aKI }],
-        [0, { [_jN]: _sAK }],
-        [0, { [_jN]: _sT }],
-    ],
-    3,
+    [[0, { [_jN]: _aKI }], [0, { [_jN]: _sAK }], [0, { [_jN]: _sT }]], 3
 ];
-var CreateOAuth2TokenRequest$ = [
-    3,
-    n0,
-    _COATR,
+var CreateOAuth2TokenRequest$ = [3, n0, _COATR,
     0,
     [_tI],
-    [[() => CreateOAuth2TokenRequestBody$, 16]],
-    1,
+    [[() => CreateOAuth2TokenRequestBody$, 16]], 1
 ];
-var CreateOAuth2TokenRequestBody$ = [
-    3,
-    n0,
-    _COATRB,
+var CreateOAuth2TokenRequestBody$ = [3, n0, _COATRB,
     0,
     [_cI, _gT, _co, _rU, _cV, _rT],
-    [
-        [0, { [_jN]: _cI }],
-        [0, { [_jN]: _gT }],
-        0,
-        [0, { [_jN]: _rU }],
-        [0, { [_jN]: _cV }],
-        [() => RefreshToken, { [_jN]: _rT }],
-    ],
-    2,
+    [[0, { [_jN]: _cI }], [0, { [_jN]: _gT }], 0, [0, { [_jN]: _rU }], [0, { [_jN]: _cV }], [() => RefreshToken, { [_jN]: _rT }]], 2
 ];
-var CreateOAuth2TokenResponse$ = [
-    3,
-    n0,
-    _COATRr,
+var CreateOAuth2TokenResponse$ = [3, n0, _COATRr,
     0,
     [_tO],
-    [[() => CreateOAuth2TokenResponseBody$, 16]],
-    1,
+    [[() => CreateOAuth2TokenResponseBody$, 16]], 1
 ];
-var CreateOAuth2TokenResponseBody$ = [
-    3,
-    n0,
-    _COATRBr,
+var CreateOAuth2TokenResponseBody$ = [3, n0, _COATRBr,
     0,
     [_aT, _tT, _eI, _rT, _iT],
-    [
-        [() => AccessToken$, { [_jN]: _aT }],
-        [0, { [_jN]: _tT }],
-        [1, { [_jN]: _eI }],
-        [() => RefreshToken, { [_jN]: _rT }],
-        [0, { [_jN]: _iT }],
-    ],
-    4,
+    [[() => AccessToken$, { [_jN]: _aT }], [0, { [_jN]: _tT }], [1, { [_jN]: _eI }], [() => RefreshToken, { [_jN]: _rT }], [0, { [_jN]: _iT }]], 4
 ];
-var InternalServerException$ = [-3, n0, _ISE, { [_e]: _s, [_hE]: 500 }, [_e, _m], [0, 0], 2];
-TypeRegistry.for(n0).registerError(InternalServerException$, InternalServerException);
-var TooManyRequestsError$ = [-3, n0, _TMRE, { [_e]: _c, [_hE]: 429 }, [_e, _m], [0, 0], 2];
-TypeRegistry.for(n0).registerError(TooManyRequestsError$, TooManyRequestsError);
-var ValidationException$ = [-3, n0, _VE, { [_e]: _c, [_hE]: 400 }, [_e, _m], [0, 0], 2];
-TypeRegistry.for(n0).registerError(ValidationException$, ValidationException);
-var SigninServiceException$ = [-3, _sm, "SigninServiceException", 0, [], []];
-TypeRegistry.for(_sm).registerError(SigninServiceException$, SigninServiceException);
-var CreateOAuth2Token$ = [
-    9,
-    n0,
-    _COAT,
-    { [_h]: ["POST", "/v1/token", 200] },
-    () => CreateOAuth2TokenRequest$,
-    () => CreateOAuth2TokenResponse$,
+var CreateOAuth2Token$ = [9, n0, _COAT,
+    { [_h]: ["POST", "/v1/token", 200] }, () => CreateOAuth2TokenRequest$, () => CreateOAuth2TokenResponse$
 ];
+
+const getRuntimeConfig$1 = (config) => {
+    return {
+        apiVersion: "2023-01-01",
+        base64Decoder: config?.base64Decoder ?? fromBase64$1,
+        base64Encoder: config?.base64Encoder ?? toBase64$1,
+        disableHostPrefix: config?.disableHostPrefix ?? false,
+        endpointProvider: config?.endpointProvider ?? defaultEndpointResolver,
+        extensions: config?.extensions ?? [],
+        httpAuthSchemeProvider: config?.httpAuthSchemeProvider ?? defaultSigninHttpAuthSchemeProvider,
+        httpAuthSchemes: config?.httpAuthSchemes ?? [
+            {
+                schemeId: "aws.auth#sigv4",
+                identityProvider: (ipc) => ipc.getIdentityProvider("aws.auth#sigv4"),
+                signer: new AwsSdkSigV4Signer(),
+            },
+            {
+                schemeId: "smithy.api#noAuth",
+                identityProvider: (ipc) => ipc.getIdentityProvider("smithy.api#noAuth") || (async () => ({})),
+                signer: new NoAuthSigner(),
+            },
+        ],
+        logger: config?.logger ?? new NoOpLogger(),
+        protocol: config?.protocol ?? AwsRestJsonProtocol,
+        protocolSettings: config?.protocolSettings ?? {
+            defaultNamespace: "com.amazonaws.signin",
+            errorTypeRegistries,
+            version: "2023-01-01",
+            serviceTarget: "Signin",
+        },
+        serviceId: config?.serviceId ?? "Signin",
+        urlParser: config?.urlParser ?? parseUrl,
+        utf8Decoder: config?.utf8Decoder ?? fromUtf8$2,
+        utf8Encoder: config?.utf8Encoder ?? toUtf8$1,
+    };
+};
+
+const getRuntimeConfig = (config) => {
+    emitWarningIfUnsupportedVersion$1(process.version);
+    const defaultsMode = resolveDefaultsModeConfig(config);
+    const defaultConfigProvider = () => defaultsMode().then(loadConfigsForDefaultMode);
+    const clientSharedValues = getRuntimeConfig$1(config);
+    emitWarningIfUnsupportedVersion(process.version);
+    const loaderConfig = {
+        profile: config?.profile,
+        logger: clientSharedValues.logger,
+    };
+    return {
+        ...clientSharedValues,
+        ...config,
+        runtime: "node",
+        defaultsMode,
+        authSchemePreference: config?.authSchemePreference ?? loadConfig(NODE_AUTH_SCHEME_PREFERENCE_OPTIONS, loaderConfig),
+        bodyLengthChecker: config?.bodyLengthChecker ?? calculateBodyLength,
+        defaultUserAgentProvider: config?.defaultUserAgentProvider ?? createDefaultUserAgentProvider({ serviceId: clientSharedValues.serviceId, clientVersion: packageInfo.version }),
+        maxAttempts: config?.maxAttempts ?? loadConfig(NODE_MAX_ATTEMPT_CONFIG_OPTIONS, config),
+        region: config?.region ?? loadConfig(NODE_REGION_CONFIG_OPTIONS, { ...NODE_REGION_CONFIG_FILE_OPTIONS, ...loaderConfig }),
+        requestHandler: NodeHttpHandler.create(config?.requestHandler ?? defaultConfigProvider),
+        retryMode: config?.retryMode ??
+            loadConfig({
+                ...NODE_RETRY_MODE_CONFIG_OPTIONS,
+                default: async () => (await defaultConfigProvider()).retryMode || DEFAULT_RETRY_MODE,
+            }, config),
+        sha256: config?.sha256 ?? Hash.bind(null, "sha256"),
+        streamCollector: config?.streamCollector ?? streamCollector,
+        useDualstackEndpoint: config?.useDualstackEndpoint ?? loadConfig(NODE_USE_DUALSTACK_ENDPOINT_CONFIG_OPTIONS, loaderConfig),
+        useFipsEndpoint: config?.useFipsEndpoint ?? loadConfig(NODE_USE_FIPS_ENDPOINT_CONFIG_OPTIONS, loaderConfig),
+        userAgentAppId: config?.userAgentAppId ?? loadConfig(NODE_APP_ID_CONFIG_OPTIONS, loaderConfig),
+    };
+};
+
+const getHttpAuthExtensionConfiguration = (runtimeConfig) => {
+    const _httpAuthSchemes = runtimeConfig.httpAuthSchemes;
+    let _httpAuthSchemeProvider = runtimeConfig.httpAuthSchemeProvider;
+    let _credentials = runtimeConfig.credentials;
+    return {
+        setHttpAuthScheme(httpAuthScheme) {
+            const index = _httpAuthSchemes.findIndex((scheme) => scheme.schemeId === httpAuthScheme.schemeId);
+            if (index === -1) {
+                _httpAuthSchemes.push(httpAuthScheme);
+            }
+            else {
+                _httpAuthSchemes.splice(index, 1, httpAuthScheme);
+            }
+        },
+        httpAuthSchemes() {
+            return _httpAuthSchemes;
+        },
+        setHttpAuthSchemeProvider(httpAuthSchemeProvider) {
+            _httpAuthSchemeProvider = httpAuthSchemeProvider;
+        },
+        httpAuthSchemeProvider() {
+            return _httpAuthSchemeProvider;
+        },
+        setCredentials(credentials) {
+            _credentials = credentials;
+        },
+        credentials() {
+            return _credentials;
+        },
+    };
+};
+const resolveHttpAuthRuntimeConfig = (config) => {
+    return {
+        httpAuthSchemes: config.httpAuthSchemes(),
+        httpAuthSchemeProvider: config.httpAuthSchemeProvider(),
+        credentials: config.credentials(),
+    };
+};
+
+const resolveRuntimeExtensions = (runtimeConfig, extensions) => {
+    const extensionConfiguration = Object.assign(getAwsRegionExtensionConfiguration(runtimeConfig), getDefaultExtensionConfiguration(runtimeConfig), getHttpHandlerExtensionConfiguration(runtimeConfig), getHttpAuthExtensionConfiguration(runtimeConfig));
+    extensions.forEach((extension) => extension.configure(extensionConfiguration));
+    return Object.assign(runtimeConfig, resolveAwsRegionExtensionConfiguration(extensionConfiguration), resolveDefaultRuntimeConfig(extensionConfiguration), resolveHttpHandlerRuntimeConfig(extensionConfiguration), resolveHttpAuthRuntimeConfig(extensionConfiguration));
+};
+
+class SigninClient extends Client {
+    config;
+    constructor(...[configuration]) {
+        const _config_0 = getRuntimeConfig(configuration || {});
+        super(_config_0);
+        this.initConfig = _config_0;
+        const _config_1 = resolveClientEndpointParameters(_config_0);
+        const _config_2 = resolveUserAgentConfig(_config_1);
+        const _config_3 = resolveRetryConfig(_config_2);
+        const _config_4 = resolveRegionConfig(_config_3);
+        const _config_5 = resolveHostHeaderConfig(_config_4);
+        const _config_6 = resolveEndpointConfig(_config_5);
+        const _config_7 = resolveHttpAuthSchemeConfig(_config_6);
+        const _config_8 = resolveRuntimeExtensions(_config_7, configuration?.extensions || []);
+        this.config = _config_8;
+        this.middlewareStack.use(getSchemaSerdePlugin(this.config));
+        this.middlewareStack.use(getUserAgentPlugin(this.config));
+        this.middlewareStack.use(getRetryPlugin(this.config));
+        this.middlewareStack.use(getContentLengthPlugin(this.config));
+        this.middlewareStack.use(getHostHeaderPlugin(this.config));
+        this.middlewareStack.use(getLoggerPlugin(this.config));
+        this.middlewareStack.use(getRecursionDetectionPlugin(this.config));
+        this.middlewareStack.use(getHttpAuthSchemeEndpointRuleSetPlugin(this.config, {
+            httpAuthSchemeParametersProvider: defaultSigninHttpAuthSchemeParametersProvider,
+            identityProviderConfigProvider: async (config) => new DefaultIdentityProviderConfig({
+                "aws.auth#sigv4": config.credentials,
+            }),
+        }));
+        this.middlewareStack.use(getHttpSigningPlugin(this.config));
+    }
+    destroy() {
+        super.destroy();
+    }
+}
 
 class CreateOAuth2TokenCommand extends Command
     .classBuilder()
-    .ep(commonParams)
+    .ep({
+    ...commonParams,
+    IsControlPlane: { type: "staticContextParams", value: false },
+})
     .m(function (Command, cs, config, o) {
     return [getEndpointPlugin(config, Command.getEndpointParameterInstructions())];
 })
@@ -49608,6 +50471,7 @@ var index = /*#__PURE__*/Object.freeze({
     TooManyRequestsError$: TooManyRequestsError$,
     ValidationException: ValidationException,
     ValidationException$: ValidationException$,
-    __Client: Client
+    __Client: Client,
+    errorTypeRegistries: errorTypeRegistries
 });
 //# sourceMappingURL=index.js.map
