@@ -27,10 +27,7 @@ import {
   run,
 } from './run';
 
-const createTestJob = (
-  appPath: string,
-  dependencies: string[] = [],
-): Job => ({
+const createTestJob = (appPath: string, dependencies: string[] = []): Job => ({
   app: {
     depends_on: dependencies,
     metadata: {},
