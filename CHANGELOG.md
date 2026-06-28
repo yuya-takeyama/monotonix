@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## [0.0.10] - 2026-06-29
+
+### Fixed
+
+- Fetch all pull request files when filtering jobs by changed files [#237](https://github.com/yuya-takeyama/monotonix/pull/237)
+
 ## [0.0.9] - 2026-06-28
 
 ### Added
