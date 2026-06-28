@@ -37978,10 +37978,11 @@ const run = async ({ githubToken, jobs }) => {
     switch (context.eventName) {
         case 'pull_request':
         case 'pull_request_target': {
-            const { data: files } = await octokit.rest.pulls.listFiles({
+            const files = await octokit.paginate(octokit.rest.pulls.listFiles, {
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 pull_number: context.issue.number,
+                per_page: 100,
             });
             const changedFiles = files.map(file => file.filename);
             return jobs.filter(job => {

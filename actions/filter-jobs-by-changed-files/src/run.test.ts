@@ -1,10 +1,69 @@
 import { Job } from '@monotonix/schema';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const githubMocks = vi.hoisted(() => ({
+  context: {
+    eventName: 'pull_request',
+    repo: { owner: 'owner', repo: 'repo' },
+    issue: { number: 123 },
+    sha: 'abc123',
+  },
+  getOctokit: vi.fn(),
+  paginate: vi.fn(),
+  listFiles: vi.fn(),
+  getCommit: vi.fn(),
+}));
+
+vi.mock('@actions/github', () => ({
+  context: githubMocks.context,
+  getOctokit: githubMocks.getOctokit,
+}));
+
 import {
   jobMatchesChangedFiles,
   matchesDependency,
   PathInfo,
   resolveDependencyPaths,
+  run,
 } from './run';
+
+const createTestJob = (appPath: string, dependencies: string[] = []): Job => ({
+  app: {
+    depends_on: dependencies,
+    metadata: {},
+  },
+  context: {
+    dedupe_key: 'test',
+    github_ref: 'refs/heads/main',
+    app_path: appPath,
+    root_dir: 'apps',
+    job_key: 'build',
+    last_commit: { hash: 'abc123', timestamp: 123456 },
+    label: `${appPath} / build`,
+  },
+  on: { push: null },
+  configs: {},
+  params: {},
+  metadata: {},
+});
+
+beforeEach(() => {
+  githubMocks.context.eventName = 'pull_request';
+  githubMocks.context.repo = { owner: 'owner', repo: 'repo' };
+  githubMocks.context.issue = { number: 123 };
+  githubMocks.context.sha = 'abc123';
+  githubMocks.paginate.mockReset();
+  githubMocks.listFiles.mockReset();
+  githubMocks.getCommit.mockReset();
+  githubMocks.getOctokit.mockReset();
+  githubMocks.getOctokit.mockReturnValue({
+    paginate: githubMocks.paginate,
+    rest: {
+      pulls: { listFiles: githubMocks.listFiles },
+      repos: { getCommit: githubMocks.getCommit },
+    },
+  });
+});
 
 describe('matchesDependency', () => {
   describe('directory dependencies', () => {
@@ -132,29 +191,6 @@ describe('resolveDependencyPaths', () => {
 });
 
 describe('jobMatchesChangedFiles', () => {
-  const createTestJob = (
-    appPath: string,
-    dependencies: string[] = [],
-  ): Job => ({
-    app: {
-      depends_on: dependencies,
-      metadata: {},
-    },
-    context: {
-      dedupe_key: 'test',
-      github_ref: 'refs/heads/main',
-      app_path: appPath,
-      root_dir: 'apps',
-      job_key: 'build',
-      last_commit: { hash: 'abc123', timestamp: 123456 },
-      label: 'test-app / build',
-    },
-    on: { push: null },
-    configs: {},
-    params: {},
-    metadata: {},
-  });
-
   it('matches when files are within app path', () => {
     const job = createTestJob('apps/foo');
     const changedFiles = ['apps/foo/main.go', 'apps/bar/main.go'];
@@ -228,5 +264,32 @@ describe('jobMatchesChangedFiles', () => {
     expect(jobMatchesChangedFiles(job, changedFiles, dependencyPathInfos)).toBe(
       false,
     );
+  });
+});
+
+describe('run', () => {
+  it('uses all paginated pull request files when filtering jobs', async () => {
+    githubMocks.paginate.mockResolvedValue([
+      ...Array.from({ length: 30 }, (_, index) => ({
+        filename: `docs/file-${index + 1}.md`,
+      })),
+      { filename: 'apps/late-match/main.go' },
+    ]);
+
+    const matchingJob = createTestJob('apps/late-match');
+    const nonMatchingJob = createTestJob('apps/not-changed');
+    const result = await run({
+      githubToken: 'token',
+      jobs: [matchingJob, nonMatchingJob],
+    });
+
+    expect(githubMocks.paginate).toHaveBeenCalledWith(githubMocks.listFiles, {
+      owner: 'owner',
+      repo: 'repo',
+      pull_number: 123,
+      per_page: 100,
+    });
+    expect(githubMocks.listFiles).not.toHaveBeenCalled();
+    expect(result).toEqual([matchingJob]);
   });
 });
