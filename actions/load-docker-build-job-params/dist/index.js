@@ -49275,7 +49275,7 @@ const DockerBuildGlobalConfigSchema = GlobalConfigSchema.extend({
                     })),
                     repositories: record(string(), object({
                         type: _enum(['private', 'public']).default('private'),
-                        base_url: string(),
+                        base_url: string().min(1),
                     })),
                 })
                     .optional(),
@@ -49285,7 +49285,7 @@ const DockerBuildGlobalConfigSchema = GlobalConfigSchema.extend({
                         service_account: string(),
                     })),
                     repositories: record(string(), object({
-                        base_url: string(),
+                        base_url: string().min(1),
                     })),
                 })
                     .optional(),
@@ -49390,14 +49390,14 @@ const resolveRepositoryBaseUrl = (globalConfig, inputJob) => {
         case 'aws': {
             const repository = registries.aws?.repositories[registry.aws.repository];
             if (!repository) {
-                throw new Error(`Repository not found from Global Config: ${registry.aws.repository}`);
+                throw new Error(`Repository not found from Global Config: ${registry.aws.repository} (aws)`);
             }
             return repository.base_url;
         }
         case 'gcp': {
             const repository = registries.gcp?.repositories[registry.gcp.repository];
             if (!repository) {
-                throw new Error(`Repository not found from Global Config: ${registry.gcp.repository}`);
+                throw new Error(`Repository not found from Global Config: ${registry.gcp.repository} (gcp)`);
             }
             return repository.base_url;
         }
@@ -49431,6 +49431,7 @@ function run({ globalConfig, jobs, context, timezone, }) {
             params: {
                 ...job.params,
                 docker_build: {
+                    // registry must be resolved before tags: resolveRegistry reports a missing provider section clearly, while generateImageReferences would blame the repository key
                     registry: resolveRegistry(globalConfig, localDockerBuildConfig.registry),
                     context: resolvedContext,
                     ...(resolvedDockerfile && { dockerfile: resolvedDockerfile }),
@@ -49456,11 +49457,11 @@ function resolveRegistry(globalConfig, registry) {
             }
             const repository = awsConfig.repositories[registry.aws.repository];
             if (!repository) {
-                throw new Error(`Repository not found from Global Config: ${registry.aws.repository}`);
+                throw new Error(`Repository not found from Global Config: ${registry.aws.repository} (aws)`);
             }
             const iam = awsConfig.iams[registry.aws.iam];
             if (!iam) {
-                throw new Error(`IAM not found from Global Config: ${registry.aws.iam}`);
+                throw new Error(`IAM not found from Global Config: ${registry.aws.iam} (aws)`);
             }
             return {
                 type: 'aws',
@@ -49482,11 +49483,11 @@ function resolveRegistry(globalConfig, registry) {
             }
             const repository = gcpConfig.repositories[registry.gcp.repository];
             if (!repository) {
-                throw new Error(`Repository not found from Global Config: ${registry.gcp.repository}`);
+                throw new Error(`Repository not found from Global Config: ${registry.gcp.repository} (gcp)`);
             }
             const iam = gcpConfig.iams[registry.gcp.iam];
             if (!iam) {
-                throw new Error(`IAM not found from Global Config: ${registry.gcp.iam}`);
+                throw new Error(`IAM not found from Global Config: ${registry.gcp.iam} (gcp)`);
             }
             return {
                 type: 'gcp',
