@@ -46476,6 +46476,75 @@ const $ZodUnion = /*@__PURE__*/ $constructor("$ZodUnion", (inst, def) => {
         });
     };
 });
+const $ZodDiscriminatedUnion = 
+/*@__PURE__*/
+$constructor("$ZodDiscriminatedUnion", (inst, def) => {
+    def.inclusive = false;
+    $ZodUnion.init(inst, def);
+    const _super = inst._zod.parse;
+    defineLazy(inst._zod, "propValues", () => {
+        const propValues = {};
+        for (const option of def.options) {
+            const pv = option._zod.propValues;
+            if (!pv || Object.keys(pv).length === 0)
+                throw new Error(`Invalid discriminated union option at index "${def.options.indexOf(option)}"`);
+            for (const [k, v] of Object.entries(pv)) {
+                if (!propValues[k])
+                    propValues[k] = new Set();
+                for (const val of v) {
+                    propValues[k].add(val);
+                }
+            }
+        }
+        return propValues;
+    });
+    const disc = cached(() => {
+        const opts = def.options;
+        const map = new Map();
+        for (const o of opts) {
+            const values = o._zod.propValues?.[def.discriminator];
+            if (!values || values.size === 0)
+                throw new Error(`Invalid discriminated union option at index "${def.options.indexOf(o)}"`);
+            for (const v of values) {
+                if (map.has(v)) {
+                    throw new Error(`Duplicate discriminator value "${String(v)}"`);
+                }
+                map.set(v, o);
+            }
+        }
+        return map;
+    });
+    inst._zod.parse = (payload, ctx) => {
+        const input = payload.value;
+        if (!isObject(input)) {
+            payload.issues.push({
+                code: "invalid_type",
+                expected: "object",
+                input,
+                inst,
+            });
+            return payload;
+        }
+        const opt = disc.value.get(input?.[def.discriminator]);
+        if (opt) {
+            return opt._zod.run(payload, ctx);
+        }
+        if (def.unionFallback) {
+            return _super(payload, ctx);
+        }
+        // no matching discriminator
+        payload.issues.push({
+            code: "invalid_union",
+            errors: [],
+            note: "No matching discriminator",
+            discriminator: def.discriminator,
+            input,
+            path: [def.discriminator],
+            inst,
+        });
+        return payload;
+    };
+});
 const $ZodIntersection = /*@__PURE__*/ $constructor("$ZodIntersection", (inst, def) => {
     $ZodType.init(inst, def);
     inst._zod.parse = (payload, ctx) => {
@@ -48839,6 +48908,19 @@ function union(options, params) {
         ...normalizeParams(params),
     });
 }
+const ZodDiscriminatedUnion = /*@__PURE__*/ $constructor("ZodDiscriminatedUnion", (inst, def) => {
+    ZodUnion.init(inst, def);
+    $ZodDiscriminatedUnion.init(inst, def);
+});
+function discriminatedUnion(discriminator, options, params) {
+    // const [options, params] = args;
+    return new ZodDiscriminatedUnion({
+        type: "union",
+        options,
+        discriminator,
+        ...normalizeParams(params),
+    });
+}
 const ZodIntersection = /*@__PURE__*/ $constructor("ZodIntersection", (inst, def) => {
     $ZodIntersection.init(inst, def);
     ZodType.init(inst, def);
@@ -49195,21 +49277,42 @@ const DockerBuildGlobalConfigSchema = GlobalConfigSchema.extend({
                         type: _enum(['private', 'public']).default('private'),
                         base_url: string(),
                     })),
-                }),
+                })
+                    .optional(),
+                gcp: object({
+                    iams: record(string(), object({
+                        workload_identity_provider: string(),
+                        service_account: string(),
+                    })),
+                    repositories: record(string(), object({
+                        base_url: string(),
+                    })),
+                })
+                    .optional(),
             }),
         }),
     }),
 });
+const InputRegistrySchema = discriminatedUnion('type', [
+    object({
+        type: literal('aws'),
+        aws: object({
+            iam: string(),
+            repository: string(),
+        }),
+    }),
+    object({
+        type: literal('gcp'),
+        gcp: object({
+            iam: string(),
+            repository: string(),
+        }),
+    }),
+]);
 const InputJobSchema = JobSchema.extend({
     configs: JobSchema.shape.configs.extend({
         docker_build: object({
-            registry: object({
-                type: literal('aws'),
-                aws: object({
-                    iam: string(),
-                    repository: string(),
-                }),
-            }),
+            registry: InputRegistrySchema,
             tagging: _enum(['always_latest', 'semver_datetime', 'pull_request']),
             platforms: array(string()),
             context: string().optional(),
@@ -49218,21 +49321,36 @@ const InputJobSchema = JobSchema.extend({
     }),
 });
 const InputJobsSchema = array(InputJobSchema);
+const OutputRegistrySchema = discriminatedUnion('type', [
+    object({
+        type: literal('aws'),
+        aws: object({
+            iam: object({
+                role: string(),
+                region: string(),
+            }),
+            repository: object({
+                type: _enum(['private', 'public']),
+            }),
+        }),
+    }),
+    object({
+        type: literal('gcp'),
+        gcp: object({
+            iam: object({
+                workload_identity_provider: string(),
+                service_account: string(),
+            }),
+            repository: object({
+                host: string(),
+            }),
+        }),
+    }),
+]);
 InputJobSchema.extend({
     params: InputJobSchema.shape.params.extend({
         docker_build: object({
-            registry: object({
-                type: literal('aws'),
-                aws: object({
-                    iam: object({
-                        role: string(),
-                        region: string(),
-                    }),
-                    repository: object({
-                        type: _enum(['private', 'public']),
-                    }),
-                }),
-            }),
+            registry: OutputRegistrySchema,
             context: string(),
             dockerfile: string().optional(),
             tags: string(),
@@ -49247,35 +49365,43 @@ function loadGlobalConfig(globalConfigFilePath) {
 }
 
 const generateImageReferences = ({ context, globalConfig, inputJob, timezone, }) => {
-    const registry = inputJob.configs.docker_build.registry;
-    if (registry.type === 'aws') {
-        const repository = globalConfig.job_types.docker_build.registries.aws.repositories[inputJob.configs.docker_build.registry.aws.repository];
-        if (!repository) {
-            throw new Error(`Repository not found from Global Config: ${inputJob.configs.docker_build.registry.aws.repository}`);
-        }
-        switch (inputJob.configs.docker_build.tagging) {
-            case 'always_latest':
-                return [
-                    `${join(repository.base_url, extractAppLabel(inputJob.context.app_path, inputJob.context.root_dir))}:latest`,
-                ];
-            case 'semver_datetime': {
-                const timestamp = getCommittedAt(context);
-                return [
-                    `${join(repository.base_url, extractAppLabel(inputJob.context.app_path, inputJob.context.root_dir))}:${generateSemverDatetimeTag(timestamp, timezone)}`,
-                ];
+    const baseUrl = resolveRepositoryBaseUrl(globalConfig, inputJob);
+    const imageName = join(baseUrl, extractAppLabel(inputJob.context.app_path, inputJob.context.root_dir));
+    switch (inputJob.configs.docker_build.tagging) {
+        case 'always_latest':
+            return [`${imageName}:latest`];
+        case 'semver_datetime':
+            return [
+                `${imageName}:${generateSemverDatetimeTag(getCommittedAt(context), timezone)}`,
+            ];
+        case 'pull_request':
+            if (!context.payload.pull_request) {
+                throw new Error(`Tagging strategy "pull_request" requires a pull request`);
             }
-            case 'pull_request':
-                if (!context.payload.pull_request) {
-                    throw new Error(`Tagging strategy "pull_request" requires a pull request`);
-                }
-                return [
-                    `${join(repository.base_url, extractAppLabel(inputJob.context.app_path, inputJob.context.root_dir))}:pr-${context.payload.pull_request.number}`,
-                ];
-            default:
-                throw new Error(`Unsupported tagging: ${inputJob.configs.docker_build.tagging} for environment: ${registry.type}`);
+            return [`${imageName}:pr-${context.payload.pull_request.number}`];
+        default:
+            throw new Error(`Unsupported tagging: ${inputJob.configs.docker_build.tagging}`);
+    }
+};
+const resolveRepositoryBaseUrl = (globalConfig, inputJob) => {
+    const registry = inputJob.configs.docker_build.registry;
+    const registries = globalConfig.job_types.docker_build.registries;
+    switch (registry.type) {
+        case 'aws': {
+            const repository = registries.aws?.repositories[registry.aws.repository];
+            if (!repository) {
+                throw new Error(`Repository not found from Global Config: ${registry.aws.repository}`);
+            }
+            return repository.base_url;
+        }
+        case 'gcp': {
+            const repository = registries.gcp?.repositories[registry.gcp.repository];
+            if (!repository) {
+                throw new Error(`Repository not found from Global Config: ${registry.gcp.repository}`);
+            }
+            return repository.base_url;
         }
     }
-    throw new Error(`Unsupported environment: ${registry.type}`);
 };
 const generateSemverDatetimeTag = (timestamp, timezone) => {
     const datetime = DateTime.fromSeconds(timestamp).setZone(timezone);
@@ -49294,14 +49420,6 @@ function getCommittedAt(context) {
 function run({ globalConfig, jobs, context, timezone, }) {
     return jobs.map((job) => {
         const localDockerBuildConfig = job.configs.docker_build;
-        const repository = globalConfig.job_types.docker_build.registries.aws.repositories[localDockerBuildConfig.registry.aws.repository];
-        if (!repository) {
-            throw new Error(`Repository not found from Global Config: ${localDockerBuildConfig.registry.aws.repository}`);
-        }
-        const iam = globalConfig.job_types.docker_build.registries.aws.iams[localDockerBuildConfig.registry.aws.repository];
-        if (!iam) {
-            throw new Error(`IAM not found from Global Config: ${localDockerBuildConfig.registry.aws.iam}`);
-        }
         const resolvedContext = localDockerBuildConfig.context
             ? resolvePath(localDockerBuildConfig.context, job.context.app_path)
             : job.context.app_path;
@@ -49313,18 +49431,7 @@ function run({ globalConfig, jobs, context, timezone, }) {
             params: {
                 ...job.params,
                 docker_build: {
-                    registry: {
-                        type: 'aws',
-                        aws: {
-                            iam: {
-                                role: iam.role,
-                                region: iam.region,
-                            },
-                            repository: {
-                                type: repository.type,
-                            },
-                        },
-                    },
+                    registry: resolveRegistry(globalConfig, localDockerBuildConfig.registry),
                     context: resolvedContext,
                     ...(resolvedDockerfile && { dockerfile: resolvedDockerfile }),
                     tags: generateImageReferences({
@@ -49338,6 +49445,63 @@ function run({ globalConfig, jobs, context, timezone, }) {
             },
         };
     });
+}
+function resolveRegistry(globalConfig, registry) {
+    const registries = globalConfig.job_types.docker_build.registries;
+    switch (registry.type) {
+        case 'aws': {
+            const awsConfig = registries.aws;
+            if (!awsConfig) {
+                throw new Error(`Registry provider not configured in Global Config: aws`);
+            }
+            const repository = awsConfig.repositories[registry.aws.repository];
+            if (!repository) {
+                throw new Error(`Repository not found from Global Config: ${registry.aws.repository}`);
+            }
+            const iam = awsConfig.iams[registry.aws.iam];
+            if (!iam) {
+                throw new Error(`IAM not found from Global Config: ${registry.aws.iam}`);
+            }
+            return {
+                type: 'aws',
+                aws: {
+                    iam: {
+                        role: iam.role,
+                        region: iam.region,
+                    },
+                    repository: {
+                        type: repository.type,
+                    },
+                },
+            };
+        }
+        case 'gcp': {
+            const gcpConfig = registries.gcp;
+            if (!gcpConfig) {
+                throw new Error(`Registry provider not configured in Global Config: gcp`);
+            }
+            const repository = gcpConfig.repositories[registry.gcp.repository];
+            if (!repository) {
+                throw new Error(`Repository not found from Global Config: ${registry.gcp.repository}`);
+            }
+            const iam = gcpConfig.iams[registry.gcp.iam];
+            if (!iam) {
+                throw new Error(`IAM not found from Global Config: ${registry.gcp.iam}`);
+            }
+            return {
+                type: 'gcp',
+                gcp: {
+                    iam: {
+                        workload_identity_provider: iam.workload_identity_provider,
+                        service_account: iam.service_account,
+                    },
+                    repository: {
+                        host: repository.base_url.split('/')[0],
+                    },
+                },
+            };
+        }
+    }
 }
 
 try {
