@@ -18,7 +18,7 @@
     "@monotonix/dynamodb-common": "workspace:*",
     "@monotonix/schema": "workspace:*",
     "@monotonix/utils": "workspace:*",
-    "js-yaml": "^4.3.0",
+    "js-yaml": "^4.3.1",
     "zod": "4.3.6"
   },
   "devDependencies": {
