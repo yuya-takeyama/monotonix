@@ -67,6 +67,14 @@ job_types:
           dev_pr:
             type: private
             base_url: YOUR-DEV-ACCOUNT.dkr.ecr.ap-northeast-1.amazonaws.com/your-repo-pr
+      gcp:
+        iams:
+          dev_main:
+            workload_identity_provider: projects/123456789/locations/global/workloadIdentityPools/github/providers/YOUR-PROVIDER
+            service_account: monotonix-builder@YOUR-PROJECT.iam.gserviceaccount.com
+        repositories:
+          dev_main:
+            base_url: asia-northeast1-docker.pkg.dev/YOUR-PROJECT/YOUR-REPOSITORY
 ```
 
 ### 3. Application Configuration
@@ -137,6 +145,21 @@ jobs:
         branches: [main]
     configs:
       go_test:
+```
+
+To push to Google Cloud Artifact Registry instead, set the registry `type` to `gcp`:
+
+```yaml
+configs:
+  docker_build:
+    registry:
+      type: gcp
+      gcp:
+        iam: dev_main
+        repository: dev_main
+    tagging: always_latest
+    platforms:
+      - linux/amd64
 ```
 
 ### 4. GitHub Actions Workflow
@@ -232,6 +255,31 @@ jobs:
           platforms: ${{ matrix.job.params.docker_build.platforms }}
 ```
 
+For jobs that push to Google Cloud Artifact Registry, replace the AWS credential and ECR login steps of the `build` job with Workload Identity Federation auth and a Docker login:
+
+```yaml
+- id: auth
+  uses: google-github-actions/auth@v3
+  with:
+    workload_identity_provider: ${{ matrix.job.params.docker_build.registry.gcp.iam.workload_identity_provider }}
+    service_account: ${{ matrix.job.params.docker_build.registry.gcp.iam.service_account }}
+    token_format: access_token
+- uses: docker/login-action@v3
+  with:
+    registry: ${{ matrix.job.params.docker_build.registry.gcp.repository.host }}
+    username: oauth2accesstoken
+    password: ${{ steps.auth.outputs.access_token }}
+- uses: docker/setup-buildx-action@v3
+- uses: docker/build-push-action@v6
+  with:
+    context: ${{ matrix.job.params.docker_build.context }}
+    push: true
+    tags: ${{ matrix.job.params.docker_build.tags }}
+    platforms: ${{ matrix.job.params.docker_build.platforms }}
+```
+
+State tracking (`filter-jobs-by-dynamodb-state` / `set-dynamodb-state-to-running`) is DynamoDB-based regardless of registry provider, so the AWS credentials steps for state management remain required even when images are pushed to Google Cloud.
+
 ## AWS Setup
 
 ### 1. Create DynamoDB Table
@@ -303,6 +351,51 @@ aws ecr create-repository --repository-name your-repo/your-app --region ap-north
 
 # PR repository
 aws ecr create-repository --repository-name your-repo-pr/your-app --region ap-northeast-1
+```
+
+## Google Cloud Setup
+
+### 1. Create an Artifact Registry Repository
+
+```bash
+gcloud artifacts repositories create YOUR-REPOSITORY \
+  --repository-format=docker \
+  --location=asia-northeast1
+```
+
+### 2. Configure Workload Identity Federation
+
+Create a workload identity pool and an OIDC provider for GitHub Actions:
+
+```bash
+gcloud iam workload-identity-pools create github \
+  --location=global \
+  --display-name="GitHub Actions"
+
+gcloud iam workload-identity-pools providers create-oidc YOUR-PROVIDER \
+  --location=global \
+  --workload-identity-pool=github \
+  --issuer-uri="https://token.actions.githubusercontent.com" \
+  --attribute-mapping="google.subject=assertion.sub,attribute.repository=assertion.repository" \
+  --attribute-condition="assertion.repository == 'YOUR-ORG/YOUR-REPO'"
+```
+
+### 3. Create a Service Account and Grant Permissions
+
+```bash
+gcloud iam service-accounts create monotonix-builder
+
+# Allow the service account to push images
+gcloud artifacts repositories add-iam-policy-binding YOUR-REPOSITORY \
+  --location=asia-northeast1 \
+  --member="serviceAccount:monotonix-builder@YOUR-PROJECT.iam.gserviceaccount.com" \
+  --role="roles/artifactregistry.writer"
+
+# Allow the GitHub repository to impersonate the service account
+gcloud iam service-accounts add-iam-policy-binding \
+  monotonix-builder@YOUR-PROJECT.iam.gserviceaccount.com \
+  --member="principalSet://iam.googleapis.com/projects/YOUR-PROJECT-NUMBER/locations/global/workloadIdentityPools/github/attribute.repository/YOUR-ORG/YOUR-REPO" \
+  --role="roles/iam.workloadIdentityUser"
 ```
 
 ## Extensible Job Types
