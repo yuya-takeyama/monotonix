@@ -2,13 +2,15 @@
 
 ## Unreleased
 
+## [0.0.11] - 2026-08-21
+
 ### Added
 
-- Support Google Cloud Artifact Registry (`registry.type: gcp`) in `load-docker-build-job-params`, with Workload Identity Federation parameters resolved from Global Config.
+- Support Google Cloud Artifact Registry (`registry.type: gcp`) in `load-docker-build-job-params`, with Workload Identity Federation parameters resolved from Global Config [#239](https://github.com/yuya-takeyama/monotonix/pull/239)
 
 ### Fixed
 
-- **Breaking**: `load-docker-build-job-params` now resolves the AWS IAM entry using the job's `iam` key instead of its `repository` key. Previously the `iam` value was ignored; configs where `iam` does not match an existing `iams` key (even if they worked before) will now fail with `IAM not found from Global Config: <key> (aws)`.
+- **Breaking**: `load-docker-build-job-params` now resolves the AWS IAM entry using the job's `iam` key instead of its `repository` key. Previously the `iam` value was ignored; configs where `iam` does not match an existing `iams` key (even if they worked before) will now fail with `IAM not found from Global Config: <key> (aws)` [#239](https://github.com/yuya-takeyama/monotonix/pull/239)
 
 ## [0.0.10] - 2026-06-29
 
