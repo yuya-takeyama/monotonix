@@ -206,4 +206,194 @@ describe('run', () => {
       'apps/mono/apps/web/Dockerfile',
     );
   });
+
+  const stubGcpGlobalConfig: DockerBuildGlobalConfig = {
+    job_types: {
+      docker_build: {
+        registries: {
+          gcp: {
+            iams: {
+              'some-registry': {
+                workload_identity_provider:
+                  'projects/123456789/locations/global/workloadIdentityPools/github/providers/my-provider',
+                service_account: 'builder@my-project.iam.gserviceaccount.com',
+              },
+            },
+            repositories: {
+              'some-registry': {
+                base_url:
+                  'asia-northeast1-docker.pkg.dev/my-project/my-repository',
+              },
+            },
+          },
+        },
+      },
+    },
+  };
+
+  const stubGcpJob: InputJob = {
+    ...stubJob,
+    configs: {
+      docker_build: {
+        registry: {
+          type: 'gcp',
+          gcp: {
+            iam: 'some-registry',
+            repository: 'some-registry',
+          },
+        },
+        tagging: 'always_latest',
+        platforms: ['linux/amd64', 'linux/arm64'],
+      },
+    },
+  };
+
+  it('returns build parameters for a gcp registry job', () => {
+    const result = run({
+      globalConfig: stubGcpGlobalConfig,
+      jobs: [stubGcpJob],
+      context: stubContext,
+      timezone: 'UTC',
+    });
+    const expected: OutputJob[] = [
+      {
+        ...stubGcpJob,
+        params: {
+          docker_build: {
+            registry: {
+              type: 'gcp',
+              gcp: {
+                iam: {
+                  workload_identity_provider:
+                    'projects/123456789/locations/global/workloadIdentityPools/github/providers/my-provider',
+                  service_account: 'builder@my-project.iam.gserviceaccount.com',
+                },
+                repository: {
+                  host: 'asia-northeast1-docker.pkg.dev',
+                },
+              },
+            },
+            context: 'apps/hello-world',
+            tags: 'asia-northeast1-docker.pkg.dev/my-project/my-repository/hello-world:latest',
+            platforms: 'linux/amd64,linux/arm64',
+          },
+        },
+      },
+    ];
+
+    expect(result).toEqual(expected);
+  });
+
+  it('resolves aws and gcp jobs in the same run', () => {
+    const mixedGlobalConfig: DockerBuildGlobalConfig = {
+      job_types: {
+        docker_build: {
+          registries: {
+            ...stubGlobalConfig.job_types.docker_build.registries,
+            ...stubGcpGlobalConfig.job_types.docker_build.registries,
+          },
+        },
+      },
+    };
+
+    const result = run({
+      globalConfig: mixedGlobalConfig,
+      jobs: [stubJob, stubGcpJob],
+      context: stubContext,
+      timezone: 'UTC',
+    });
+
+    expect(result[0].params.docker_build.registry.type).toBe('aws');
+    expect(result[1].params.docker_build.registry.type).toBe('gcp');
+  });
+
+  it('resolves the aws iam entry by its iam key even when it differs from the repository key', () => {
+    const globalConfig: DockerBuildGlobalConfig = {
+      job_types: {
+        docker_build: {
+          registries: {
+            aws: {
+              iams: {
+                'iam-key': {
+                  role: 'some-identity',
+                  region: 'some-region',
+                },
+              },
+              repositories: {
+                'repo-key': {
+                  type: 'private',
+                  base_url: 'some-repository-base',
+                },
+              },
+            },
+          },
+        },
+      },
+    };
+    const job: InputJob = {
+      ...stubJob,
+      configs: {
+        docker_build: {
+          ...stubJob.configs.docker_build,
+          registry: {
+            type: 'aws',
+            aws: {
+              iam: 'iam-key',
+              repository: 'repo-key',
+            },
+          },
+        },
+      },
+    };
+
+    const result = run({
+      globalConfig,
+      jobs: [job],
+      context: stubContext,
+      timezone: 'UTC',
+    });
+
+    const registry = result[0].params.docker_build.registry;
+    expect(registry.type).toBe('aws');
+    if (registry.type === 'aws') {
+      expect(registry.aws.iam.role).toBe('some-identity');
+    }
+  });
+
+  it('throws when a gcp job is used but registries.gcp is not configured', () => {
+    expect(() =>
+      run({
+        globalConfig: stubGlobalConfig,
+        jobs: [stubGcpJob],
+        context: stubContext,
+        timezone: 'UTC',
+      }),
+    ).toThrow('Registry provider not configured in Global Config: gcp');
+  });
+
+  it('throws when the gcp iam key is not found', () => {
+    const job: InputJob = {
+      ...stubGcpJob,
+      configs: {
+        docker_build: {
+          ...stubGcpJob.configs.docker_build,
+          registry: {
+            type: 'gcp',
+            gcp: {
+              iam: 'unknown',
+              repository: 'some-registry',
+            },
+          },
+        },
+      },
+    };
+    expect(() =>
+      run({
+        globalConfig: stubGcpGlobalConfig,
+        jobs: [job],
+        context: stubContext,
+        timezone: 'UTC',
+      }),
+    ).toThrow('IAM not found from Global Config: unknown');
+  });
 });
