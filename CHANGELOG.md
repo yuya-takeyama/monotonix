@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Added
+
+- Support Google Cloud Artifact Registry (`registry.type: gcp`) in `load-docker-build-job-params`, with Workload Identity Federation parameters resolved from Global Config.
+
+### Fixed
+
+- **Breaking**: `load-docker-build-job-params` now resolves the AWS IAM entry using the job's `iam` key instead of its `repository` key. Previously the `iam` value was ignored; configs where `iam` does not match an existing `iams` key (even if they worked before) will now fail with `IAM not found from Global Config: <key> (aws)`.
+
 ## [0.0.10] - 2026-06-29
 
 ### Fixed
