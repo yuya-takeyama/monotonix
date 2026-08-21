@@ -18,57 +18,65 @@ export const generateImageReferences = ({
   inputJob,
   timezone,
 }: generateTagsType): string[] => {
-  const registry = inputJob.configs.docker_build.registry;
+  const baseUrl = resolveRepositoryBaseUrl(globalConfig, inputJob);
+  const imageName = join(
+    baseUrl,
+    extractAppLabel(inputJob.context.app_path, inputJob.context.root_dir),
+  );
 
-  if (registry.type === 'aws') {
-    const repository =
-      globalConfig.job_types.docker_build.registries.aws.repositories[
-        inputJob.configs.docker_build.registry.aws.repository
+  switch (inputJob.configs.docker_build.tagging) {
+    case 'always_latest':
+      return [`${imageName}:latest`];
+
+    case 'semver_datetime':
+      return [
+        `${imageName}:${generateSemverDatetimeTag(getCommittedAt(context), timezone)}`,
       ];
-    if (!repository) {
-      throw new Error(
-        `Repository not found from Global Config: ${inputJob.configs.docker_build.registry.aws.repository}`,
-      );
-    }
 
-    switch (inputJob.configs.docker_build.tagging) {
-      case 'always_latest':
-        return [
-          `${join(repository.base_url, extractAppLabel(inputJob.context.app_path, inputJob.context.root_dir))}:latest`,
-        ];
-
-      case 'semver_datetime': {
-        const timestamp = getCommittedAt(context);
-        return [
-          `${join(
-            repository.base_url,
-            extractAppLabel(
-              inputJob.context.app_path,
-              inputJob.context.root_dir,
-            ),
-          )}:${generateSemverDatetimeTag(timestamp, timezone)}`,
-        ];
+    case 'pull_request':
+      if (!context.payload.pull_request) {
+        throw new Error(
+          `Tagging strategy "pull_request" requires a pull request`,
+        );
       }
 
-      case 'pull_request':
-        if (!context.payload.pull_request) {
-          throw new Error(
-            `Tagging strategy "pull_request" requires a pull request`,
-          );
-        }
+      return [`${imageName}:pr-${context.payload.pull_request.number}`];
 
-        return [
-          `${join(repository.base_url, extractAppLabel(inputJob.context.app_path, inputJob.context.root_dir))}:pr-${context.payload.pull_request.number}`,
-        ];
+    default:
+      throw new Error(
+        `Unsupported tagging: ${inputJob.configs.docker_build.tagging}`,
+      );
+  }
+};
 
-      default:
+const resolveRepositoryBaseUrl = (
+  globalConfig: DockerBuildGlobalConfig,
+  inputJob: InputJob,
+): string => {
+  const registry = inputJob.configs.docker_build.registry;
+  const registries = globalConfig.job_types.docker_build.registries;
+
+  switch (registry.type) {
+    case 'aws': {
+      const repository = registries.aws?.repositories[registry.aws.repository];
+      if (!repository) {
         throw new Error(
-          `Unsupported tagging: ${inputJob.configs.docker_build.tagging} for environment: ${registry.type}`,
+          `Repository not found from Global Config: ${registry.aws.repository}`,
         );
+      }
+      return repository.base_url;
+    }
+
+    case 'gcp': {
+      const repository = registries.gcp?.repositories[registry.gcp.repository];
+      if (!repository) {
+        throw new Error(
+          `Repository not found from Global Config: ${registry.gcp.repository}`,
+        );
+      }
+      return repository.base_url;
     }
   }
-
-  throw new Error(`Unsupported environment: ${registry.type}`);
 };
 
 export const generateSemverDatetimeTag = (
