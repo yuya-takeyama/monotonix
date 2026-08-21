@@ -11,6 +11,7 @@
 ### Fixed
 
 - **Breaking**: `load-docker-build-job-params` now resolves the AWS IAM entry using the job's `iam` key instead of its `repository` key. Previously the `iam` value was ignored; configs where `iam` does not match an existing `iams` key (even if they worked before) will now fail with `IAM not found from Global Config: <key> (aws)` [#239](https://github.com/yuya-takeyama/monotonix/pull/239)
+- Update vulnerable dependencies [#241](https://github.com/yuya-takeyama/monotonix/pull/241)
 
 ## [0.0.10] - 2026-06-29
 
