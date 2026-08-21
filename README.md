@@ -70,7 +70,7 @@ job_types:
       gcp:
         iams:
           dev_main:
-            workload_identity_provider: projects/123456789/locations/global/workloadIdentityPools/github/providers/YOUR-PROVIDER
+            workload_identity_provider: projects/YOUR-PROJECT-NUMBER/locations/global/workloadIdentityPools/github/providers/YOUR-PROVIDER
             service_account: monotonix-builder@YOUR-PROJECT.iam.gserviceaccount.com
         repositories:
           dev_main:
@@ -255,7 +255,7 @@ jobs:
           platforms: ${{ matrix.job.params.docker_build.platforms }}
 ```
 
-For jobs that push to Google Cloud Artifact Registry, replace the AWS credential and ECR login steps of the `build` job with Workload Identity Federation auth and a Docker login:
+For jobs that push to Google Cloud Artifact Registry, replace the second `aws-actions/configure-aws-credentials` step and the `aws-actions/amazon-ecr-login` step of the `build` job with Workload Identity Federation auth and a Docker login (the first `aws-actions/configure-aws-credentials` step handles DynamoDB state and stays):
 
 ```yaml
 - id: auth
@@ -378,6 +378,15 @@ gcloud iam workload-identity-pools providers create-oidc YOUR-PROVIDER \
   --issuer-uri="https://token.actions.githubusercontent.com" \
   --attribute-mapping="google.subject=assertion.sub,attribute.repository=assertion.repository" \
   --attribute-condition="assertion.repository == 'YOUR-ORG/YOUR-REPO'"
+```
+
+The full provider resource name for `workload_identity_provider` can be obtained with:
+
+```bash
+gcloud iam workload-identity-pools providers describe YOUR-PROVIDER \
+  --location=global \
+  --workload-identity-pool=github \
+  --format='value(name)'
 ```
 
 ### 3. Create a Service Account and Grant Permissions

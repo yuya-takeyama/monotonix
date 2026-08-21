@@ -64,6 +64,23 @@ describe('DockerBuildGlobalConfigSchema', () => {
         .base_url,
     ).toBe('asia-northeast1-docker.pkg.dev/my-project/my-repository');
   });
+
+  it('rejects an empty base_url', () => {
+    expect(() =>
+      DockerBuildGlobalConfigSchema.parse({
+        job_types: {
+          docker_build: {
+            registries: {
+              gcp: {
+                iams: gcpRegistry.iams,
+                repositories: { dev: { base_url: '' } },
+              },
+            },
+          },
+        },
+      }),
+    ).toThrow();
+  });
 });
 
 describe('InputJobsSchema registry union', () => {

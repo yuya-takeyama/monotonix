@@ -61,7 +61,7 @@ const resolveRepositoryBaseUrl = (
       const repository = registries.aws?.repositories[registry.aws.repository];
       if (!repository) {
         throw new Error(
-          `Repository not found from Global Config: ${registry.aws.repository}`,
+          `Repository not found from Global Config: ${registry.aws.repository} (aws)`,
         );
       }
       return repository.base_url;
@@ -71,7 +71,7 @@ const resolveRepositoryBaseUrl = (
       const repository = registries.gcp?.repositories[registry.gcp.repository];
       if (!repository) {
         throw new Error(
-          `Repository not found from Global Config: ${registry.gcp.repository}`,
+          `Repository not found from Global Config: ${registry.gcp.repository} (gcp)`,
         );
       }
       return repository.base_url;

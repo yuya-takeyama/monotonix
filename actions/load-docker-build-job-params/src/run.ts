@@ -39,6 +39,7 @@ export function run({
       params: {
         ...job.params,
         docker_build: {
+          // registry must be resolved before tags: resolveRegistry reports a missing provider section clearly, while generateImageReferences would blame the repository key
           registry: resolveRegistry(
             globalConfig,
             localDockerBuildConfig.registry,
@@ -76,14 +77,14 @@ function resolveRegistry(
       const repository = awsConfig.repositories[registry.aws.repository];
       if (!repository) {
         throw new Error(
-          `Repository not found from Global Config: ${registry.aws.repository}`,
+          `Repository not found from Global Config: ${registry.aws.repository} (aws)`,
         );
       }
 
       const iam = awsConfig.iams[registry.aws.iam];
       if (!iam) {
         throw new Error(
-          `IAM not found from Global Config: ${registry.aws.iam}`,
+          `IAM not found from Global Config: ${registry.aws.iam} (aws)`,
         );
       }
 
@@ -112,14 +113,14 @@ function resolveRegistry(
       const repository = gcpConfig.repositories[registry.gcp.repository];
       if (!repository) {
         throw new Error(
-          `Repository not found from Global Config: ${registry.gcp.repository}`,
+          `Repository not found from Global Config: ${registry.gcp.repository} (gcp)`,
         );
       }
 
       const iam = gcpConfig.iams[registry.gcp.iam];
       if (!iam) {
         throw new Error(
-          `IAM not found from Global Config: ${registry.gcp.iam}`,
+          `IAM not found from Global Config: ${registry.gcp.iam} (gcp)`,
         );
       }
 

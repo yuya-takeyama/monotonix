@@ -371,6 +371,17 @@ describe('run', () => {
     ).toThrow('Registry provider not configured in Global Config: gcp');
   });
 
+  it('throws when an aws job is used but registries.aws is not configured', () => {
+    expect(() =>
+      run({
+        globalConfig: stubGcpGlobalConfig,
+        jobs: [stubJob],
+        context: stubContext,
+        timezone: 'UTC',
+      }),
+    ).toThrow('Registry provider not configured in Global Config: aws');
+  });
+
   it('throws when the gcp iam key is not found', () => {
     const job: InputJob = {
       ...stubGcpJob,

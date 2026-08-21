@@ -202,6 +202,8 @@ two keys differ.
 - Existing AWS configs parse and resolve identically (`registries.aws`
   required → optional is a relaxation; the input/output `aws` shapes are
   unchanged).
-- The iam-lookup bug fix changes behavior only for configs where the `iam` and
-  `repository` keys differ — configs that today resolve the wrong IAM entry or
-  crash.
+- The iam-lookup bug fix is a behavior change: because the old code read
+  `iams[<repository key>]`, the `iam` value was never read at all. Configs
+  whose `iam` value does not match any `iams` key worked before (as long as
+  `repository` matched an `iams` key) and will now throw. This is an
+  intentional breaking fix, announced in the CHANGELOG.

@@ -18,7 +18,7 @@ export const DockerBuildGlobalConfigSchema = GlobalConfigSchema.extend({
               z.string(),
               z.object({
                 type: z.enum(['private', 'public']).default('private'),
-                base_url: z.string(),
+                base_url: z.string().min(1),
               }),
             ),
           })
@@ -35,7 +35,7 @@ export const DockerBuildGlobalConfigSchema = GlobalConfigSchema.extend({
             repositories: z.record(
               z.string(),
               z.object({
-                base_url: z.string(),
+                base_url: z.string().min(1),
               }),
             ),
           })
