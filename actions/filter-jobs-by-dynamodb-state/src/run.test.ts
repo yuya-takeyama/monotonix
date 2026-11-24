@@ -47,6 +47,24 @@ describe.skipIf(!testEndpoint)('run', () => {
       }),
     );
 
+  const putRunning = (
+    job: Job,
+    item: { runId?: string; commitTs: number; ttl: number },
+  ) =>
+    db.docClient.send(
+      new PutCommand({
+        TableName: db.table,
+        Item: {
+          ...stateKey(job, 'running'),
+          appPath: job.context.app_path,
+          jobKey: job.context.job_key,
+          jobStatus: 'running',
+          commitHash: 'running-commit',
+          ...item,
+        },
+      }),
+    );
+
   test('keeps a job for only one of two runs filtering it at the same time', async () => {
     const job = buildJob();
 
@@ -107,5 +125,44 @@ describe.skipIf(!testEndpoint)('run', () => {
       runId: 'run-b',
       commitHash: 'bbb',
     });
+  });
+
+  test("skips a job another run is still building even after that run's claim has expired", async () => {
+    const job = buildJob({ commitTs: 1_700_000_000 });
+    await putRunning(job, {
+      runId: 'run-a',
+      commitTs: 1_700_000_000,
+      ttl: now + 60,
+    });
+
+    expect(await filter('run-b', [job])).toEqual([]);
+    expect(await db.getState(job, 'claimed')).toBeUndefined();
+  });
+
+  test('keeps a job whose running state has expired, belongs to this run, or is for an older commit', async () => {
+    const expired = buildJob({ jobKey: 'expired', commitTs: 1_700_000_000 });
+    const own = buildJob({ jobKey: 'own', commitTs: 1_700_000_000 });
+    const older = buildJob({ jobKey: 'older', commitTs: 1_700_000_100 });
+    await putRunning(expired, {
+      runId: 'run-a',
+      commitTs: 1_700_000_000,
+      ttl: now - 1,
+    });
+    await putRunning(own, {
+      runId: 'run-b',
+      commitTs: 1_700_000_000,
+      ttl: now + 60,
+    });
+    await putRunning(older, {
+      runId: 'run-a',
+      commitTs: 1_700_000_000,
+      ttl: now + 60,
+    });
+
+    expect(await filter('run-b', [expired, own, older])).toEqual([
+      expired,
+      own,
+      older,
+    ]);
   });
 });

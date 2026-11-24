@@ -45725,17 +45725,26 @@ const run = async ({ docClient, table, jobs, runId, now, ttlSeconds, }) => {
     }
     const res = await docClient.send(new QueryCommand({
         TableName: table,
+        ConsistentRead: true,
         KeyConditionExpression: 'pk = :pk',
         ExpressionAttributeValues: {
             ':pk': `STATE#${firstJob.context.dedupe_key}`,
         },
     }));
-    const successTimestamps = toSuccessTimestamps(res.Items ?? []);
+    const { successTimestamps, runningStates } = toStates(res.Items ?? []);
     const unfinishedJobs = jobs.filter(job => {
         const successTs = successTimestamps.get(`${job.context.app_path}#${job.context.job_key}`);
         if (successTs !== undefined &&
             successTs >= job.context.last_commit.timestamp) {
             info(`${job.context.label}: ${job.context.last_commit.hash}: Skip: Job is already in success state`);
+            return false;
+        }
+        const running = runningStates.get(`${job.context.app_path}#${job.context.job_key}`);
+        if (running &&
+            running.runId !== runId &&
+            running.ttl >= now &&
+            running.commitTs >= job.context.last_commit.timestamp) {
+            info(`${job.context.label}: ${job.context.last_commit.hash}: Skip: Job is already running in run ${running.runId ?? '(unknown)'} for commit ${running.commitHash}`);
             return false;
         }
         return true;
@@ -45758,19 +45767,24 @@ const run = async ({ docClient, table, jobs, runId, now, ttlSeconds, }) => {
     }));
     return claimedJobs.filter(job => job !== undefined);
 };
-const toSuccessTimestamps = (items) => {
+const toStates = (items) => {
     const successTimestamps = new Map();
+    const runningStates = new Map();
     for (const item of items) {
         const result = StateItemSchema.safeParse(item);
         if (!result.success) {
             warning(`Failed to parse state item: ${result.error}: ${JSON.stringify(item)}`);
             continue;
         }
+        const key = `${result.data.appPath}#${result.data.jobKey}`;
         if (result.data.jobStatus === 'success') {
-            successTimestamps.set(`${result.data.appPath}#${result.data.jobKey}`, result.data.commitTs);
+            successTimestamps.set(key, result.data.commitTs);
+        }
+        if (result.data.jobStatus === 'running') {
+            runningStates.set(key, result.data);
         }
     }
-    return successTimestamps;
+    return { successTimestamps, runningStates };
 };
 
 (async () => {

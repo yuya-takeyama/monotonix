@@ -28383,6 +28383,13 @@ function notice(message, properties = {}) {
     issueCommand('notice', toCommandProperties(properties), message instanceof Error ? message.toString() : message);
 }
 /**
+ * Writes info to log with console.log.
+ * @param message info message
+ */
+function info(message) {
+    process.stdout.write(message + os.EOL);
+}
+/**
  * Gets the value of an state set by this action's main execution.
  *
  * @param     name     name of the state to get
@@ -45602,7 +45609,7 @@ const releaseHeldState = async ({ docClient, table, job, runId, heldStatus, }) =
             runId,
         });
         if (!released) {
-            notice(`${job.context.label}: Left the ${heldStatus} state in place because this run does not hold it`);
+            info(`${job.context.label}: Left the ${heldStatus} state in place because this run does not hold it`);
         }
     }
     catch (err) {

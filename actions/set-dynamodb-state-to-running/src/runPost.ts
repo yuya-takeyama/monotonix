@@ -1,4 +1,4 @@
-import { notice } from '@actions/core';
+import { info, notice } from '@actions/core';
 import { type DynamoDBDocumentClient, PutCommand } from '@aws-sdk/lib-dynamodb';
 import {
   type HeldStatus,
@@ -93,7 +93,7 @@ const releaseHeldState = async ({
       runId,
     });
     if (!released) {
-      notice(
+      info(
         `${job.context.label}: Left the ${heldStatus} state in place because this run does not hold it`,
       );
     }

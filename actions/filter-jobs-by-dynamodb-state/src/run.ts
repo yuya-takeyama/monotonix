@@ -3,7 +3,11 @@ import {
   type DynamoDBDocumentClient,
   QueryCommand,
 } from '@aws-sdk/lib-dynamodb';
-import { acquireState, StateItemSchema } from '@monotonix/dynamodb-common';
+import {
+  acquireState,
+  type StateItem,
+  StateItemSchema,
+} from '@monotonix/dynamodb-common';
 import { Jobs } from '@monotonix/schema';
 
 type runParam = {
@@ -31,13 +35,14 @@ export const run = async ({
   const res = await docClient.send(
     new QueryCommand({
       TableName: table,
+      ConsistentRead: true,
       KeyConditionExpression: 'pk = :pk',
       ExpressionAttributeValues: {
         ':pk': `STATE#${firstJob.context.dedupe_key}`,
       },
     }),
   );
-  const successTimestamps = toSuccessTimestamps(res.Items ?? []);
+  const { successTimestamps, runningStates } = toStates(res.Items ?? []);
 
   const unfinishedJobs = jobs.filter(job => {
     const successTs = successTimestamps.get(
@@ -49,6 +54,20 @@ export const run = async ({
     ) {
       info(
         `${job.context.label}: ${job.context.last_commit.hash}: Skip: Job is already in success state`,
+      );
+      return false;
+    }
+    const running = runningStates.get(
+      `${job.context.app_path}#${job.context.job_key}`,
+    );
+    if (
+      running &&
+      running.runId !== runId &&
+      running.ttl >= now &&
+      running.commitTs >= job.context.last_commit.timestamp
+    ) {
+      info(
+        `${job.context.label}: ${job.context.last_commit.hash}: Skip: Job is already running in run ${running.runId ?? '(unknown)'} for commit ${running.commitHash}`,
       );
       return false;
     }
@@ -79,8 +98,14 @@ export const run = async ({
   return claimedJobs.filter(job => job !== undefined);
 };
 
-const toSuccessTimestamps = (items: unknown[]): Map<string, number> => {
+type RunningState = Pick<
+  StateItem,
+  'commitTs' | 'commitHash' | 'runId' | 'ttl'
+>;
+
+const toStates = (items: unknown[]) => {
   const successTimestamps = new Map<string, number>();
+  const runningStates = new Map<string, RunningState>();
 
   for (const item of items) {
     const result = StateItemSchema.safeParse(item);
@@ -90,13 +115,14 @@ const toSuccessTimestamps = (items: unknown[]): Map<string, number> => {
       );
       continue;
     }
+    const key = `${result.data.appPath}#${result.data.jobKey}`;
     if (result.data.jobStatus === 'success') {
-      successTimestamps.set(
-        `${result.data.appPath}#${result.data.jobKey}`,
-        result.data.commitTs,
-      );
+      successTimestamps.set(key, result.data.commitTs);
+    }
+    if (result.data.jobStatus === 'running') {
+      runningStates.set(key, result.data);
     }
   }
 
-  return successTimestamps;
+  return { successTimestamps, runningStates };
 };
