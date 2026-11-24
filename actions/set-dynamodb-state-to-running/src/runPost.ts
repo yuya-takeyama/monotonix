@@ -1,11 +1,9 @@
 import { notice } from '@actions/core';
+import { type DynamoDBDocumentClient, PutCommand } from '@aws-sdk/lib-dynamodb';
 import {
-  DeleteCommand,
-  type DynamoDBDocumentClient,
-  PutCommand,
-} from '@aws-sdk/lib-dynamodb';
-import {
+  type HeldStatus,
   isConditionalCheckFailed,
+  releaseState,
   StateItem,
   stateKey,
 } from '@monotonix/dynamodb-common';
@@ -15,6 +13,7 @@ type runPostParam = {
   docClient: DynamoDBDocumentClient;
   table: string;
   job: Job;
+  acquired: boolean;
   jobStatus: 'success' | 'failure' | 'cancelled';
   runId: string;
   ttl: number;
@@ -23,50 +22,28 @@ export const runPost = async ({
   docClient,
   table,
   job,
+  acquired,
   jobStatus,
   runId,
   ttl,
 }: runPostParam): Promise<void> => {
   try {
-    if (jobStatus === 'success') {
-      await putSuccessState({ job, table, docClient, ttl });
-    }
-  } catch (err) {
-    if (isConditionalCheckFailed(err)) {
-      notice(
-        `${job.context.label}: A newer or the same commit is already in success state`,
-      );
-      // No need to let it fail
-    } else {
-      throw err;
+    if (acquired && jobStatus === 'success') {
+      await putSuccessState({ docClient, table, job, ttl });
     }
   } finally {
-    try {
-      await deleteRunningState({ job, table, docClient, runId });
-    } catch (err) {
-      if (isConditionalCheckFailed(err)) {
-        notice(
-          `${job.context.label}: The running state is held by another run now`,
-        );
-        // No need to let it fail
-      } else {
-        console.error(`Failed to delete running state: ${err}`);
-      }
+    for (const heldStatus of ['running', 'claimed'] as const) {
+      await releaseHeldState({ docClient, table, job, runId, heldStatus });
     }
   }
 };
 
 const putSuccessState = async ({
-  job,
-  table,
   docClient,
+  table,
+  job,
   ttl,
-}: {
-  job: Job;
-  table: string;
-  docClient: DynamoDBDocumentClient;
-  ttl: number;
-}) => {
+}: Pick<runPostParam, 'docClient' | 'table' | 'job' | 'ttl'>) => {
   const item: StateItem = {
     ...stateKey(job, 'success'),
     appPath: job.context.app_path,
@@ -76,38 +53,51 @@ const putSuccessState = async ({
     commitHash: job.context.last_commit.hash,
     ttl,
   };
-  return docClient.send(
-    new PutCommand({
-      TableName: table,
-      Item: item,
-      ConditionExpression:
-        'attribute_not_exists(commitTs) OR commitTs < :newCommitTs',
-      ExpressionAttributeValues: {
-        ':newCommitTs': job.context.last_commit.timestamp,
-      },
-    }),
-  );
+  try {
+    await docClient.send(
+      new PutCommand({
+        TableName: table,
+        Item: item,
+        ConditionExpression:
+          'attribute_not_exists(commitTs) OR commitTs < :newCommitTs',
+        ExpressionAttributeValues: {
+          ':newCommitTs': job.context.last_commit.timestamp,
+        },
+      }),
+    );
+  } catch (err) {
+    if (!isConditionalCheckFailed(err)) {
+      throw err;
+    }
+    notice(
+      `${job.context.label}: A newer or the same commit is already in success state`,
+    );
+  }
 };
 
-const deleteRunningState = async ({
-  job,
-  table,
+const releaseHeldState = async ({
   docClient,
+  table,
+  job,
   runId,
-}: {
-  job: Job;
-  table: string;
-  docClient: DynamoDBDocumentClient;
-  runId: string;
+  heldStatus,
+}: Pick<runPostParam, 'docClient' | 'table' | 'job' | 'runId'> & {
+  heldStatus: HeldStatus;
 }) => {
-  return docClient.send(
-    new DeleteCommand({
-      TableName: table,
-      Key: stateKey(job, 'running'),
-      ConditionExpression: 'runId = :runId',
-      ExpressionAttributeValues: {
-        ':runId': runId,
-      },
-    }),
-  );
+  try {
+    const released = await releaseState({
+      docClient,
+      table,
+      job,
+      jobStatus: heldStatus,
+      runId,
+    });
+    if (!released) {
+      notice(
+        `${job.context.label}: Left the ${heldStatus} state in place because this run does not hold it`,
+      );
+    }
+  } catch (err) {
+    console.error(`Failed to delete ${heldStatus} state: ${err}`);
+  }
 };

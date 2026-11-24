@@ -28404,14 +28404,6 @@ function setFailed(message) {
 function error(message, properties = {}) {
     issueCommand('error', toCommandProperties(properties), message instanceof Error ? message.toString() : message);
 }
-/**
- * Adds a notice issue
- * @param message notice issue message. Errors will be converted to string via toString()
- * @param properties optional properties to add to the annotation.
- */
-function notice(message, properties = {}) {
-    issueCommand('notice', toCommandProperties(properties), message instanceof Error ? message.toString() : message);
-}
 //-----------------------------------------------------------------------
 // Wrapper action state
 //-----------------------------------------------------------------------
@@ -45373,18 +45365,15 @@ function superRefine(fn) {
     return _superRefine(fn);
 }
 
-const StateItemSchema = object({
+object({
     pk: string(),
     sk: string(),
     appPath: string(),
     jobKey: string(),
-    jobStatus: _enum(['running', 'success']),
+    jobStatus: _enum(['claimed', 'running', 'success']),
     commitTs: number(),
     commitHash: string(),
     runId: string().optional(),
-    // Running items only: `claimed` by the setup job, `started` by the build
-    // job. Running items without it were written by a build job.
-    phase: _enum(['claimed', 'started']).optional(),
     ttl: number(),
 });
 const stateKey = (job, jobStatus) => ({
@@ -45400,25 +45389,24 @@ const getRunId = (env = process.env) => {
 };
 // Matched by name so a second bundled copy of the SDK cannot defeat instanceof.
 const isConditionalCheckFailed = (err) => err instanceof Error && err.name === 'ConditionalCheckFailedException';
-const claimRunningState = async ({ docClient, table, job, runId, now, ttlSeconds, phase, }) => {
+const acquireState = async ({ docClient, table, job, jobStatus, runId, now, ttlSeconds, }) => {
     const item = {
-        ...stateKey(job, 'running'),
+        ...stateKey(job, jobStatus),
         appPath: job.context.app_path,
         jobKey: job.context.job_key,
-        jobStatus: 'running',
+        jobStatus,
         commitTs: job.context.last_commit.timestamp,
         commitHash: job.context.last_commit.hash,
         runId,
-        phase,
         ttl: now + ttlSeconds,
     };
     try {
         await docClient.send(new PutCommand({
             TableName: table,
             Item: item,
-            // DynamoDB TTL deletes expired items lazily, so an expired claim can
-            // still be in the table and must not block anyone.
-            ConditionExpression: 'attribute_not_exists(commitTs) OR commitTs < :commitTs OR runId = :runId OR #ttl < :now',
+            // DynamoDB TTL deletes expired items lazily, so an expired item can
+            // still be in the table. It gives way to the same or a newer commit.
+            ConditionExpression: 'attribute_not_exists(commitTs) OR commitTs < :commitTs OR runId = :runId OR (#ttl < :now AND commitTs <= :commitTs)',
             ExpressionAttributeNames: { '#ttl': 'ttl' },
             ExpressionAttributeValues: {
                 ':commitTs': item.commitTs,
@@ -45427,21 +45415,19 @@ const claimRunningState = async ({ docClient, table, job, runId, now, ttlSeconds
             },
             ReturnValuesOnConditionCheckFailure: 'ALL_OLD',
         }));
-        return { claimed: true };
+        return { acquired: true };
     }
     catch (err) {
         if (!isConditionalCheckFailed(err)) {
             throw err;
         }
         const held = err.Item;
-        const heldPhase = StateItemSchema.shape.phase.safeParse(held?.phase?.S);
         return {
-            claimed: false,
+            acquired: false,
             holder: {
                 runId: held?.runId?.S,
                 commitHash: held?.commitHash?.S,
                 commitTs: held?.commitTs?.N ? Number(held.commitTs.N) : undefined,
-                phase: heldPhase.success ? heldPhase.data : undefined,
             },
         };
     }
@@ -45555,23 +45541,16 @@ const JobSchema = object({
 
 const run = async (params) => {
     const { job } = params;
-    const claim = await claimRunningState({ ...params, phase: 'started' });
-    if (claim.claimed) {
-        return 'acquired';
+    const result = await acquireState({ ...params, jobStatus: 'running' });
+    if (result.acquired) {
+        return;
     }
-    const { holder } = claim;
-    const holderIsNewer = holder.commitTs !== undefined &&
-        holder.commitTs > job.context.last_commit.timestamp;
-    const heldBy = `Run ${holder.runId ?? '(unknown)'} holds the running state for commit ${holder.commitHash ?? '(unknown)'}`;
-    // An older commit may still start while a newer commit is only claimed by
-    // its setup job. Only a newer commit that has started stops it.
-    if (holderIsNewer && holder.phase === 'claimed') {
-        notice(`${job.context.label}: ${heldBy}, which has not started yet. Running this older commit without holding the running state.`);
-        return 'superseded';
-    }
-    throw new Error(holderIsNewer
-        ? `${job.context.label}: ${heldBy}. A newer commit is already running.`
-        : `${job.context.label}: ${heldBy}. Another run claimed the same commit, for example after this run's claim expired.`);
+    const { holder } = result;
+    const reason = holder.commitTs !== undefined &&
+        holder.commitTs > job.context.last_commit.timestamp
+        ? 'A newer commit is already running.'
+        : 'Another run is already running the same commit.';
+    throw new Error(`${job.context.label}: Run ${holder.runId ?? '(unknown)'} holds the running state for commit ${holder.commitHash ?? '(unknown)'}. ${reason}`);
 };
 
 const ACQUIRED_STATE = 'MONOTONIX_DYNAMODB_STATE_ACQUIRED';
@@ -45586,12 +45565,15 @@ const saveAwsCredentialsIntoState = () => {
 
 (async () => {
     try {
+        // Saved first, so the post step can release this run's claim even when
+        // this step fails.
+        saveAwsCredentialsIntoState();
         const table = getInput('dynamodb-table');
         const region = getInput('dynamodb-region');
         const jobJson = getInput('job');
         const job = JobSchema.parse(JSON.parse(jobJson));
         const ttlSeconds = parseDuration(getInput('running-ttl'));
-        const outcome = await run({
+        await run({
             docClient: DynamoDBDocumentClient.from(new DynamoDBClient({ region })),
             table,
             job,
@@ -45599,10 +45581,7 @@ const saveAwsCredentialsIntoState = () => {
             now: Math.floor(Date.now() / 1000),
             ttlSeconds,
         });
-        if (outcome === 'acquired') {
-            saveAwsCredentialsIntoState();
-            saveState(ACQUIRED_STATE, 'true');
-        }
+        saveState(ACQUIRED_STATE, 'true');
     }
     catch (error) {
         console.error(error);

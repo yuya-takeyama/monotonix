@@ -1,5 +1,9 @@
 import type { ConditionalCheckFailedException } from '@aws-sdk/client-dynamodb';
-import { type DynamoDBDocumentClient, PutCommand } from '@aws-sdk/lib-dynamodb';
+import {
+  DeleteCommand,
+  type DynamoDBDocumentClient,
+  PutCommand,
+} from '@aws-sdk/lib-dynamodb';
 import type { Job } from '@monotonix/schema';
 import { z } from 'zod';
 
@@ -8,17 +12,16 @@ export const StateItemSchema = z.object({
   sk: z.string(),
   appPath: z.string(),
   jobKey: z.string(),
-  jobStatus: z.enum(['running', 'success']),
+  jobStatus: z.enum(['claimed', 'running', 'success']),
   commitTs: z.number(),
   commitHash: z.string(),
   runId: z.string().optional(),
-  // Running items only: `claimed` by the setup job, `started` by the build
-  // job. Running items without it were written by a build job.
-  phase: z.enum(['claimed', 'started']).optional(),
   ttl: z.number(),
 });
 
 export type StateItem = z.infer<typeof StateItemSchema>;
+
+export type HeldStatus = Exclude<StateItem['jobStatus'], 'success'>;
 
 export const stateKey = (job: Job, jobStatus: StateItem['jobStatus']) => ({
   pk: `STATE#${job.context.dedupe_key}`,
@@ -39,43 +42,41 @@ export const isConditionalCheckFailed = (
 ): err is ConditionalCheckFailedException =>
   err instanceof Error && err.name === 'ConditionalCheckFailedException';
 
-export type ClaimResult =
-  | { claimed: true }
+export type AcquireResult =
+  | { acquired: true }
   | {
-      claimed: false;
-      holder: Partial<
-        Pick<StateItem, 'runId' | 'commitHash' | 'commitTs' | 'phase'>
-      >;
+      acquired: false;
+      holder: Partial<Pick<StateItem, 'runId' | 'commitHash' | 'commitTs'>>;
     };
 
-type ClaimRunningStateParams = {
+type HeldStateParams = {
   docClient: DynamoDBDocumentClient;
   table: string;
   job: Job;
+  jobStatus: HeldStatus;
   runId: string;
-  now: number;
-  ttlSeconds: number;
-  phase: NonNullable<StateItem['phase']>;
 };
 
-export const claimRunningState = async ({
+export const acquireState = async ({
   docClient,
   table,
   job,
+  jobStatus,
   runId,
   now,
   ttlSeconds,
-  phase,
-}: ClaimRunningStateParams): Promise<ClaimResult> => {
+}: HeldStateParams & {
+  now: number;
+  ttlSeconds: number;
+}): Promise<AcquireResult> => {
   const item: StateItem = {
-    ...stateKey(job, 'running'),
+    ...stateKey(job, jobStatus),
     appPath: job.context.app_path,
     jobKey: job.context.job_key,
-    jobStatus: 'running',
+    jobStatus,
     commitTs: job.context.last_commit.timestamp,
     commitHash: job.context.last_commit.hash,
     runId,
-    phase,
     ttl: now + ttlSeconds,
   };
   try {
@@ -83,10 +84,10 @@ export const claimRunningState = async ({
       new PutCommand({
         TableName: table,
         Item: item,
-        // DynamoDB TTL deletes expired items lazily, so an expired claim can
-        // still be in the table and must not block anyone.
+        // DynamoDB TTL deletes expired items lazily, so an expired item can
+        // still be in the table. It gives way to the same or a newer commit.
         ConditionExpression:
-          'attribute_not_exists(commitTs) OR commitTs < :commitTs OR runId = :runId OR #ttl < :now',
+          'attribute_not_exists(commitTs) OR commitTs < :commitTs OR runId = :runId OR (#ttl < :now AND commitTs <= :commitTs)',
         ExpressionAttributeNames: { '#ttl': 'ttl' },
         ExpressionAttributeValues: {
           ':commitTs': item.commitTs,
@@ -96,22 +97,46 @@ export const claimRunningState = async ({
         ReturnValuesOnConditionCheckFailure: 'ALL_OLD',
       }),
     );
-    return { claimed: true };
+    return { acquired: true };
   } catch (err) {
     if (!isConditionalCheckFailed(err)) {
       throw err;
     }
     const held = err.Item;
-    const heldPhase = StateItemSchema.shape.phase.safeParse(held?.phase?.S);
     return {
-      claimed: false,
+      acquired: false,
       holder: {
         runId: held?.runId?.S,
         commitHash: held?.commitHash?.S,
         commitTs: held?.commitTs?.N ? Number(held.commitTs.N) : undefined,
-        phase: heldPhase.success ? heldPhase.data : undefined,
       },
     };
+  }
+};
+
+// Returns false when another run holds the item or it is already gone.
+export const releaseState = async ({
+  docClient,
+  table,
+  job,
+  jobStatus,
+  runId,
+}: HeldStateParams): Promise<boolean> => {
+  try {
+    await docClient.send(
+      new DeleteCommand({
+        TableName: table,
+        Key: stateKey(job, jobStatus),
+        ConditionExpression: 'runId = :runId',
+        ExpressionAttributeValues: { ':runId': runId },
+      }),
+    );
+    return true;
+  } catch (err) {
+    if (isConditionalCheckFailed(err)) {
+      return false;
+    }
+    throw err;
   }
 };
 

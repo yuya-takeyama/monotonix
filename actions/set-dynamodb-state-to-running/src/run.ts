@@ -1,6 +1,5 @@
-import { notice } from '@actions/core';
 import { type DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
-import { claimRunningState } from '@monotonix/dynamodb-common';
+import { acquireState } from '@monotonix/dynamodb-common';
 import { Job } from '@monotonix/schema';
 
 type runParam = {
@@ -11,33 +10,20 @@ type runParam = {
   now: number;
   ttlSeconds: number;
 };
-export const run = async (
-  params: runParam,
-): Promise<'acquired' | 'superseded'> => {
+export const run = async (params: runParam): Promise<void> => {
   const { job } = params;
-  const claim = await claimRunningState({ ...params, phase: 'started' });
-  if (claim.claimed) {
-    return 'acquired';
+  const result = await acquireState({ ...params, jobStatus: 'running' });
+  if (result.acquired) {
+    return;
   }
 
-  const { holder } = claim;
-  const holderIsNewer =
+  const { holder } = result;
+  const reason =
     holder.commitTs !== undefined &&
-    holder.commitTs > job.context.last_commit.timestamp;
-  const heldBy = `Run ${holder.runId ?? '(unknown)'} holds the running state for commit ${holder.commitHash ?? '(unknown)'}`;
-
-  // An older commit may still start while a newer commit is only claimed by
-  // its setup job. Only a newer commit that has started stops it.
-  if (holderIsNewer && holder.phase === 'claimed') {
-    notice(
-      `${job.context.label}: ${heldBy}, which has not started yet. Running this older commit without holding the running state.`,
-    );
-    return 'superseded';
-  }
-
+    holder.commitTs > job.context.last_commit.timestamp
+      ? 'A newer commit is already running.'
+      : 'Another run is already running the same commit.';
   throw new Error(
-    holderIsNewer
-      ? `${job.context.label}: ${heldBy}. A newer commit is already running.`
-      : `${job.context.label}: ${heldBy}. Another run claimed the same commit, for example after this run's claim expired.`,
+    `${job.context.label}: Run ${holder.runId ?? '(unknown)'} holds the running state for commit ${holder.commitHash ?? '(unknown)'}. ${reason}`,
   );
 };

@@ -1,4 +1,4 @@
-import { getInput, getState, info, setFailed } from '@actions/core';
+import { getInput, getState, setFailed } from '@actions/core';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
 import { getRunId, parseDuration } from '@monotonix/dynamodb-common';
@@ -12,12 +12,6 @@ import { ACQUIRED_STATE, getAwsCredentialsFromState } from './utils';
     const region = getInput('dynamodb-region');
     const jobJson = getInput('job');
     const job = JobSchema.parse(JSON.parse(jobJson));
-    if (getState(ACQUIRED_STATE) !== 'true') {
-      info(
-        `${job.context.label}: Skip: This job did not acquire the running state`,
-      );
-      return;
-    }
     const jobStatus = getInput('job-status');
     if (
       jobStatus !== 'success' &&
@@ -38,6 +32,7 @@ import { ACQUIRED_STATE, getAwsCredentialsFromState } from './utils';
       ),
       table,
       job,
+      acquired: getState(ACQUIRED_STATE) === 'true',
       jobStatus,
       runId: getRunId(),
       ttl,

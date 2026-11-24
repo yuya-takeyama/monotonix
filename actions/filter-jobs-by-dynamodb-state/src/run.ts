@@ -3,7 +3,7 @@ import {
   type DynamoDBDocumentClient,
   QueryCommand,
 } from '@aws-sdk/lib-dynamodb';
-import { claimRunningState, StateItemSchema } from '@monotonix/dynamodb-common';
+import { acquireState, StateItemSchema } from '@monotonix/dynamodb-common';
 import { Jobs } from '@monotonix/schema';
 
 type runParam = {
@@ -57,16 +57,16 @@ export const run = async ({
 
   const claimedJobs = await Promise.all(
     unfinishedJobs.map(async job => {
-      const claim = await claimRunningState({
+      const claim = await acquireState({
         docClient,
         table,
         job,
+        jobStatus: 'claimed',
         runId,
         now,
         ttlSeconds,
-        phase: 'claimed',
       });
-      if (!claim.claimed) {
+      if (!claim.acquired) {
         info(
           `${job.context.label}: ${job.context.last_commit.hash}: Skip: Job is already claimed by run ${claim.holder.runId ?? '(unknown)'} for commit ${claim.holder.commitHash ?? '(unknown)'}`,
         );

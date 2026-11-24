@@ -57,9 +57,10 @@ describe.skipIf(!testEndpoint)('run', () => {
 
     expect([a.length, b.length].sort()).toEqual([0, 1]);
     const winner = a.length === 1 ? 'run-a' : 'run-b';
-    expect(await db.getState(job, 'running')).toMatchObject({
+    expect(await db.getState(job, 'claimed')).toMatchObject({
       runId: winner,
     });
+    expect(await db.getState(job, 'running')).toBeUndefined();
   });
 
   test('drops only the jobs another run has claimed', async () => {
@@ -82,7 +83,7 @@ describe.skipIf(!testEndpoint)('run', () => {
     await putSuccess(job, 1_700_000_000);
 
     expect(await filter('run-a', [job])).toEqual([]);
-    expect(await db.getState(job, 'running')).toBeUndefined();
+    expect(await db.getState(job, 'claimed')).toBeUndefined();
   });
 
   test('keeps and claims a job whose commit is newer than its success state', async () => {
@@ -90,8 +91,21 @@ describe.skipIf(!testEndpoint)('run', () => {
     await putSuccess(job, 1_700_000_000);
 
     expect(await filter('run-a', [job])).toEqual([job]);
-    expect(await db.getState(job, 'running')).toMatchObject({
+    expect(await db.getState(job, 'claimed')).toMatchObject({
       runId: 'run-a',
+    });
+  });
+
+  test('keeps a newer commit and drops an older one once the newer commit has claimed the job', async () => {
+    const older = buildJob({ commitTs: 1_700_000_000, commitHash: 'aaa' });
+    const newer = buildJob({ commitTs: 1_700_000_100, commitHash: 'bbb' });
+    await filter('run-a', [older]);
+
+    expect(await filter('run-b', [newer])).toEqual([newer]);
+    expect(await filter('run-c', [older])).toEqual([]);
+    expect(await db.getState(newer, 'claimed')).toMatchObject({
+      runId: 'run-b',
+      commitHash: 'bbb',
     });
   });
 });

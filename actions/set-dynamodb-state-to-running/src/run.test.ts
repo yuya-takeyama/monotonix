@@ -1,9 +1,11 @@
-import { claimRunningState } from '@monotonix/dynamodb-common';
+import { PutCommand } from '@aws-sdk/lib-dynamodb';
+import { acquireState, stateKey } from '@monotonix/dynamodb-common';
 import {
   buildJob,
   createTestTable,
   testEndpoint,
 } from '@monotonix/dynamodb-common/testing';
+import type { Job } from '@monotonix/schema';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { run } from './run';
 import { runPost } from './runPost';
@@ -11,7 +13,9 @@ import { runPost } from './runPost';
 describe.skipIf(!testEndpoint)('set-dynamodb-state-to-running', () => {
   const now = 1_800_000_000;
   const ttlSeconds = 3600;
-  const job = buildJob();
+  const x = buildJob({ commitTs: 1_764_000_000, commitHash: 'c0ffee0' });
+  const y = buildJob({ commitTs: 1_764_000_100, commitHash: 'beef001' });
+  const z = buildJob({ commitTs: 1_764_000_200, commitHash: 'cafe002' });
   let db: Awaited<ReturnType<typeof createTestTable>>;
 
   beforeEach(async () => {
@@ -22,121 +26,242 @@ describe.skipIf(!testEndpoint)('set-dynamodb-state-to-running', () => {
     await db.drop();
   });
 
-  const newerJob = buildJob({
-    commitTs: job.context.last_commit.timestamp + 100,
-    commitHash: 'beef001',
-  });
+  // What filter-jobs-by-dynamodb-state does for each job it keeps.
+  const setup = async (runId: string, job: Job) =>
+    (
+      await acquireState({
+        docClient: db.docClient,
+        table: db.table,
+        job,
+        jobStatus: 'claimed',
+        runId,
+        now,
+        ttlSeconds,
+      })
+    ).acquired;
 
-  const claimInSetup = (runId: string, claimedJob = job) =>
-    claimRunningState({
-      docClient: db.docClient,
-      table: db.table,
-      job: claimedJob,
-      runId,
-      now,
-      ttlSeconds,
-      phase: 'claimed',
-    });
-
-  const acquire = (runId: string, acquiredJob = job) =>
+  const start = (runId: string, job: Job, table = db.table) =>
     run({
       docClient: db.docClient,
-      table: db.table,
-      job: acquiredJob,
+      table,
+      job,
       runId,
       now: now + 30,
       ttlSeconds,
     });
 
-  const post = (runId: string, jobStatus: 'success' | 'failure') =>
+  const finish = (
+    runId: string,
+    job: Job,
+    acquired: boolean,
+    jobStatus: 'success' | 'failure',
+  ) =>
     runPost({
       docClient: db.docClient,
       table: db.table,
       job,
+      acquired,
       jobStatus,
       runId,
       ttl: now + 86400,
     });
 
-  test('acquires the running state its own setup job claimed', async () => {
-    await claimInSetup('run-a');
+  const putRunningWithoutRunId = (job: Job) =>
+    db.docClient.send(
+      new PutCommand({
+        TableName: db.table,
+        Item: {
+          ...stateKey(job, 'running'),
+          appPath: job.context.app_path,
+          jobKey: job.context.job_key,
+          jobStatus: 'running',
+          commitTs: job.context.last_commit.timestamp,
+          commitHash: job.context.last_commit.hash,
+          ttl: now + ttlSeconds,
+        },
+      }),
+    );
 
-    await expect(acquire('run-a')).resolves.toBe('acquired');
-    expect(await db.getState(job, 'running')).toMatchObject({
+  test('starts the job its setup claimed, then records success and releases both states', async () => {
+    await setup('run-a', x);
+
+    await expect(start('run-a', x)).resolves.toBeUndefined();
+    expect(await db.getState(x, 'running')).toMatchObject({
       runId: 'run-a',
-      phase: 'started',
+      commitHash: 'c0ffee0',
       ttl: now + 30 + ttlSeconds,
     });
-  });
+    expect(await db.getState(x, 'claimed')).toMatchObject({ runId: 'run-a' });
 
-  test('acquires a running state nobody holds, as when re-running failed jobs', async () => {
-    await claimInSetup('run-a');
-    await acquire('run-a');
-    await post('run-a', 'failure');
+    await finish('run-a', x, true, 'success');
 
-    await expect(acquire('run-a')).resolves.toBe('acquired');
-    expect(await db.getState(job, 'running')).toMatchObject({
-      runId: 'run-a',
+    expect(await db.getState(x, 'success')).toMatchObject({
+      commitHash: 'c0ffee0',
     });
+    expect(await db.getState(x, 'running')).toBeUndefined();
+    expect(await db.getState(x, 'claimed')).toBeUndefined();
   });
 
-  test('fails and names the holder when another run holds the running state', async () => {
-    await claimInSetup('run-a');
+  test('releases both states without recording success when the job fails', async () => {
+    await setup('run-a', x);
+    await start('run-a', x);
 
-    await expect(acquire('run-b')).rejects.toThrow(/Run run-a holds/);
+    await finish('run-a', x, true, 'failure');
+
+    expect(await db.getState(x, 'success')).toBeUndefined();
+    expect(await db.getState(x, 'running')).toBeUndefined();
+    expect(await db.getState(x, 'claimed')).toBeUndefined();
   });
 
-  test('lets an older commit run when a newer commit is claimed but not started', async () => {
-    await claimInSetup('run-a');
-    await claimInSetup('run-b', newerJob);
+  test('lets only one of two runs start the same commit at the same time', async () => {
+    const results = await Promise.allSettled([
+      start('run-a', x),
+      start('run-b', x),
+    ]);
 
-    await expect(acquire('run-a')).resolves.toBe('superseded');
-    expect(await db.getState(job, 'running')).toMatchObject({
+    expect(results.map(r => r.status).sort()).toEqual([
+      'fulfilled',
+      'rejected',
+    ]);
+    const winner = results[0]?.status === 'fulfilled' ? 'run-a' : 'run-b';
+    const loser = results.find(r => r.status === 'rejected');
+    expect(loser?.reason).toBeInstanceOf(Error);
+    expect((loser?.reason as Error).message).toBe(
+      `apps/web / build_prd: Run ${winner} holds the running state for commit c0ffee0. Another run is already running the same commit.`,
+    );
+    expect(await db.getState(x, 'running')).toMatchObject({ runId: winner });
+  });
+
+  test('fails an older commit whose build starts after a newer commit started, even when a third commit has claimed the job since', async () => {
+    await setup('run-a', x);
+    await setup('run-b', y);
+    await start('run-b', y);
+    await setup('run-c', z);
+
+    await expect(start('run-a', x)).rejects.toThrow(
+      /Run run-b holds the running state for commit beef001. A newer commit is already running./,
+    );
+    await finish('run-a', x, false, 'failure');
+
+    expect(await db.getState(x, 'running')).toMatchObject({
       runId: 'run-b',
       commitHash: 'beef001',
-      phase: 'claimed',
+    });
+    expect(await db.getState(x, 'claimed')).toMatchObject({
+      runId: 'run-c',
+      commitHash: 'cafe002',
     });
   });
 
-  test('fails an older commit when a newer commit has started', async () => {
-    await claimInSetup('run-a');
-    await claimInSetup('run-b', newerJob);
-    await acquire('run-b', newerJob);
+  test('starts an older commit while a newer commit is only claimed', async () => {
+    await setup('run-a', x);
+    await setup('run-b', y);
 
-    await expect(acquire('run-a')).rejects.toThrow(/Run run-b holds/);
+    await expect(start('run-a', x)).resolves.toBeUndefined();
+    await expect(start('run-b', y)).resolves.toBeUndefined();
+    await finish('run-a', x, true, 'success');
+
+    expect(await db.getState(x, 'success')).toMatchObject({
+      commitHash: 'c0ffee0',
+    });
+    expect(await db.getState(x, 'running')).toMatchObject({ runId: 'run-b' });
+    expect(await db.getState(x, 'claimed')).toMatchObject({ runId: 'run-b' });
   });
 
-  test('post of the holding run records success and releases the claim', async () => {
-    await claimInSetup('run-a');
-    await acquire('run-a');
+  test('records no success for a run that did not acquire the running state, even when its job succeeds', async () => {
+    await setup('run-b', y);
+    await start('run-b', y);
 
-    await post('run-a', 'success');
+    await expect(start('run-a', x)).rejects.toThrow(/Run run-b holds/);
+    await finish('run-a', x, false, 'success');
 
-    expect(await db.getState(job, 'running')).toBeUndefined();
-    expect(await db.getState(job, 'success')).toMatchObject({
-      commitTs: job.context.last_commit.timestamp,
-      commitHash: job.context.last_commit.hash,
+    expect(await db.getState(x, 'success')).toBeUndefined();
+  });
+
+  test('re-running all jobs claims and starts again while the first attempt still holds its claim', async () => {
+    await setup('run-a', x);
+
+    expect(await setup('run-a', x)).toBe(true);
+    await expect(start('run-a', x)).resolves.toBeUndefined();
+  });
+
+  test('re-running all jobs claims and starts again after a failed attempt released its states', async () => {
+    await setup('run-a', x);
+    await start('run-a', x);
+    await finish('run-a', x, true, 'failure');
+
+    expect(await setup('run-a', x)).toBe(true);
+    await expect(start('run-a', x)).resolves.toBeUndefined();
+  });
+
+  test('re-running a failed build job starts it and releases the claim its setup still holds', async () => {
+    await setup('run-a', x);
+
+    await expect(start('run-a', x)).resolves.toBeUndefined();
+    await finish('run-a', x, true, 'success');
+
+    expect(await db.getState(x, 'success')).toMatchObject({
+      commitHash: 'c0ffee0',
+    });
+    expect(await db.getState(x, 'claimed')).toBeUndefined();
+  });
+
+  test('re-running a failed build job starts it after the first attempt released its states', async () => {
+    await setup('run-a', x);
+    await start('run-a', x);
+    await finish('run-a', x, true, 'failure');
+
+    await expect(start('run-a', x)).resolves.toBeUndefined();
+    await finish('run-a', x, true, 'success');
+
+    expect(await db.getState(x, 'success')).toMatchObject({
+      commitHash: 'c0ffee0',
+    });
+    expect(await db.getState(x, 'running')).toBeUndefined();
+  });
+
+  test('releases the claim when the main step fails with an error other than a failed condition', async () => {
+    await setup('run-a', x);
+
+    await expect(
+      start('run-a', x, `${db.table}-missing`),
+    ).rejects.toMatchObject({ name: 'ResourceNotFoundException' });
+    await finish('run-a', x, false, 'failure');
+
+    expect(await db.getState(x, 'claimed')).toBeUndefined();
+    expect(await db.getState(x, 'running')).toBeUndefined();
+    expect(await db.getState(x, 'success')).toBeUndefined();
+  });
+
+  test('a run that fails to start releases its own claim and leaves the running state without runId that blocked it', async () => {
+    await putRunningWithoutRunId(x);
+    await setup('run-a', x);
+
+    await expect(start('run-a', x)).rejects.toThrow(
+      'apps/web / build_prd: Run (unknown) holds the running state for commit c0ffee0. Another run is already running the same commit.',
+    );
+    await finish('run-a', x, false, 'failure');
+
+    expect(await db.getState(x, 'claimed')).toBeUndefined();
+    expect(await db.getState(x, 'running')).toEqual({
+      ...stateKey(x, 'running'),
+      appPath: 'apps/web',
+      jobKey: 'build_prd',
+      jobStatus: 'running',
+      commitTs: 1_764_000_000,
+      commitHash: 'c0ffee0',
+      ttl: now + ttlSeconds,
     });
   });
 
-  test('post of the holding run releases the claim without success on failure', async () => {
-    await claimInSetup('run-a');
-    await acquire('run-a');
+  test('a newer commit starts over a running state without runId for an older commit', async () => {
+    await putRunningWithoutRunId(x);
+    await setup('run-b', y);
 
-    await post('run-a', 'failure');
-
-    expect(await db.getState(job, 'running')).toBeUndefined();
-    expect(await db.getState(job, 'success')).toBeUndefined();
-  });
-
-  test('post of another run leaves the claim intact', async () => {
-    await claimInSetup('run-a');
-    await acquire('run-a');
-
-    await post('run-b', 'failure');
-
-    expect(await db.getState(job, 'running')).toMatchObject({
-      runId: 'run-a',
+    await expect(start('run-b', y)).resolves.toBeUndefined();
+    expect(await db.getState(x, 'running')).toMatchObject({
+      runId: 'run-b',
+      commitHash: 'beef001',
     });
   });
 });

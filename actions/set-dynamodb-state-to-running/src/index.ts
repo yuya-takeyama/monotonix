@@ -8,13 +8,16 @@ import { ACQUIRED_STATE, saveAwsCredentialsIntoState } from './utils';
 
 (async () => {
   try {
+    // Saved first, so the post step can release this run's claim even when
+    // this step fails.
+    saveAwsCredentialsIntoState();
     const table = getInput('dynamodb-table');
     const region = getInput('dynamodb-region');
     const jobJson = getInput('job');
     const job = JobSchema.parse(JSON.parse(jobJson));
     const ttlSeconds = parseDuration(getInput('running-ttl'));
 
-    const outcome = await run({
+    await run({
       docClient: DynamoDBDocumentClient.from(new DynamoDBClient({ region })),
       table,
       job,
@@ -22,11 +25,7 @@ import { ACQUIRED_STATE, saveAwsCredentialsIntoState } from './utils';
       now: Math.floor(Date.now() / 1000),
       ttlSeconds,
     });
-
-    if (outcome === 'acquired') {
-      saveAwsCredentialsIntoState();
-      saveState(ACQUIRED_STATE, 'true');
-    }
+    saveState(ACQUIRED_STATE, 'true');
   } catch (error) {
     console.error(error);
     setFailed(`Action failed with error: ${error}`);

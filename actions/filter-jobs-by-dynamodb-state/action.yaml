@@ -13,7 +13,7 @@ inputs:
     description: 'DynamoDB Region'
     required: true
   running-ttl:
-    description: 'TTL for the running state each kept job is claimed with (format: 1d, 1h, 1m, 1s)'
+    description: 'TTL for the claim on each kept job, after which another run for the same commit can claim it (format: 1d, 1h, 1m, 1s)'
     default: '1h'
 
 outputs:

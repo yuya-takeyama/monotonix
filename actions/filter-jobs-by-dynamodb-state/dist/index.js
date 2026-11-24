@@ -45507,13 +45507,10 @@ const StateItemSchema = object({
     sk: string(),
     appPath: string(),
     jobKey: string(),
-    jobStatus: _enum(['running', 'success']),
+    jobStatus: _enum(['claimed', 'running', 'success']),
     commitTs: number(),
     commitHash: string(),
     runId: string().optional(),
-    // Running items only: `claimed` by the setup job, `started` by the build
-    // job. Running items without it were written by a build job.
-    phase: _enum(['claimed', 'started']).optional(),
     ttl: number(),
 });
 const stateKey = (job, jobStatus) => ({
@@ -45529,25 +45526,24 @@ const getRunId = (env = process.env) => {
 };
 // Matched by name so a second bundled copy of the SDK cannot defeat instanceof.
 const isConditionalCheckFailed = (err) => err instanceof Error && err.name === 'ConditionalCheckFailedException';
-const claimRunningState = async ({ docClient, table, job, runId, now, ttlSeconds, phase, }) => {
+const acquireState = async ({ docClient, table, job, jobStatus, runId, now, ttlSeconds, }) => {
     const item = {
-        ...stateKey(job, 'running'),
+        ...stateKey(job, jobStatus),
         appPath: job.context.app_path,
         jobKey: job.context.job_key,
-        jobStatus: 'running',
+        jobStatus,
         commitTs: job.context.last_commit.timestamp,
         commitHash: job.context.last_commit.hash,
         runId,
-        phase,
         ttl: now + ttlSeconds,
     };
     try {
         await docClient.send(new PutCommand({
             TableName: table,
             Item: item,
-            // DynamoDB TTL deletes expired items lazily, so an expired claim can
-            // still be in the table and must not block anyone.
-            ConditionExpression: 'attribute_not_exists(commitTs) OR commitTs < :commitTs OR runId = :runId OR #ttl < :now',
+            // DynamoDB TTL deletes expired items lazily, so an expired item can
+            // still be in the table. It gives way to the same or a newer commit.
+            ConditionExpression: 'attribute_not_exists(commitTs) OR commitTs < :commitTs OR runId = :runId OR (#ttl < :now AND commitTs <= :commitTs)',
             ExpressionAttributeNames: { '#ttl': 'ttl' },
             ExpressionAttributeValues: {
                 ':commitTs': item.commitTs,
@@ -45556,21 +45552,19 @@ const claimRunningState = async ({ docClient, table, job, runId, now, ttlSeconds
             },
             ReturnValuesOnConditionCheckFailure: 'ALL_OLD',
         }));
-        return { claimed: true };
+        return { acquired: true };
     }
     catch (err) {
         if (!isConditionalCheckFailed(err)) {
             throw err;
         }
         const held = err.Item;
-        const heldPhase = StateItemSchema.shape.phase.safeParse(held?.phase?.S);
         return {
-            claimed: false,
+            acquired: false,
             holder: {
                 runId: held?.runId?.S,
                 commitHash: held?.commitHash?.S,
                 commitTs: held?.commitTs?.N ? Number(held.commitTs.N) : undefined,
-                phase: heldPhase.success ? heldPhase.data : undefined,
             },
         };
     }
@@ -45747,16 +45741,16 @@ const run = async ({ docClient, table, jobs, runId, now, ttlSeconds, }) => {
         return true;
     });
     const claimedJobs = await Promise.all(unfinishedJobs.map(async (job) => {
-        const claim = await claimRunningState({
+        const claim = await acquireState({
             docClient,
             table,
             job,
+            jobStatus: 'claimed',
             runId,
             now,
             ttlSeconds,
-            phase: 'claimed',
         });
-        if (!claim.claimed) {
+        if (!claim.acquired) {
             info(`${job.context.label}: ${job.context.last_commit.hash}: Skip: Job is already claimed by run ${claim.holder.runId ?? '(unknown)'} for commit ${claim.holder.commitHash ?? '(unknown)'}`);
             return undefined;
         }

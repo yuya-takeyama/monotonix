@@ -22,7 +22,7 @@ The actions work together in a specific sequence:
 2. `filter-jobs-by-changed-files`: Filters jobs based on changed files in commit/PR
 3. `filter-jobs-by-dynamodb-state`: Skips completed jobs and claims the rest for this workflow run in DynamoDB, dropping jobs another run already claimed
 4. `load-docker-build-job-params`: Enriches Docker jobs with registry configs from global config
-5. `set-dynamodb-state-to-running`: Confirms the claim at the start of the build job and handles post-completion state updates
+5. `set-dynamodb-state-to-running`: Marks the job as running at the start of the build job, failing when the same or a newer commit is already running, and handles post-completion state updates
 
 ### Key Concepts
 
@@ -141,9 +141,11 @@ Each action follows this pattern:
 
 ### State Values
 
-- `running`: A workflow run claimed the job and is executing it, or is about to. Records include the claiming `runId` (`GITHUB_RUN_ID`) and a `phase`: `claimed` by the setup job, `started` by the build job
+- `claimed`: Written by `filter-jobs-by-dynamodb-state` for each job it keeps. Decides which workflow run builds a commit
+- `running`: Written by `set-dynamodb-state-to-running` when the build job starts. Decides the order in which commits build
 - `success`: Job completed successfully
-- Records include the commit SHA and timestamp for version comparison
+- Records include the commit SHA and timestamp for version comparison. `claimed` and `running` records also include the `runId` (`GITHUB_RUN_ID`) that holds them
+- `claimed` and `running` are written with the same conditional put (`acquireState` in `@monotonix/dynamodb-common`), and the post step of `set-dynamodb-state-to-running` deletes both when its own run holds them (`releaseState`)
 
 ### Integration Tests
 

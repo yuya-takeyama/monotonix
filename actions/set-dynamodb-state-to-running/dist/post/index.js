@@ -28383,13 +28383,6 @@ function notice(message, properties = {}) {
     issueCommand('notice', toCommandProperties(properties), message instanceof Error ? message.toString() : message);
 }
 /**
- * Writes info to log with console.log.
- * @param message info message
- */
-function info(message) {
-    process.stdout.write(message + os.EOL);
-}
-/**
  * Gets the value of an state set by this action's main execution.
  *
  * @param     name     name of the state to get
@@ -45416,13 +45409,10 @@ object({
     sk: string(),
     appPath: string(),
     jobKey: string(),
-    jobStatus: _enum(['running', 'success']),
+    jobStatus: _enum(['claimed', 'running', 'success']),
     commitTs: number(),
     commitHash: string(),
     runId: string().optional(),
-    // Running items only: `claimed` by the setup job, `started` by the build
-    // job. Running items without it were written by a build job.
-    phase: _enum(['claimed', 'started']).optional(),
     ttl: number(),
 });
 const stateKey = (job, jobStatus) => ({
@@ -45438,6 +45428,24 @@ const getRunId = (env = process.env) => {
 };
 // Matched by name so a second bundled copy of the SDK cannot defeat instanceof.
 const isConditionalCheckFailed = (err) => err instanceof Error && err.name === 'ConditionalCheckFailedException';
+// Returns false when another run holds the item or it is already gone.
+const releaseState = async ({ docClient, table, job, jobStatus, runId, }) => {
+    try {
+        await docClient.send(new DeleteCommand({
+            TableName: table,
+            Key: stateKey(job, jobStatus),
+            ConditionExpression: 'runId = :runId',
+            ExpressionAttributeValues: { ':runId': runId },
+        }));
+        return true;
+    }
+    catch (err) {
+        if (isConditionalCheckFailed(err)) {
+            return false;
+        }
+        throw err;
+    }
+};
 const parseDuration = (duration) => {
     const regex = /(\d+)(\D+)/g;
     let matches;
@@ -45545,37 +45553,19 @@ const JobSchema = object({
     metadata: MetadataSchema.default({}), // Default to empty object
 });
 
-const runPost = async ({ docClient, table, job, jobStatus, runId, ttl, }) => {
+const runPost = async ({ docClient, table, job, acquired, jobStatus, runId, ttl, }) => {
     try {
-        if (jobStatus === 'success') {
-            await putSuccessState({ job, table, docClient, ttl });
-        }
-    }
-    catch (err) {
-        if (isConditionalCheckFailed(err)) {
-            notice(`${job.context.label}: A newer or the same commit is already in success state`);
-            // No need to let it fail
-        }
-        else {
-            throw err;
+        if (acquired && jobStatus === 'success') {
+            await putSuccessState({ docClient, table, job, ttl });
         }
     }
     finally {
-        try {
-            await deleteRunningState({ job, table, docClient, runId });
-        }
-        catch (err) {
-            if (isConditionalCheckFailed(err)) {
-                notice(`${job.context.label}: The running state is held by another run now`);
-                // No need to let it fail
-            }
-            else {
-                console.error(`Failed to delete running state: ${err}`);
-            }
+        for (const heldStatus of ['running', 'claimed']) {
+            await releaseHeldState({ docClient, table, job, runId, heldStatus });
         }
     }
 };
-const putSuccessState = async ({ job, table, docClient, ttl, }) => {
+const putSuccessState = async ({ docClient, table, job, ttl, }) => {
     const item = {
         ...stateKey(job, 'success'),
         appPath: job.context.app_path,
@@ -45585,24 +45575,39 @@ const putSuccessState = async ({ job, table, docClient, ttl, }) => {
         commitHash: job.context.last_commit.hash,
         ttl,
     };
-    return docClient.send(new PutCommand({
-        TableName: table,
-        Item: item,
-        ConditionExpression: 'attribute_not_exists(commitTs) OR commitTs < :newCommitTs',
-        ExpressionAttributeValues: {
-            ':newCommitTs': job.context.last_commit.timestamp,
-        },
-    }));
+    try {
+        await docClient.send(new PutCommand({
+            TableName: table,
+            Item: item,
+            ConditionExpression: 'attribute_not_exists(commitTs) OR commitTs < :newCommitTs',
+            ExpressionAttributeValues: {
+                ':newCommitTs': job.context.last_commit.timestamp,
+            },
+        }));
+    }
+    catch (err) {
+        if (!isConditionalCheckFailed(err)) {
+            throw err;
+        }
+        notice(`${job.context.label}: A newer or the same commit is already in success state`);
+    }
 };
-const deleteRunningState = async ({ job, table, docClient, runId, }) => {
-    return docClient.send(new DeleteCommand({
-        TableName: table,
-        Key: stateKey(job, 'running'),
-        ConditionExpression: 'runId = :runId',
-        ExpressionAttributeValues: {
-            ':runId': runId,
-        },
-    }));
+const releaseHeldState = async ({ docClient, table, job, runId, heldStatus, }) => {
+    try {
+        const released = await releaseState({
+            docClient,
+            table,
+            job,
+            jobStatus: heldStatus,
+            runId,
+        });
+        if (!released) {
+            notice(`${job.context.label}: Left the ${heldStatus} state in place because this run does not hold it`);
+        }
+    }
+    catch (err) {
+        console.error(`Failed to delete ${heldStatus} state: ${err}`);
+    }
 };
 
 const ACQUIRED_STATE = 'MONOTONIX_DYNAMODB_STATE_ACQUIRED';
@@ -45618,10 +45623,6 @@ const getAwsCredentialsFromState = () => ({
         const region = getInput('dynamodb-region');
         const jobJson = getInput('job');
         const job = JobSchema.parse(JSON.parse(jobJson));
-        if (getState(ACQUIRED_STATE) !== 'true') {
-            info(`${job.context.label}: Skip: This job did not acquire the running state`);
-            return;
-        }
         const jobStatus = getInput('job-status');
         if (jobStatus !== 'success' &&
             jobStatus !== 'failure' &&
@@ -45637,6 +45638,7 @@ const getAwsCredentialsFromState = () => ({
             })),
             table,
             job,
+            acquired: getState(ACQUIRED_STATE) === 'true',
             jobStatus,
             runId: getRunId(),
             ttl,
