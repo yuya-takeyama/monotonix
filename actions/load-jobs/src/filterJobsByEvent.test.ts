@@ -135,6 +135,37 @@ describe('filterJobsByGitHubContext', () => {
         }),
       ).toStrictEqual([]);
     });
+
+    describe('when branches are glob patterns', () => {
+      const patternJob: Job = {
+        ...pushMainJob,
+        on: { push: { branches: ['release/*', 'hotfix/**', 'v{1,2}'] } },
+      };
+
+      it.each([
+        ['release/v1', true],
+        ['release/v1/rc', false],
+        ['release', false],
+        ['hotfix/a', true],
+        ['hotfix/a/b', true],
+        ['v1', true],
+        ['v2', true],
+        ['v3', false],
+        ['feature', false],
+      ])('branch %s matches: %s', (branchName, matches) => {
+        const event: Partial<Event> = {
+          eventName: 'push',
+          ref: `refs/heads/${branchName}`,
+        };
+        expect(
+          filterJobsByEvent({
+            jobs: [patternJob],
+            // @ts-expect-error
+            event,
+          }),
+        ).toStrictEqual(matches ? [patternJob] : []);
+      });
+    });
   });
 
   describe('pull_request event', () => {

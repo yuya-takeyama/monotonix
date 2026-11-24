@@ -15,9 +15,9 @@
     "@actions/github": "9.1.1",
     "@monotonix/schema": "workspace:*",
     "@monotonix/utils": "workspace:*",
-    "js-yaml": "^4.3.1",
+    "js-yaml": "^4.3.2",
     "luxon": "3.7.2",
-    "zod": "4.3.6"
+    "zod": "4.6.6"
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "29.0.3",
@@ -28,9 +28,9 @@
     "@types/luxon": "3.7.1",
     "@types/node": "24.10.9",
     "prettier": "3.8.1",
-    "rimraf": "6.1.3",
+    "rimraf": "6.1.4",
     "rollup": "4.62.2",
     "typescript": "5.9.3",
-    "vitest": "4.1.9"
+    "vitest": "4.1.12"
   }
 }

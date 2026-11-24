@@ -3,5 +3,3 @@ packages:
   - packages/*
 allowBuilds:
   unrs-resolver: true
-minimumReleaseAgeExclude:
-  - js-yaml@4.3.0
