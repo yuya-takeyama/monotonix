@@ -289,23 +289,23 @@ Each job has two states in DynamoDB, and each action writes one of them. Both na
 
 `filter-jobs-by-dynamodb-state` decides which jobs a workflow run builds. It skips a job whose commit is already in success state, and a job that another run is still building for the same or a newer commit. It claims every other job. The claim is a conditional write, so when two runs for the same commit filter the job at the same time, only one of them keeps it. The other run drops the job and logs which run claimed it. A run for a newer commit takes over the claim, and a run for an older commit drops the job.
 
-`set-dynamodb-state-to-running` runs at the start of the build job and takes the running state. It fails, naming the run and commit that hold the running state, when another run holds it for the same commit or for a newer commit. An older commit therefore never starts after a newer commit has started. It does not look at the claim, so an older commit still builds when a newer commit has claimed the job but has not started yet.
+`set-dynamodb-state-to-running` runs at the start of the build job and takes the running state. It fails, naming the run and commit that hold the running state, when another run holds it for the same commit or for a newer commit. An older commit therefore does not start while a newer commit's running state exists. It does not look at the claim, so an older commit still builds when a newer commit has claimed the job but has not started yet.
 
 The post step of `set-dynamodb-state-to-running` records success when the job succeeded and this run took the running state. It then deletes the running state and the claimed state if this run still holds them, and leaves them if another run holds them. The post step does this even when the main step failed, so a build job that could not start still releases its claim.
 
 A claim stops blocking other runs for the same commit when one of these happens:
 
 - The post step of `set-dynamodb-state-to-running` in the run that holds it deletes it.
-- Its `running-ttl` passes. An expired state gives way to the same or a newer commit even before DynamoDB TTL deletes it.
+- Its TTL passes: `claim-ttl` of `filter-jobs-by-dynamodb-state` for the claim (default `15m`), `running-ttl` of `set-dynamodb-state-to-running` for the running state (default `1h`). An expired state gives way to the same or a newer commit even before DynamoDB TTL deletes it.
 
 To keep claims accurate, set up the workflow this way:
 
 - Run `filter-jobs-by-dynamodb-state` after the other job filters, so every job it keeps reaches a build job.
 - Run `set-dynamodb-state-to-running` in every build job that gets its jobs from `filter-jobs-by-dynamodb-state`.
 - Use the same version of `filter-jobs-by-dynamodb-state` and `set-dynamodb-state-to-running`.
-- Set `running-ttl` of `set-dynamodb-state-to-running` longer than your longest build. While a build is running, `filter-jobs-by-dynamodb-state` skips that job for other runs of the same or an older commit, even after the claim has expired. Once the running state expires too, another run for the same commit can take the job and fail in `set-dynamodb-state-to-running`.
+- Set `running-ttl` of `set-dynamodb-state-to-running` longer than your longest build. While a build is running, `filter-jobs-by-dynamodb-state` skips that job for other runs of the same or an older commit, so the claim only has to last until the build job starts. Once the running state expires, another run for the same commit can take the job and fail in `set-dynamodb-state-to-running`.
 
-If a run is cancelled or fails after its setup job and before its build job reaches `set-dynamodb-state-to-running`, for example when `fail-fast` cancels queued matrix jobs, its claim blocks that job for the same commit until `running-ttl` passes. Runs for newer commits are not blocked. A re-run of the same workflow run keeps its claim, because the run ID does not change.
+If a run is cancelled or fails after `filter-jobs-by-dynamodb-state` and before its build job reaches `set-dynamodb-state-to-running`, for example when `fail-fast` cancels queued matrix jobs, its claim blocks that job for the same commit until `claim-ttl` passes. Keep `claim-ttl` just above the usual wait between the setup job and the start of the build jobs. If a build job waits longer than that, another run for the same commit can claim the job and then fail in `set-dynamodb-state-to-running`. Runs for newer commits are not blocked. A re-run of the same workflow run keeps its claim, because the run ID does not change.
 
 ## AWS Setup
 

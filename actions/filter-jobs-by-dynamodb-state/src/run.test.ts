@@ -165,4 +165,16 @@ describe.skipIf(!testEndpoint)('run', () => {
       older,
     ]);
   });
+
+  test('skips a job another run is building for a newer commit, even after that running state has expired', async () => {
+    const job = buildJob({ commitTs: 1_700_000_000 });
+    await putRunning(job, {
+      runId: 'run-a',
+      commitTs: 1_700_000_100,
+      ttl: now - 1,
+    });
+
+    expect(await filter('run-b', [job])).toEqual([]);
+    expect(await db.getState(job, 'claimed')).toBeUndefined();
+  });
 });

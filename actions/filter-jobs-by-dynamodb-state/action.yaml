@@ -12,9 +12,9 @@ inputs:
   dynamodb-region:
     description: 'DynamoDB Region'
     required: true
-  running-ttl:
-    description: 'TTL for the claim on each kept job, after which another run for the same commit can claim it (format: 1d, 1h, 1m, 1s)'
-    default: '1h'
+  claim-ttl:
+    description: 'TTL for the claim on each kept job. It only needs to cover the time from this step until the build job reaches set-dynamodb-state-to-running (format: 1d, 1h, 1m, 1s)'
+    default: '15m'
 
 outputs:
   result:

@@ -20,8 +20,17 @@ export const saveAwsCredentialsIntoState = () => {
   );
 };
 
-export const getAwsCredentialsFromState = () => ({
-  accessKeyId: getState('MONOTONIX_DYNAMODB_STATE_AWS_ACCESS_KEY_ID'),
-  secretAccessKey: getState('MONOTONIX_DYNAMODB_STATE_AWS_SECRET_ACCESS_KEY'),
-  sessionToken: getState('MONOTONIX_DYNAMODB_STATE_AWS_SESSION_TOKEN'),
-});
+// Credentials that did not come from env vars (instance profile, AWS_PROFILE)
+// are not saved; leave them to the SDK's default provider chain.
+export const getAwsCredentialsFromState = () => {
+  const accessKeyId = getState('MONOTONIX_DYNAMODB_STATE_AWS_ACCESS_KEY_ID');
+  if (!accessKeyId) {
+    return undefined;
+  }
+  return {
+    accessKeyId,
+    secretAccessKey: getState('MONOTONIX_DYNAMODB_STATE_AWS_SECRET_ACCESS_KEY'),
+    sessionToken:
+      getState('MONOTONIX_DYNAMODB_STATE_AWS_SESSION_TOKEN') || undefined,
+  };
+};

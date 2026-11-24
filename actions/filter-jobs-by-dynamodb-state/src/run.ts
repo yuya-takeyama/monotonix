@@ -63,8 +63,9 @@ export const run = async ({
     if (
       running &&
       running.runId !== runId &&
-      running.ttl >= now &&
-      running.commitTs >= job.context.last_commit.timestamp
+      (running.commitTs > job.context.last_commit.timestamp ||
+        (running.commitTs === job.context.last_commit.timestamp &&
+          running.ttl >= now))
     ) {
       info(
         `${job.context.label}: ${job.context.last_commit.hash}: Skip: Job is already running in run ${running.runId ?? '(unknown)'} for commit ${running.commitHash}`,

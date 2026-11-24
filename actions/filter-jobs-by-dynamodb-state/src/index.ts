@@ -26,7 +26,7 @@ import { run } from './run';
       );
     }
     const jobs = JobsSchema.parse(JSON.parse(jobsJson));
-    const ttlSeconds = parseDuration(getInput('running-ttl'));
+    const ttlSeconds = parseDuration(getInput('claim-ttl'));
     const runId = getRunId();
 
     const result = await run({

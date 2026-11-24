@@ -45742,8 +45742,9 @@ const run = async ({ docClient, table, jobs, runId, now, ttlSeconds, }) => {
         const running = runningStates.get(`${job.context.app_path}#${job.context.job_key}`);
         if (running &&
             running.runId !== runId &&
-            running.ttl >= now &&
-            running.commitTs >= job.context.last_commit.timestamp) {
+            (running.commitTs > job.context.last_commit.timestamp ||
+                (running.commitTs === job.context.last_commit.timestamp &&
+                    running.ttl >= now))) {
             info(`${job.context.label}: ${job.context.last_commit.hash}: Skip: Job is already running in run ${running.runId ?? '(unknown)'} for commit ${running.commitHash}`);
             return false;
         }
@@ -45799,7 +45800,7 @@ const toStates = (items) => {
             throw new Error('Input jobs, input jobs-file, env $MONOTONIX_JOBS_FILE, or env $MONOTONIX_JOBS is required');
         }
         const jobs = JobsSchema.parse(JSON.parse(jobsJson));
-        const ttlSeconds = parseDuration(getInput('running-ttl'));
+        const ttlSeconds = parseDuration(getInput('claim-ttl'));
         const runId = getRunId();
         const result = await run({
             docClient: DynamoDBDocumentClient.from(new DynamoDBClient({ region })),
