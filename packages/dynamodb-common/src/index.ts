@@ -12,6 +12,9 @@ export const StateItemSchema = z.object({
   commitTs: z.number(),
   commitHash: z.string(),
   runId: z.string().optional(),
+  // Running items only: `claimed` by the setup job, `started` by the build
+  // job. Running items without it were written by a build job.
+  phase: z.enum(['claimed', 'started']).optional(),
   ttl: z.number(),
 });
 
@@ -38,7 +41,12 @@ export const isConditionalCheckFailed = (
 
 export type ClaimResult =
   | { claimed: true }
-  | { claimed: false; holder: { runId?: string; commitHash?: string } };
+  | {
+      claimed: false;
+      holder: Partial<
+        Pick<StateItem, 'runId' | 'commitHash' | 'commitTs' | 'phase'>
+      >;
+    };
 
 type ClaimRunningStateParams = {
   docClient: DynamoDBDocumentClient;
@@ -47,6 +55,7 @@ type ClaimRunningStateParams = {
   runId: string;
   now: number;
   ttlSeconds: number;
+  phase: NonNullable<StateItem['phase']>;
 };
 
 export const claimRunningState = async ({
@@ -56,6 +65,7 @@ export const claimRunningState = async ({
   runId,
   now,
   ttlSeconds,
+  phase,
 }: ClaimRunningStateParams): Promise<ClaimResult> => {
   const item: StateItem = {
     ...stateKey(job, 'running'),
@@ -65,6 +75,7 @@ export const claimRunningState = async ({
     commitTs: job.context.last_commit.timestamp,
     commitHash: job.context.last_commit.hash,
     runId,
+    phase,
     ttl: now + ttlSeconds,
   };
   try {
@@ -90,11 +101,15 @@ export const claimRunningState = async ({
     if (!isConditionalCheckFailed(err)) {
       throw err;
     }
+    const held = err.Item;
+    const heldPhase = StateItemSchema.shape.phase.safeParse(held?.phase?.S);
     return {
       claimed: false,
       holder: {
-        runId: err.Item?.runId?.S,
-        commitHash: err.Item?.commitHash?.S,
+        runId: held?.runId?.S,
+        commitHash: held?.commitHash?.S,
+        commitTs: held?.commitTs?.N ? Number(held.commitTs.N) : undefined,
+        phase: heldPhase.success ? heldPhase.data : undefined,
       },
     };
   }

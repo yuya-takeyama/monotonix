@@ -14,7 +14,7 @@ import { ACQUIRED_STATE, saveAwsCredentialsIntoState } from './utils';
     const job = JobSchema.parse(JSON.parse(jobJson));
     const ttlSeconds = parseDuration(getInput('running-ttl'));
 
-    await run({
+    const outcome = await run({
       docClient: DynamoDBDocumentClient.from(new DynamoDBClient({ region })),
       table,
       job,
@@ -23,8 +23,10 @@ import { ACQUIRED_STATE, saveAwsCredentialsIntoState } from './utils';
       ttlSeconds,
     });
 
-    saveAwsCredentialsIntoState();
-    saveState(ACQUIRED_STATE, 'true');
+    if (outcome === 'acquired') {
+      saveAwsCredentialsIntoState();
+      saveState(ACQUIRED_STATE, 'true');
+    }
   } catch (error) {
     console.error(error);
     setFailed(`Action failed with error: ${error}`);

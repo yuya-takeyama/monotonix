@@ -64,6 +64,7 @@ export const run = async ({
         runId,
         now,
         ttlSeconds,
+        phase: 'claimed',
       });
       if (!claim.claimed) {
         info(

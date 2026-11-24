@@ -284,7 +284,7 @@ State tracking (`filter-jobs-by-dynamodb-state` / `set-dynamodb-state-to-running
 
 `filter-jobs-by-dynamodb-state` decides which jobs a workflow run builds. It skips a job whose commit is already in success state. It claims every other job by writing a running state that names the workflow run (`GITHUB_RUN_ID`). The write is conditional, so when two runs filter the same job at the same time, only one of them claims and keeps it. The other run drops the job and logs which run claimed it.
 
-`set-dynamodb-state-to-running` runs at the start of the build job. It accepts the claim that its own setup job made, and it fails if another run holds the job. Its post step records success and deletes the running state only when its own run holds it.
+`set-dynamodb-state-to-running` runs at the start of the build job. It accepts the claim that its own setup job made and marks the job as started. It fails if another run holds the job for the same commit, or for a newer commit that has started. If a run for a newer commit has only claimed the job and its build job has not started, the older commit still runs, without holding the running state. Its post step records success and deletes the running state only when its own run holds it.
 
 A claim stops blocking other runs when one of these happens:
 

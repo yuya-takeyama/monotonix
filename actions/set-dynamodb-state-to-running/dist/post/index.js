@@ -45420,6 +45420,9 @@ object({
     commitTs: number(),
     commitHash: string(),
     runId: string().optional(),
+    // Running items only: `claimed` by the setup job, `started` by the build
+    // job. Running items without it were written by a build job.
+    phase: _enum(['claimed', 'started']).optional(),
     ttl: number(),
 });
 const stateKey = (job, jobStatus) => ({

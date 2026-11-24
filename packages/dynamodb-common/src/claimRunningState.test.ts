@@ -38,6 +38,7 @@ describe.skipIf(!testEndpoint)('claimRunningState', () => {
       runId,
       now,
       ttlSeconds,
+      phase: 'claimed',
       ...overrides,
     });
 
@@ -47,6 +48,7 @@ describe.skipIf(!testEndpoint)('claimRunningState', () => {
       runId: 'run-a',
       commitTs: 1_700_000_000,
       commitHash: 'aaa',
+      phase: 'claimed',
       ttl: now + ttlSeconds,
     });
   });
@@ -56,7 +58,12 @@ describe.skipIf(!testEndpoint)('claimRunningState', () => {
 
     expect(await claim('run-b')).toEqual({
       claimed: false,
-      holder: { runId: 'run-a', commitHash: 'aaa' },
+      holder: {
+        runId: 'run-a',
+        commitHash: 'aaa',
+        commitTs: 1_700_000_000,
+        phase: 'claimed',
+      },
     });
     expect(await db.getState(job, 'running')).toMatchObject({
       runId: 'run-a',
@@ -66,9 +73,12 @@ describe.skipIf(!testEndpoint)('claimRunningState', () => {
   test('accepts a claim the same run already holds', async () => {
     await claim('run-a');
 
-    expect(await claim('run-a', { now: now + 60 })).toEqual({ claimed: true });
+    expect(await claim('run-a', { now: now + 60, phase: 'started' })).toEqual({
+      claimed: true,
+    });
     expect(await db.getState(job, 'running')).toMatchObject({
       runId: 'run-a',
+      phase: 'started',
       ttl: now + 60 + ttlSeconds,
     });
   });
@@ -90,7 +100,12 @@ describe.skipIf(!testEndpoint)('claimRunningState', () => {
 
     expect(await claim('run-a')).toEqual({
       claimed: false,
-      holder: { runId: 'run-b', commitHash: 'bbb' },
+      holder: {
+        runId: 'run-b',
+        commitHash: 'bbb',
+        commitTs: 1_700_000_100,
+        phase: 'claimed',
+      },
     });
   });
 
@@ -121,7 +136,12 @@ describe.skipIf(!testEndpoint)('claimRunningState', () => {
 
     expect(await claim('run-b')).toEqual({
       claimed: false,
-      holder: { runId: undefined, commitHash: 'aaa' },
+      holder: {
+        runId: undefined,
+        commitHash: 'aaa',
+        commitTs: 1_700_000_000,
+        phase: undefined,
+      },
     });
   });
 

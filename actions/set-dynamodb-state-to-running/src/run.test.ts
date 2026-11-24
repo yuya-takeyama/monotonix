@@ -22,21 +22,27 @@ describe.skipIf(!testEndpoint)('set-dynamodb-state-to-running', () => {
     await db.drop();
   });
 
-  const claimInSetup = (runId: string) =>
+  const newerJob = buildJob({
+    commitTs: job.context.last_commit.timestamp + 100,
+    commitHash: 'beef001',
+  });
+
+  const claimInSetup = (runId: string, claimedJob = job) =>
     claimRunningState({
       docClient: db.docClient,
       table: db.table,
-      job,
+      job: claimedJob,
       runId,
       now,
       ttlSeconds,
+      phase: 'claimed',
     });
 
-  const acquire = (runId: string) =>
+  const acquire = (runId: string, acquiredJob = job) =>
     run({
       docClient: db.docClient,
       table: db.table,
-      job,
+      job: acquiredJob,
       runId,
       now: now + 30,
       ttlSeconds,
@@ -55,9 +61,10 @@ describe.skipIf(!testEndpoint)('set-dynamodb-state-to-running', () => {
   test('acquires the running state its own setup job claimed', async () => {
     await claimInSetup('run-a');
 
-    await expect(acquire('run-a')).resolves.toBeUndefined();
+    await expect(acquire('run-a')).resolves.toBe('acquired');
     expect(await db.getState(job, 'running')).toMatchObject({
       runId: 'run-a',
+      phase: 'started',
       ttl: now + 30 + ttlSeconds,
     });
   });
@@ -67,7 +74,7 @@ describe.skipIf(!testEndpoint)('set-dynamodb-state-to-running', () => {
     await acquire('run-a');
     await post('run-a', 'failure');
 
-    await expect(acquire('run-a')).resolves.toBeUndefined();
+    await expect(acquire('run-a')).resolves.toBe('acquired');
     expect(await db.getState(job, 'running')).toMatchObject({
       runId: 'run-a',
     });
@@ -77,6 +84,26 @@ describe.skipIf(!testEndpoint)('set-dynamodb-state-to-running', () => {
     await claimInSetup('run-a');
 
     await expect(acquire('run-b')).rejects.toThrow(/Run run-a holds/);
+  });
+
+  test('lets an older commit run when a newer commit is claimed but not started', async () => {
+    await claimInSetup('run-a');
+    await claimInSetup('run-b', newerJob);
+
+    await expect(acquire('run-a')).resolves.toBe('superseded');
+    expect(await db.getState(job, 'running')).toMatchObject({
+      runId: 'run-b',
+      commitHash: 'beef001',
+      phase: 'claimed',
+    });
+  });
+
+  test('fails an older commit when a newer commit has started', async () => {
+    await claimInSetup('run-a');
+    await claimInSetup('run-b', newerJob);
+    await acquire('run-b', newerJob);
+
+    await expect(acquire('run-a')).rejects.toThrow(/Run run-b holds/);
   });
 
   test('post of the holding run records success and releases the claim', async () => {

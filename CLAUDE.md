@@ -141,7 +141,7 @@ Each action follows this pattern:
 
 ### State Values
 
-- `running`: A workflow run claimed the job and is executing it, or is about to. Records include the claiming `runId` (`GITHUB_RUN_ID`)
+- `running`: A workflow run claimed the job and is executing it, or is about to. Records include the claiming `runId` (`GITHUB_RUN_ID`) and a `phase`: `claimed` by the setup job, `started` by the build job
 - `success`: Job completed successfully
 - Records include the commit SHA and timestamp for version comparison
 

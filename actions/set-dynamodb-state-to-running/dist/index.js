@@ -28404,6 +28404,14 @@ function setFailed(message) {
 function error(message, properties = {}) {
     issueCommand('error', toCommandProperties(properties), message instanceof Error ? message.toString() : message);
 }
+/**
+ * Adds a notice issue
+ * @param message notice issue message. Errors will be converted to string via toString()
+ * @param properties optional properties to add to the annotation.
+ */
+function notice(message, properties = {}) {
+    issueCommand('notice', toCommandProperties(properties), message instanceof Error ? message.toString() : message);
+}
 //-----------------------------------------------------------------------
 // Wrapper action state
 //-----------------------------------------------------------------------
@@ -45365,7 +45373,7 @@ function superRefine(fn) {
     return _superRefine(fn);
 }
 
-object({
+const StateItemSchema = object({
     pk: string(),
     sk: string(),
     appPath: string(),
@@ -45374,6 +45382,9 @@ object({
     commitTs: number(),
     commitHash: string(),
     runId: string().optional(),
+    // Running items only: `claimed` by the setup job, `started` by the build
+    // job. Running items without it were written by a build job.
+    phase: _enum(['claimed', 'started']).optional(),
     ttl: number(),
 });
 const stateKey = (job, jobStatus) => ({
@@ -45389,7 +45400,7 @@ const getRunId = (env = process.env) => {
 };
 // Matched by name so a second bundled copy of the SDK cannot defeat instanceof.
 const isConditionalCheckFailed = (err) => err instanceof Error && err.name === 'ConditionalCheckFailedException';
-const claimRunningState = async ({ docClient, table, job, runId, now, ttlSeconds, }) => {
+const claimRunningState = async ({ docClient, table, job, runId, now, ttlSeconds, phase, }) => {
     const item = {
         ...stateKey(job, 'running'),
         appPath: job.context.app_path,
@@ -45398,6 +45409,7 @@ const claimRunningState = async ({ docClient, table, job, runId, now, ttlSeconds
         commitTs: job.context.last_commit.timestamp,
         commitHash: job.context.last_commit.hash,
         runId,
+        phase,
         ttl: now + ttlSeconds,
     };
     try {
@@ -45421,11 +45433,15 @@ const claimRunningState = async ({ docClient, table, job, runId, now, ttlSeconds
         if (!isConditionalCheckFailed(err)) {
             throw err;
         }
+        const held = err.Item;
+        const heldPhase = StateItemSchema.shape.phase.safeParse(held?.phase?.S);
         return {
             claimed: false,
             holder: {
-                runId: err.Item?.runId?.S,
-                commitHash: err.Item?.commitHash?.S,
+                runId: held?.runId?.S,
+                commitHash: held?.commitHash?.S,
+                commitTs: held?.commitTs?.N ? Number(held.commitTs.N) : undefined,
+                phase: heldPhase.success ? heldPhase.data : undefined,
             },
         };
     }
@@ -45538,10 +45554,24 @@ const JobSchema = object({
 });
 
 const run = async (params) => {
-    const claim = await claimRunningState(params);
-    if (!claim.claimed) {
-        throw new Error(`${params.job.context.label}: Run ${claim.holder.runId ?? '(unknown)'} holds the running state for commit ${claim.holder.commitHash ?? '(unknown)'}. A newer commit took it over, or this run's claim expired before this job started.`);
+    const { job } = params;
+    const claim = await claimRunningState({ ...params, phase: 'started' });
+    if (claim.claimed) {
+        return 'acquired';
     }
+    const { holder } = claim;
+    const holderIsNewer = holder.commitTs !== undefined &&
+        holder.commitTs > job.context.last_commit.timestamp;
+    const heldBy = `Run ${holder.runId ?? '(unknown)'} holds the running state for commit ${holder.commitHash ?? '(unknown)'}`;
+    // An older commit may still start while a newer commit is only claimed by
+    // its setup job. Only a newer commit that has started stops it.
+    if (holderIsNewer && holder.phase === 'claimed') {
+        notice(`${job.context.label}: ${heldBy}, which has not started yet. Running this older commit without holding the running state.`);
+        return 'superseded';
+    }
+    throw new Error(holderIsNewer
+        ? `${job.context.label}: ${heldBy}. A newer commit is already running.`
+        : `${job.context.label}: ${heldBy}. Another run claimed the same commit, for example after this run's claim expired.`);
 };
 
 const ACQUIRED_STATE = 'MONOTONIX_DYNAMODB_STATE_ACQUIRED';
@@ -45561,7 +45591,7 @@ const saveAwsCredentialsIntoState = () => {
         const jobJson = getInput('job');
         const job = JobSchema.parse(JSON.parse(jobJson));
         const ttlSeconds = parseDuration(getInput('running-ttl'));
-        await run({
+        const outcome = await run({
             docClient: DynamoDBDocumentClient.from(new DynamoDBClient({ region })),
             table,
             job,
@@ -45569,8 +45599,10 @@ const saveAwsCredentialsIntoState = () => {
             now: Math.floor(Date.now() / 1000),
             ttlSeconds,
         });
-        saveAwsCredentialsIntoState();
-        saveState(ACQUIRED_STATE, 'true');
+        if (outcome === 'acquired') {
+            saveAwsCredentialsIntoState();
+            saveState(ACQUIRED_STATE, 'true');
+        }
     }
     catch (error) {
         console.error(error);

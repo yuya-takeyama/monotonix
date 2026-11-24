@@ -45511,6 +45511,9 @@ const StateItemSchema = object({
     commitTs: number(),
     commitHash: string(),
     runId: string().optional(),
+    // Running items only: `claimed` by the setup job, `started` by the build
+    // job. Running items without it were written by a build job.
+    phase: _enum(['claimed', 'started']).optional(),
     ttl: number(),
 });
 const stateKey = (job, jobStatus) => ({
@@ -45526,7 +45529,7 @@ const getRunId = (env = process.env) => {
 };
 // Matched by name so a second bundled copy of the SDK cannot defeat instanceof.
 const isConditionalCheckFailed = (err) => err instanceof Error && err.name === 'ConditionalCheckFailedException';
-const claimRunningState = async ({ docClient, table, job, runId, now, ttlSeconds, }) => {
+const claimRunningState = async ({ docClient, table, job, runId, now, ttlSeconds, phase, }) => {
     const item = {
         ...stateKey(job, 'running'),
         appPath: job.context.app_path,
@@ -45535,6 +45538,7 @@ const claimRunningState = async ({ docClient, table, job, runId, now, ttlSeconds
         commitTs: job.context.last_commit.timestamp,
         commitHash: job.context.last_commit.hash,
         runId,
+        phase,
         ttl: now + ttlSeconds,
     };
     try {
@@ -45558,11 +45562,15 @@ const claimRunningState = async ({ docClient, table, job, runId, now, ttlSeconds
         if (!isConditionalCheckFailed(err)) {
             throw err;
         }
+        const held = err.Item;
+        const heldPhase = StateItemSchema.shape.phase.safeParse(held?.phase?.S);
         return {
             claimed: false,
             holder: {
-                runId: err.Item?.runId?.S,
-                commitHash: err.Item?.commitHash?.S,
+                runId: held?.runId?.S,
+                commitHash: held?.commitHash?.S,
+                commitTs: held?.commitTs?.N ? Number(held.commitTs.N) : undefined,
+                phase: heldPhase.success ? heldPhase.data : undefined,
             },
         };
     }
@@ -45746,6 +45754,7 @@ const run = async ({ docClient, table, jobs, runId, now, ttlSeconds, }) => {
             runId,
             now,
             ttlSeconds,
+            phase: 'claimed',
         });
         if (!claim.claimed) {
             info(`${job.context.label}: ${job.context.last_commit.hash}: Skip: Job is already claimed by run ${claim.holder.runId ?? '(unknown)'} for commit ${claim.holder.commitHash ?? '(unknown)'}`);
