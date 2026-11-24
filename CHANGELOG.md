@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## [0.0.12] - 2026-11-24
+
 ### Fixed
 
 - **Breaking**: `filter-jobs-by-dynamodb-state` now claims each job it keeps in a new claimed state that names the workflow run (`GITHUB_RUN_ID`), and drops a job that another run has claimed for the same or a newer commit. When two workflow runs start seconds apart, only one of them keeps the job. Before, both kept it and the second one failed in `set-dynamodb-state-to-running` with `ConditionalCheckFailedException`. The build order in `set-dynamodb-state-to-running` is unchanged. An older commit fails when it starts while a newer commit's running state exists, and still builds when a newer commit has only claimed the job. Upgrade `filter-jobs-by-dynamodb-state` and `set-dynamodb-state-to-running` together, because an older `set-dynamodb-state-to-running` does not release claims. `filter-jobs-by-dynamodb-state` now needs `dynamodb:PutItem` and has a `claim-ttl` input (default `15m`). It also skips a job that another run is still building for the same or a newer commit. If a run is cancelled or fails after `filter-jobs-by-dynamodb-state` and before its build job reaches `set-dynamodb-state-to-running`, its claim blocks that job for the same commit until `claim-ttl` passes. [#243](https://github.com/yuya-takeyama/monotonix/pull/243)
