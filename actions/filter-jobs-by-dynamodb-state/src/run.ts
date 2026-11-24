@@ -1,32 +1,31 @@
 import { info, warning } from '@actions/core';
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, QueryCommand } from '@aws-sdk/lib-dynamodb';
-import { StateItem, StateItemSchema } from '@monotonix/dynamodb-common';
+import {
+  type DynamoDBDocumentClient,
+  QueryCommand,
+} from '@aws-sdk/lib-dynamodb';
+import {
+  acquireState,
+  type StateItem,
+  StateItemSchema,
+} from '@monotonix/dynamodb-common';
 import { Jobs } from '@monotonix/schema';
-import { z } from 'zod';
 
 type runParam = {
-  jobs: Jobs;
-  table: string;
-  region: string;
-};
-export const run = async ({ jobs, table, region }: runParam): Promise<Jobs> => {
-  const client = new DynamoDBClient({ region });
-  const docClient = DynamoDBDocumentClient.from(client);
-
-  return filterJobs({
-    docClient,
-    jobs,
-    table,
-  });
-};
-
-type filterJobsParams = {
   docClient: DynamoDBDocumentClient;
   table: string;
   jobs: Jobs;
+  runId: string;
+  now: number;
+  ttlSeconds: number;
 };
-const filterJobs = async ({ docClient, table, jobs }: filterJobsParams) => {
+export const run = async ({
+  docClient,
+  table,
+  jobs,
+  runId,
+  now,
+  ttlSeconds,
+}: runParam): Promise<Jobs> => {
   const firstJob = jobs[0];
 
   if (!firstJob) {
@@ -36,89 +35,95 @@ const filterJobs = async ({ docClient, table, jobs }: filterJobsParams) => {
   const res = await docClient.send(
     new QueryCommand({
       TableName: table,
+      ConsistentRead: true,
       KeyConditionExpression: 'pk = :pk',
       ExpressionAttributeValues: {
         ':pk': `STATE#${firstJob.context.dedupe_key}`,
       },
     }),
   );
+  const { successTimestamps, runningStates } = toStates(res.Items ?? []);
 
-  if (res.Items && res.Items.length > 0) {
-    return filterJobsByAppJobStatuses(jobs, transofrmItems(res.Items));
-  } else {
-    return jobs;
-  }
-};
-
-const filterJobsByAppJobStatuses = (
-  jobs: Jobs,
-  appJobStatuses: AppJobStatuses,
-) => {
-  return jobs.filter(job => {
-    const appJobStatus =
-      appJobStatuses[`${job.context.app_path}#${job.context.job_key}`];
-    if (appJobStatus) {
-      if (
-        appJobStatus.successTs &&
-        appJobStatus.successTs >= job.context.last_commit.timestamp
-      ) {
-        info(
-          `${job.context.label}: ${job.context.last_commit.hash}: Skip: Job is already in success state`,
-        );
-        return false;
-      }
-      if (
-        appJobStatus.runningTs &&
-        appJobStatus.runningTs >= job.context.last_commit.timestamp
-      ) {
-        info(
-          `${job.context.label}: ${job.context.last_commit.hash}: Skip: Job is already in running state`,
-        );
-        return false;
-      }
+  const unfinishedJobs = jobs.filter(job => {
+    const successTs = successTimestamps.get(
+      `${job.context.app_path}#${job.context.job_key}`,
+    );
+    if (
+      successTs !== undefined &&
+      successTs >= job.context.last_commit.timestamp
+    ) {
+      info(
+        `${job.context.label}: ${job.context.last_commit.hash}: Skip: Job is already in success state`,
+      );
+      return false;
+    }
+    const running = runningStates.get(
+      `${job.context.app_path}#${job.context.job_key}`,
+    );
+    if (
+      running &&
+      running.runId !== runId &&
+      (running.commitTs > job.context.last_commit.timestamp ||
+        (running.commitTs === job.context.last_commit.timestamp &&
+          running.ttl >= now))
+    ) {
+      info(
+        `${job.context.label}: ${job.context.last_commit.hash}: Skip: Job is already running in run ${running.runId ?? '(unknown)'} for commit ${running.commitHash}`,
+      );
+      return false;
     }
     return true;
   });
+
+  const claimedJobs = await Promise.all(
+    unfinishedJobs.map(async job => {
+      const claim = await acquireState({
+        docClient,
+        table,
+        job,
+        jobStatus: 'claimed',
+        runId,
+        now,
+        ttlSeconds,
+      });
+      if (!claim.acquired) {
+        info(
+          `${job.context.label}: ${job.context.last_commit.hash}: Skip: Job is already claimed by run ${claim.holder.runId ?? '(unknown)'} for commit ${claim.holder.commitHash ?? '(unknown)'}`,
+        );
+        return undefined;
+      }
+      return job;
+    }),
+  );
+
+  return claimedJobs.filter(job => job !== undefined);
 };
 
-const AppJobStatusSchema = z.object({
-  appPath: z.string(),
-  jobKey: z.string(),
-  runningTs: z.number().optional(),
-  successTs: z.number().optional(),
-});
+type RunningState = Pick<
+  StateItem,
+  'commitTs' | 'commitHash' | 'runId' | 'ttl'
+>;
 
-const AppJobStatusesSchema = z.record(z.string(), AppJobStatusSchema);
-type AppJobStatuses = z.infer<typeof AppJobStatusesSchema>;
-
-const transofrmItems = (items: unknown[]): AppJobStatuses => {
-  const appJobStatuses: AppJobStatuses = {};
+const toStates = (items: unknown[]) => {
+  const successTimestamps = new Map<string, number>();
+  const runningStates = new Map<string, RunningState>();
 
   for (const item of items) {
-    let stateItem: StateItem | null = null;
     const result = StateItemSchema.safeParse(item);
-    if (result.success) {
-      stateItem = result.data;
-      const appJobStatus =
-        appJobStatuses[`${stateItem.appPath}#${stateItem.jobKey}`];
-      if (!appJobStatus) {
-        appJobStatuses[`${stateItem.appPath}#${stateItem.jobKey}`] = {
-          appPath: stateItem.appPath,
-          jobKey: stateItem.jobKey,
-          [`${stateItem.jobStatus}Ts`]: stateItem.commitTs,
-        };
-      } else {
-        appJobStatuses[`${stateItem.appPath}#${stateItem.jobKey}`] = {
-          ...appJobStatus,
-          [`${stateItem.jobStatus}Ts`]: stateItem.commitTs,
-        };
-      }
-    } else {
+    if (!result.success) {
       warning(
         `Failed to parse state item: ${result.error}: ${JSON.stringify(item)}`,
       );
+      continue;
+    }
+    const key = `${result.data.appPath}#${result.data.jobKey}`;
+    if (result.data.jobStatus === 'success') {
+      successTimestamps.set(key, result.data.commitTs);
+    }
+    if (result.data.jobStatus === 'running') {
+      runningStates.set(key, result.data);
     }
   }
 
-  return appJobStatuses;
+  return { successTimestamps, runningStates };
 };

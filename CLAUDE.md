@@ -20,9 +20,9 @@ The actions work together in a specific sequence:
 
 1. `load-jobs`: Scans for `monotonix.yaml` files and loads job configurations
 2. `filter-jobs-by-changed-files`: Filters jobs based on changed files in commit/PR
-3. `filter-jobs-by-dynamodb-state`: Filters out already running/completed jobs using DynamoDB
+3. `filter-jobs-by-dynamodb-state`: Skips completed jobs and claims the rest for this workflow run in DynamoDB, dropping jobs another run already claimed
 4. `load-docker-build-job-params`: Enriches Docker jobs with registry configs from global config
-5. `set-dynamodb-state-to-running`: Marks jobs as running and handles post-completion state updates
+5. `set-dynamodb-state-to-running`: Marks the job as running at the start of the build job, failing when the same or a newer commit is already running, and handles post-completion state updates
 
 ### Key Concepts
 
@@ -136,11 +136,22 @@ Each action follows this pattern:
 ### Schema
 
 - Partition Key: `STATE#{dedupe_key}` (e.g., `STATE#pr/123`, `STATE#refs/heads/main`)
-- Sort Key: `{app_path}#{job_key}` (e.g., `apps/echo#build_prd`)
+- Sort Key: `{app_path}#{job_key}#{status}` (e.g., `apps/echo#build_prd#running`)
 - TTL: Automatic cleanup of old states
 
 ### State Values
 
-- `running`: Job is currently executing
+- `claimed`: Written by `filter-jobs-by-dynamodb-state` for each job it keeps. Decides which workflow run builds a commit
+- `running`: Written by `set-dynamodb-state-to-running` when the build job starts. Decides the order in which commits build
 - `success`: Job completed successfully
-- Records include commit SHA for version comparison
+- Records include the commit SHA and timestamp for version comparison. `claimed` and `running` records also include the `runId` (`GITHUB_RUN_ID`) that holds them
+- `claimed` and `running` are written with the same conditional put (`acquireState` in `@monotonix/dynamodb-common`), and the post step of `set-dynamodb-state-to-running` deletes both when its own run holds them (`releaseState`)
+
+### Integration Tests
+
+Tests that need DynamoDB run only when `MONOTONIX_DYNAMODB_ENDPOINT` is set, and are skipped otherwise. To run them locally:
+
+```bash
+docker run -d --rm -p 8000:8000 amazon/dynamodb-local
+MONOTONIX_DYNAMODB_ENDPOINT=http://localhost:8000 pnpm run test
+```

@@ -6,7 +6,8 @@
       "outputs": ["dist/**"]
     },
     "test": {
-      "dependsOn": ["build"]
+      "dependsOn": ["build"],
+      "env": ["MONOTONIX_DYNAMODB_ENDPOINT"]
     }
   }
 }

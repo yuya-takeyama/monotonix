@@ -1,4 +1,5 @@
-import { parseDuration } from './utils';
+import { describe, expect, test } from 'vitest';
+import { parseDuration } from './index';
 
 describe('parseDuration', () => {
   const validTestCases = [

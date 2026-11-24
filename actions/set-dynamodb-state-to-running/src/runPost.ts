@@ -1,84 +1,51 @@
-import { notice } from '@actions/core';
+import { info, notice } from '@actions/core';
+import { type DynamoDBDocumentClient, PutCommand } from '@aws-sdk/lib-dynamodb';
 import {
-  ConditionalCheckFailedException,
-  DynamoDBClient,
-} from '@aws-sdk/client-dynamodb';
-import {
-  DeleteCommand,
-  DynamoDBDocumentClient,
-  PutCommand,
-} from '@aws-sdk/lib-dynamodb';
-import { StateItem } from '@monotonix/dynamodb-common';
+  type HeldStatus,
+  isConditionalCheckFailed,
+  releaseState,
+  StateItem,
+  stateKey,
+} from '@monotonix/dynamodb-common';
 import { Job } from '@monotonix/schema';
 
 type runPostParam = {
-  job: Job;
-  jobStatus: 'success' | 'failure' | 'cancelled';
+  docClient: DynamoDBDocumentClient;
   table: string;
-  region: string;
+  job: Job;
+  acquired: boolean;
+  jobStatus: 'success' | 'failure' | 'cancelled';
+  runId: string;
   ttl: number;
 };
 export const runPost = async ({
+  docClient,
   table,
-  region,
   job,
+  acquired,
   jobStatus,
+  runId,
   ttl,
 }: runPostParam): Promise<void> => {
-  const client = new DynamoDBClient({
-    region,
-    credentials: {
-      accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
-      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
-      sessionToken: process.env.AWS_SESSION_TOKEN!,
-    },
-  });
-  const docClient = DynamoDBDocumentClient.from(client);
-  const pk = `STATE#${job.context.dedupe_key}`;
-
   try {
-    if (jobStatus === 'success') {
-      await putSuccessState({ job, table, docClient, pk, ttl });
-    }
-  } catch (err) {
-    if (err instanceof ConditionalCheckFailedException) {
-      notice(
-        `${job.context.label}: A newer or the same commit is already in success state`,
-      );
-      // No need to let it fail
-    } else {
-      throw err;
+    if (acquired && jobStatus === 'success') {
+      await putSuccessState({ docClient, table, job, ttl });
     }
   } finally {
-    try {
-      await deleteRunningState({ job, table, docClient, pk });
-    } catch (err) {
-      if (err instanceof ConditionalCheckFailedException) {
-        notice(`${job.context.label}: A newer commit is already running`);
-        // No need to let it fail
-      } else {
-        console.error(`Failed to delete running state: ${err}`);
-      }
+    for (const heldStatus of ['running', 'claimed'] as const) {
+      await releaseHeldState({ docClient, table, job, runId, heldStatus });
     }
   }
 };
 
 const putSuccessState = async ({
-  job,
-  table,
   docClient,
-  pk,
+  table,
+  job,
   ttl,
-}: {
-  job: Job;
-  table: string;
-  docClient: DynamoDBDocumentClient;
-  pk: string;
-  ttl: number;
-}) => {
+}: Pick<runPostParam, 'docClient' | 'table' | 'job' | 'ttl'>) => {
   const item: StateItem = {
-    pk,
-    sk: `${job.context.app_path}#${job.context.job_key}#success`,
+    ...stateKey(job, 'success'),
     appPath: job.context.app_path,
     jobKey: job.context.job_key,
     jobStatus: 'success',
@@ -86,41 +53,51 @@ const putSuccessState = async ({
     commitHash: job.context.last_commit.hash,
     ttl,
   };
-  return docClient.send(
-    new PutCommand({
-      TableName: table,
-      Item: item,
-      ConditionExpression:
-        'attribute_not_exists(commitTs) OR commitTs < :newCommitTs',
-      ExpressionAttributeValues: {
-        ':newCommitTs': job.context.last_commit.timestamp,
-      },
-    }),
-  );
+  try {
+    await docClient.send(
+      new PutCommand({
+        TableName: table,
+        Item: item,
+        ConditionExpression:
+          'attribute_not_exists(commitTs) OR commitTs < :newCommitTs',
+        ExpressionAttributeValues: {
+          ':newCommitTs': job.context.last_commit.timestamp,
+        },
+      }),
+    );
+  } catch (err) {
+    if (!isConditionalCheckFailed(err)) {
+      throw err;
+    }
+    notice(
+      `${job.context.label}: A newer or the same commit is already in success state`,
+    );
+  }
 };
 
-const deleteRunningState = async ({
-  job,
-  table,
+const releaseHeldState = async ({
   docClient,
-  pk,
-}: {
-  job: Job;
-  table: string;
-  docClient: DynamoDBDocumentClient;
-  pk: string;
+  table,
+  job,
+  runId,
+  heldStatus,
+}: Pick<runPostParam, 'docClient' | 'table' | 'job' | 'runId'> & {
+  heldStatus: HeldStatus;
 }) => {
-  return docClient.send(
-    new DeleteCommand({
-      TableName: table,
-      Key: {
-        pk,
-        sk: `${job.context.app_path}#${job.context.job_key}#running`,
-      },
-      ConditionExpression: 'commitTs = :commitTs',
-      ExpressionAttributeValues: {
-        ':commitTs': job.context.last_commit.timestamp,
-      },
-    }),
-  );
+  try {
+    const released = await releaseState({
+      docClient,
+      table,
+      job,
+      jobStatus: heldStatus,
+      runId,
+    });
+    if (!released) {
+      info(
+        `${job.context.label}: Left the ${heldStatus} state in place because this run does not hold it`,
+      );
+    }
+  } catch (err) {
+    console.error(`Failed to delete ${heldStatus} state: ${err}`);
+  }
 };

@@ -1,23 +1,33 @@
-import { getInput, setFailed } from '@actions/core';
+import { getInput, saveState, setFailed } from '@actions/core';
+import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
+import { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
+import { getRunId, parseDuration } from '@monotonix/dynamodb-common';
 import { JobSchema } from '@monotonix/schema';
 import { run } from './run';
-import { parseDuration } from './utils';
+import { ACQUIRED_STATE, saveAwsCredentialsIntoState } from './utils';
 
-try {
-  const table = getInput('dynamodb-table');
-  const region = getInput('dynamodb-region');
-  const jobJson = getInput('job');
-  const job = JobSchema.parse(JSON.parse(jobJson));
-  const ttlDuration = parseDuration(getInput('running-ttl'));
-  const ttl = Math.floor(Date.now() / 1000) + ttlDuration;
+(async () => {
+  try {
+    // Saved first, so the post step can release this run's claim even when
+    // this step fails.
+    saveAwsCredentialsIntoState();
+    const table = getInput('dynamodb-table');
+    const region = getInput('dynamodb-region');
+    const jobJson = getInput('job');
+    const job = JobSchema.parse(JSON.parse(jobJson));
+    const ttlSeconds = parseDuration(getInput('running-ttl'));
 
-  run({
-    table,
-    region,
-    job,
-    ttl,
-  });
-} catch (error) {
-  console.error(error);
-  setFailed(`Action failed with error: ${error}`);
-}
+    await run({
+      docClient: DynamoDBDocumentClient.from(new DynamoDBClient({ region })),
+      table,
+      job,
+      runId: getRunId(),
+      now: Math.floor(Date.now() / 1000),
+      ttlSeconds,
+    });
+    saveState(ACQUIRED_STATE, 'true');
+  } catch (error) {
+    console.error(error);
+    setFailed(`Action failed with error: ${error}`);
+  }
+})();
