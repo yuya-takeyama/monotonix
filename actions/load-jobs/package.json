@@ -18,9 +18,9 @@
     "@monotonix/utils": "workspace:*",
     "ajv": "^8.20.0",
     "ajv-formats": "^3.0.0",
-    "glob": "13.0.6",
+    "glob": "14.0.6",
     "js-yaml": "^4.3.2",
-    "minimatch": "10.2.5",
+    "minimatch": "11.0.9",
     "zod": "4.6.6"
   },
   "devDependencies": {
