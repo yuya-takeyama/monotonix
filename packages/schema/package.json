@@ -18,11 +18,11 @@
     "test": "vitest run --config ../../vitest.config.ts"
   },
   "dependencies": {
-    "zod": "4.3.6"
+    "zod": "4.6.6"
   },
   "devDependencies": {
     "@types/node": "24.10.9",
     "typescript": "5.9.3",
-    "vitest": "4.1.9"
+    "vitest": "4.1.12"
   }
 }
