@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Fixed
+
+- **Breaking**: `filter-jobs-by-dynamodb-state` now claims each job it keeps by writing its running state with the workflow run ID (`GITHUB_RUN_ID`). When two workflow runs start seconds apart, only one of them keeps the job. Before, both kept it and the second one failed in `set-dynamodb-state-to-running` with `ConditionalCheckFailedException`. Upgrade `filter-jobs-by-dynamodb-state` and `set-dynamodb-state-to-running` together, because an older `set-dynamodb-state-to-running` rejects the claim. `filter-jobs-by-dynamodb-state` now needs `dynamodb:PutItem` and has a `running-ttl` input (default `1h`). If a run is cancelled after its setup job and before its build job reaches `set-dynamodb-state-to-running`, its claim blocks that job for the same commit until `running-ttl` passes. [#TBD](https://github.com/yuya-takeyama/monotonix/pull/TBD)
+- `set-dynamodb-state-to-running` reports a failed claim with `setFailed` instead of an unhandled promise rejection, and its post step does nothing when the main step did not acquire the running state. The post step deletes the running state only when its own run holds it. Before, the post step of a run that failed to start deleted the running state of the run that was still building. [#TBD](https://github.com/yuya-takeyama/monotonix/pull/TBD)
+- An expired running state no longer blocks new runs while it waits for DynamoDB TTL to delete it. [#TBD](https://github.com/yuya-takeyama/monotonix/pull/TBD)
+
 ## [0.0.11] - 2026-08-21
 
 ### Added

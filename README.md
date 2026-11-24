@@ -280,6 +280,26 @@ For jobs that push to Google Cloud Artifact Registry, replace the second `aws-ac
 
 State tracking (`filter-jobs-by-dynamodb-state` / `set-dynamodb-state-to-running`) is DynamoDB-based regardless of registry provider, so the AWS credentials steps for state management remain required even when images are pushed to Google Cloud.
 
+### How state tracking keeps one run per job
+
+`filter-jobs-by-dynamodb-state` decides which jobs a workflow run builds. It skips a job whose commit is already in success state. It claims every other job by writing a running state that names the workflow run (`GITHUB_RUN_ID`). The write is conditional, so when two runs filter the same job at the same time, only one of them claims and keeps it. The other run drops the job and logs which run claimed it.
+
+`set-dynamodb-state-to-running` runs at the start of the build job. It accepts the claim that its own setup job made, and it fails if another run holds the job. Its post step records success and deletes the running state only when its own run holds it.
+
+A claim stops blocking other runs when one of these happens:
+
+- The build job of the run that holds it finishes.
+- Its `running-ttl` passes. Expired claims are ignored even before DynamoDB TTL deletes them.
+- A run for a newer commit of the app claims the job.
+
+To keep claims accurate, set up the workflow this way:
+
+- Run `filter-jobs-by-dynamodb-state` after the other job filters, so every job it keeps reaches a build job.
+- Run `set-dynamodb-state-to-running` in every build job that gets its jobs from `filter-jobs-by-dynamodb-state`.
+- Use the same version of `filter-jobs-by-dynamodb-state` and `set-dynamodb-state-to-running`.
+
+If a run is cancelled after its setup job and before its build job reaches `set-dynamodb-state-to-running`, its claim blocks that job for the same commit until `running-ttl` passes. A re-run of the same workflow run keeps its claim, because the run ID does not change.
+
 ## AWS Setup
 
 ### 1. Create DynamoDB Table
@@ -299,7 +319,7 @@ Create IAM roles with the following permissions:
 
 #### State Manager Role
 
-For DynamoDB state management operations:
+For DynamoDB state management operations. `filter-jobs-by-dynamodb-state` uses `dynamodb:Query` and `dynamodb:PutItem`, and `set-dynamodb-state-to-running` uses `dynamodb:PutItem` and `dynamodb:DeleteItem`:
 
 ```json
 {
@@ -307,7 +327,7 @@ For DynamoDB state management operations:
   "Statement": [
     {
       "Effect": "Allow",
-      "Action": ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:Query"],
+      "Action": ["dynamodb:DeleteItem", "dynamodb:PutItem", "dynamodb:Query"],
       "Resource": "arn:aws:dynamodb:*:*:table/monotonix-state"
     }
   ]
@@ -471,6 +491,12 @@ Monotonix is designed to be extensible beyond Docker builds. You can define any 
          matrix:
            job: ${{ fromJSON(needs.setup.outputs.jobs) }}
        steps:
+         # ... AWS credentials step for state management
+         - uses: yuya-takeyama/monotonix/actions/set-dynamodb-state-to-running@main
+           with:
+             dynamodb-table: monotonix-state
+             dynamodb-region: YOUR-REGION
+             job: ${{ toJSON(matrix.job) }}
          # ... your custom execution steps
    ```
 

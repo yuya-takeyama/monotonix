@@ -5,6 +5,9 @@ import {
   setOutput,
   warning,
 } from '@actions/core';
+import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
+import { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
+import { getRunId, parseDuration } from '@monotonix/dynamodb-common';
 import { JobsSchema } from '@monotonix/schema';
 import { publishJobsResult, readJobsJsonInput } from '@monotonix/utils';
 import { run } from './run';
@@ -23,11 +26,16 @@ import { run } from './run';
       );
     }
     const jobs = JobsSchema.parse(JSON.parse(jobsJson));
+    const ttlSeconds = parseDuration(getInput('running-ttl'));
+    const runId = getRunId();
 
     const result = await run({
-      jobs,
+      docClient: DynamoDBDocumentClient.from(new DynamoDBClient({ region })),
       table,
-      region,
+      jobs,
+      runId,
+      now: Math.floor(Date.now() / 1000),
+      ttlSeconds,
     });
 
     publishJobsResult({

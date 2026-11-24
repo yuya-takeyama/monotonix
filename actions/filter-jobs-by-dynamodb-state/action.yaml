@@ -12,6 +12,9 @@ inputs:
   dynamodb-region:
     description: 'DynamoDB Region'
     required: true
+  running-ttl:
+    description: 'TTL for the running state each kept job is claimed with (format: 1d, 1h, 1m, 1s)'
+    default: '1h'
 
 outputs:
   result:

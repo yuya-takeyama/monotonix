@@ -374,6 +374,15 @@ importers:
 
   packages/dynamodb-common:
     dependencies:
+      '@aws-sdk/client-dynamodb':
+        specifier: 3.1075.0
+        version: 3.1075.0
+      '@aws-sdk/lib-dynamodb':
+        specifier: 3.1075.0
+        version: 3.1075.0(@aws-sdk/client-dynamodb@3.1075.0)
+      '@monotonix/schema':
+        specifier: workspace:*
+        version: link:../schema
       zod:
         specifier: 4.3.6
         version: 4.3.6
