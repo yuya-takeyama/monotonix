@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## [0.0.13] - 2026-11-24
+
 ### Fixed
 
 - Update vulnerable dependencies, including `glob` 14 and `minimatch` 11 in `load-apps` and `load-jobs` [#245](https://github.com/yuya-takeyama/monotonix/pull/245)
