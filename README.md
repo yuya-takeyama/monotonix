@@ -298,7 +298,7 @@ To keep claims accurate, set up the workflow this way:
 - Run `set-dynamodb-state-to-running` in every build job that gets its jobs from `filter-jobs-by-dynamodb-state`.
 - Use the same version of `filter-jobs-by-dynamodb-state` and `set-dynamodb-state-to-running`.
 
-If a run is cancelled after its setup job and before its build job reaches `set-dynamodb-state-to-running`, its claim blocks that job for the same commit until `running-ttl` passes. A re-run of the same workflow run keeps its claim, because the run ID does not change.
+If a run is cancelled or fails after its setup job and before its build job reaches `set-dynamodb-state-to-running`, its claim blocks that job for the same commit until `running-ttl` passes. A re-run of the same workflow run keeps its claim, because the run ID does not change.
 
 ## AWS Setup
 
